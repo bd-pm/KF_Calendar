@@ -1138,7 +1138,7 @@ function renderGoods(bot, evtsOnDay){
       <div class="goods-hdr-title">${goodsTitle}</div>
       <div class="goods-hdr-sub">${goodsSub}</div>
     </div>
-    <button class="see-all" onclick="window.open('https://global.bunjang.com','_blank')">See all →</button>
+    <button class="see-all" onclick="window.open('https://globalbunjang.com','_blank')">See all →</button>
   `;
   bot.appendChild(ghdr);
 
@@ -1192,7 +1192,7 @@ function renderGoods_grid(container, list){
 
     const fallbackEmoji=catInfo.emoji||'📦';
     const brandLabel=item.brand||g.label;
-    const productUrl=item.id?`https://global.bunjang.com/products/${item.id}`:'';
+    const productUrl=item.id?`https://globalbunjang.com/product/${item.id}`:'';
     const imgSrc=item.imageUrl?(location.protocol==='file:'?item.imageUrl:`/api/image?url=${encodeURIComponent(item.imageUrl)}`):'';
     const imgHtml=imgSrc
       ? `<img src="${imgSrc}" alt="${item.name}" loading="lazy" onerror="this.classList.add('err')">`
@@ -1211,7 +1211,7 @@ function renderGoods_grid(container, list){
         <div class="gcard-name">${item.name}</div>
         <div class="gcard-bottom">
           <div class="gcard-price">₩${item.price.toLocaleString()}<span>KRW</span></div>
-          <div class="cart-btn" onclick="event.stopPropagation();${productUrl?`window.open('${productUrl}','_blank')`:`window.open('https://global.bunjang.com','_blank')`}">
+          <div class="cart-btn" onclick="event.stopPropagation();${productUrl?`window.open('${productUrl}','_blank')`:`window.open('https://globalbunjang.com','_blank')`}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
               <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
@@ -1220,7 +1220,7 @@ function renderGoods_grid(container, list){
         </div>
       </div>
     `;
-    card.onclick=()=>{ window.open(productUrl||'https://global.bunjang.com','_blank'); };
+    card.onclick=()=>{ window.open(productUrl||'https://globalbunjang.com','_blank'); };
     grid.appendChild(card);
   });
 
