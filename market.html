@@ -379,6 +379,141 @@ body {
   display: flex; align-items: center; gap: 6px;
 }
 .fb-btn:hover { color: var(--accent); }
+
+/* ── 비교 플로팅 버튼 ── */
+.compare-fab {
+  position: fixed; bottom: 20px; left: 16px; z-index: 8000;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 22px; padding: 10px 18px;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer; box-shadow: 0 4px 18px rgba(155,111,216,0.45);
+  display: none; align-items: center; gap: 7px;
+  transition: all .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.compare-fab:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(155,111,216,0.55); }
+.compare-fab-badge {
+  background: #fff; color: var(--accent);
+  font-size: 11px; font-weight: 800;
+  width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── 담기 버튼 (카드 위) ── */
+.gcard { position: relative; }
+.add-compare-btn {
+  position: absolute; top: 8px; right: 8px; z-index: 5;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(255,255,255,0.9);
+  border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .18s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  font-size: 14px; color: var(--txt2);
+  -webkit-tap-highlight-color: transparent;
+}
+.add-compare-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.add-compare-btn.added { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ── 비교 모달 ── */
+.cmp-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+  z-index: 9500; display: flex; align-items: flex-end; justify-content: center;
+}
+.cmp-modal {
+  width: 100%; max-width: 600px;
+  background: linear-gradient(160deg, #F8F0FF 0%, #FFF0FA 100%);
+  border-radius: 24px 24px 0 0;
+  padding: 20px 20px 32px;
+  box-shadow: 0 -12px 60px rgba(0,0,0,0.2);
+  max-height: 90vh; overflow-y: auto;
+}
+.cmp-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: rgba(0,0,0,0.12); margin: 0 auto 18px;
+}
+.cmp-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.cmp-title { font-size: 16px; font-weight: 800; color: var(--txt1); }
+.cmp-close {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: rgba(0,0,0,0.06); border: none;
+  font-size: 18px; color: var(--txt2); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.cmp-grid {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(2, 1fr);
+}
+@media (min-width: 480px) { .cmp-grid { grid-template-columns: repeat(4, 1fr); } }
+.cmp-card {
+  background: #fff; border-radius: 14px;
+  border: 1.5px solid var(--border);
+  overflow: hidden; position: relative;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+.cmp-card-img {
+  width: 100%; aspect-ratio: 1/1; object-fit: cover;
+  background: rgba(240,235,255,0.5); display: block;
+}
+.cmp-card-img-ph {
+  width: 100%; aspect-ratio: 1/1;
+  background: linear-gradient(135deg,rgba(196,160,240,0.2),rgba(255,184,228,0.2));
+  display: flex; align-items: center; justify-content: center; font-size: 28px;
+}
+.cmp-card-body { padding: 8px 9px 10px; }
+.cmp-card-name {
+  font-size: 10.5px; font-weight: 600; color: var(--txt1);
+  line-height: 1.35; overflow: hidden; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  line-clamp: 2;
+  margin-bottom: 5px;
+}
+.cmp-card-price { font-size: 13px; font-weight: 800; color: var(--txt1); }
+.cmp-card-group {
+  font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 5px;
+  background: rgba(155,111,216,0.08); color: var(--accent);
+  border: 1px solid rgba(155,111,216,0.15);
+  display: inline-block; margin-top: 3px;
+}
+.cmp-remove {
+  position: absolute; top: 6px; right: 6px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(0,0,0,0.5); border: none;
+  color: #fff; font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+.cmp-empty-slot {
+  aspect-ratio: 1/1; border-radius: 14px;
+  border: 2px dashed var(--border2);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 6px; color: var(--txt3); font-size: 11px; font-weight: 600;
+  background: rgba(255,255,255,0.4);
+}
+.cmp-empty-slot-icon { font-size: 24px; opacity: .4; }
+.cmp-actions {
+  display: flex; gap: 10px; margin-top: 16px;
+}
+.cmp-save-btn {
+  flex: 1; padding: 12px; border-radius: 12px;
+  background: var(--accent); color: #fff;
+  border: none; font-size: 13px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: all .18s;
+}
+.cmp-save-btn:hover { opacity: .88; }
+.cmp-save-btn.secondary {
+  background: rgba(255,255,255,0.8); color: var(--accent);
+  border: 1.5px solid var(--accent);
+}
+.cmp-hint {
+  font-size: 10.5px; color: var(--txt3); text-align: center; margin-top: 10px;
+}
+@keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(8px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
 </style>
 </head>
 <body>
@@ -578,9 +713,11 @@ function isRare(item) {
 let allGoods = [];
 let activeGroup = 'all';
 let activeTag = 'all';
-let sortMode = 'price_asc'; // price_asc | price_desc
+let sortMode = 'price_desc'; // price_desc 기본 (높은 가격순)
 let visibleCount = 20;
 const PAGE_SIZE = 20;
+const MAX_COMPARE = 4;
+let compareList = []; // 비교 담은 상품 목록
 
 /* ══════════════════════════════════════
    데이터 fetch
@@ -632,7 +769,7 @@ function filtered() {
   }
   // 정렬
   if (sortMode === 'price_asc') list = [...list].sort((a, b) => a.price - b.price);
-  else list = [...list].sort((a, b) => b.price - a.price);
+  else list = [...list].sort((a, b) => b.price - a.price); // 기본: 높은 가격순
   return list;
 }
 
@@ -708,19 +845,26 @@ function cardHTML(item) {
     ? `<img class="gcard-img" src="${item.imageUrl}" alt="${escHtml(item.name)}" loading="lazy">`
     : `<div class="gcard-img-placeholder">🃏</div>`;
 
+  const inCompare = compareList.some(c => c.id === item.id);
+  const addedClass = inCompare ? ' added' : '';
+  const addedIcon = inCompare ? '✓' : '+';
+
   return `
-    <a class="gcard" href="${bunjangUrl}" target="_blank" rel="noopener">
+    <div class="gcard" data-id="${item.id}">
       ${rareBadge}
-      ${img}
-      <div class="gcard-body">
-        ${tagBadges ? `<div class="gcard-tags">${tagBadges}</div>` : ''}
-        <div class="gcard-name">${escHtml(item.name)}</div>
-        <div class="gcard-footer">
-          <div class="gcard-price">₩${item.price?.toLocaleString()}</div>
-          <div class="gcard-group ${item.group}">${groupLabel}</div>
+      <button class="add-compare-btn${addedClass}" onclick="toggleCompare('${item.id}',event)" title="비교에 담기">${addedIcon}</button>
+      <a href="${bunjangUrl}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:block;">
+        ${img}
+        <div class="gcard-body">
+          ${tagBadges ? `<div class="gcard-tags">${tagBadges}</div>` : ''}
+          <div class="gcard-name">${escHtml(item.name)}</div>
+          <div class="gcard-footer">
+            <div class="gcard-price">₩${item.price?.toLocaleString()}</div>
+            <div class="gcard-group ${item.group}">${groupLabel}</div>
+          </div>
         </div>
-      </div>
-    </a>`;
+      </a>
+    </div>`;
 }
 
 /* ══════════════════════════════════════
@@ -852,9 +996,10 @@ document.getElementById('relatedRow').addEventListener('click', e => {
 });
 
 // 정렬
+document.getElementById('sortBtn').textContent = '가격순 ↓'; // 초기: 높은순
 document.getElementById('sortBtn').addEventListener('click', () => {
-  sortMode = sortMode === 'price_asc' ? 'price_desc' : 'price_asc';
-  document.getElementById('sortBtn').textContent = sortMode === 'price_asc' ? '가격순 ↑' : '가격순 ↓';
+  sortMode = sortMode === 'price_desc' ? 'price_asc' : 'price_desc';
+  document.getElementById('sortBtn').textContent = sortMode === 'price_desc' ? '가격순 ↓' : '가격순 ↑';
   gaEvent('sort_change', { sort: sortMode });
   visibleCount = PAGE_SIZE;
   render();
@@ -866,6 +1011,181 @@ document.getElementById('loadMoreBtn').addEventListener('click', () => {
   gaEvent('load_more', { tag: activeTag, group: activeGroup, page: Math.floor(visibleCount / PAGE_SIZE) });
   render();
 });
+
+/* ══════════════════════════════════════
+   비교 기능
+══════════════════════════════════════ */
+function toggleCompare(id, e) {
+  e.preventDefault(); e.stopPropagation();
+  const item = allGoods.find(i => i.id === id);
+  if (!item) return;
+  const idx = compareList.findIndex(c => c.id === id);
+  if (idx >= 0) {
+    compareList.splice(idx, 1);
+  } else {
+    if (compareList.length >= MAX_COMPARE) {
+      showCompareToast(`최대 ${MAX_COMPARE}개까지 담을 수 있어요`);
+      return;
+    }
+    compareList.push(item);
+    showCompareToast('비교함에 담았어요 ✓');
+  }
+  updateCompareFab();
+  // 해당 카드 버튼만 업데이트
+  const btn = document.querySelector(`.gcard[data-id="${id}"] .add-compare-btn`);
+  if (btn) {
+    const inList = compareList.some(c => c.id === id);
+    btn.classList.toggle('added', inList);
+    btn.textContent = inList ? '✓' : '+';
+  }
+}
+
+function updateCompareFab() {
+  const fab = document.getElementById('compareFab');
+  const badge = document.getElementById('compareBadge');
+  badge.textContent = compareList.length;
+  fab.style.display = compareList.length > 0 ? 'flex' : 'none';
+}
+
+function showCompareToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+    background:var(--txt1);color:#fff;padding:8px 18px;border-radius:20px;
+    font-size:12px;font-weight:600;z-index:9999;white-space:nowrap;
+    box-shadow:0 4px 16px rgba(0,0,0,0.2);animation:toastIn .2s ease`;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 1800);
+}
+
+function openCompareModal() {
+  if (document.getElementById('cmp-overlay')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'cmp-overlay';
+  overlay.className = 'cmp-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  overlay.innerHTML = `
+    <div class="cmp-modal" id="cmpModal">
+      <div class="cmp-handle"></div>
+      <div class="cmp-header">
+        <div class="cmp-title">🃏 포카 비교하기</div>
+        <button class="cmp-close" onclick="document.getElementById('cmp-overlay').remove()">×</button>
+      </div>
+      <div class="cmp-grid" id="cmpGrid"></div>
+      <div class="cmp-actions">
+        <button class="cmp-save-btn secondary" onclick="clearCompare()">
+          <span>🗑</span> 전체 비우기
+        </button>
+        <button class="cmp-save-btn" onclick="saveCompareImage()">
+          <span>📸</span> 이미지로 저장
+        </button>
+      </div>
+      <div class="cmp-hint">저장한 이미지를 커뮤니티에 공유해봐!</div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  renderCompareGrid();
+}
+
+function renderCompareGrid() {
+  const grid = document.getElementById('cmpGrid');
+  if (!grid) return;
+  const slots = [];
+  for (let i = 0; i < MAX_COMPARE; i++) {
+    const item = compareList[i];
+    if (item) {
+      const groupLabel = { bts: 'BTS', seventeen: 'SVT', enhypen: 'ENHYPEN' }[item.group] || item.group.toUpperCase();
+      const tags = classifyItem(item.name);
+      const tagLabel = tags.length ? (TAG_RULES.find(r => r.tag === tags[0])?.label || '') : '';
+      const imgEl = item.imageUrl
+        ? `<img class="cmp-card-img" src="${item.imageUrl}" alt="${escHtml(item.name)}" crossorigin="anonymous">`
+        : `<div class="cmp-card-img-ph">🃏</div>`;
+      slots.push(`
+        <div class="cmp-card">
+          ${imgEl}
+          <button class="cmp-remove" onclick="removeFromCompare('${item.id}')">×</button>
+          <div class="cmp-card-body">
+            ${tagLabel ? `<div style="font-size:9px;color:var(--accent);font-weight:700;margin-bottom:3px">${tagLabel}</div>` : ''}
+            <div class="cmp-card-name">${escHtml(item.name)}</div>
+            <div class="cmp-card-price">₩${item.price?.toLocaleString()}</div>
+            <div class="cmp-card-group">${groupLabel}</div>
+          </div>
+        </div>`);
+    } else {
+      slots.push(`
+        <div class="cmp-empty-slot">
+          <div class="cmp-empty-slot-icon">＋</div>
+          <div>카드를 담아봐</div>
+        </div>`);
+    }
+  }
+  grid.innerHTML = slots.join('');
+}
+
+function removeFromCompare(id) {
+  compareList = compareList.filter(c => c.id !== id);
+  updateCompareFab();
+  renderCompareGrid();
+  // 그리드 카드 버튼 상태 업데이트
+  const btn = document.querySelector(`.gcard[data-id="${id}"] .add-compare-btn`);
+  if (btn) { btn.classList.remove('added'); btn.textContent = '+'; }
+  if (compareList.length === 0) document.getElementById('cmp-overlay')?.remove();
+}
+
+function clearCompare() {
+  compareList.forEach(item => {
+    const btn = document.querySelector(`.gcard[data-id="${item.id}"] .add-compare-btn`);
+    if (btn) { btn.classList.remove('added'); btn.textContent = '+'; }
+  });
+  compareList = [];
+  updateCompareFab();
+  document.getElementById('cmp-overlay')?.remove();
+}
+
+async function saveCompareImage() {
+  const btn = document.querySelector('.cmp-save-btn:last-child');
+  const origText = btn.innerHTML;
+  btn.innerHTML = '⏳ 저장 중…'; btn.disabled = true;
+
+  // html2canvas 동적 로드
+  if (!window.html2canvas) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  try {
+    const modal = document.getElementById('cmpModal');
+    // 저장 전 액션바/힌트 임시 숨김
+    const actions = modal.querySelector('.cmp-actions');
+    const hint = modal.querySelector('.cmp-hint');
+    const closeBtn = modal.querySelector('.cmp-close');
+    actions.style.display = 'none'; hint.style.display = 'none'; closeBtn.style.display = 'none';
+
+    const canvas = await html2canvas(modal, {
+      backgroundColor: '#F8F0FF',
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+    });
+
+    actions.style.display = ''; hint.style.display = ''; closeBtn.style.display = '';
+
+    const link = document.createElement('a');
+    link.download = `포카비교_${new Date().toLocaleDateString('ko-KR').replace(/\./g,'-').trim()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch {
+    alert('이미지 저장 중 오류가 발생했어요. 잠시 후 다시 시도해봐!');
+  }
+
+  btn.innerHTML = origText; btn.disabled = false;
+}
 
 // 초기 로드
 loadGoods();
@@ -955,6 +1275,12 @@ async function submitFeedback() {
   }
 }
 </script>
+
+<!-- 비교 플로팅 버튼 -->
+<button class="compare-fab" id="compareFab" onclick="openCompareModal()">
+  <span>비교하기</span>
+  <span class="compare-fab-badge" id="compareBadge">0</span>
+</button>
 
 <!-- 피드백 플로팅 버튼 -->
 <div class="fb-btn" onclick="openFeedbackModal()">
