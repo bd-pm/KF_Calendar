@@ -537,6 +537,18 @@ body {
 <!-- ═══ MAIN ═══ -->
 <main class="main" id="main">
 
+  <!-- 캘린더 이벤트 연동 배너 (URL 파라미터 있을 때만 표시) -->
+  <div id="contextBanner" style="display:none;margin:12px 16px 0;border-radius:12px;padding:12px 14px;border:1.5px solid rgba(155,111,216,0.25);background:rgba(245,240,255,0.85);backdrop-filter:blur(8px)">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+      <div>
+        <div id="contextBannerEyebrow" style="font-size:10px;font-weight:700;color:#9B6FD8;letter-spacing:.4px;margin-bottom:3px"></div>
+        <div id="contextBannerTitle" style="font-size:13px;font-weight:800;color:#2A1F3D"></div>
+        <div id="contextBannerDesc" style="font-size:11px;color:#8B7BAB;margin-top:2px"></div>
+      </div>
+      <button onclick="clearContextBanner()" style="background:none;border:none;font-size:16px;color:#C0B0D8;cursor:pointer;padding:0;flex-shrink:0;line-height:1">×</button>
+    </div>
+  </div>
+
   <!-- 그룹 선택 -->
   <div class="group-section">
     <div class="group-section-title">그룹 선택</div>
@@ -687,31 +699,107 @@ function groupTagStyle(group) {
   return `color:${c};background:rgba(${r},${g},${b},0.08);border-color:rgba(${r},${g},${b},0.22)`;
 }
 
+// ── LIVE 분류 규칙 (index.html과 동일한 키워드 세트) ──
 const TAG_RULES = [
   {
-    tag: 'workshop',
-    label: '공방 포카',
-    keywords: ['공방', '공개방송', '뮤직뱅크공방', '음중공방', '인기가요공방', 'show공방'],
+    tag: 'concert',
+    label: '콘서트 현장 한정',
+    icon: '🎤',
+    desc: '공연 입장 특전 · 현장 한정',
+    color: '#D04060',
+    keywords: [
+      '아미존','armyzone','army zone','입장특전','현장수령','현장한정',
+      '콘서트 포카','콘포카','공연포카','아미부스',
+      '첫콘','중콘','막콘','고양콘','부산콘','캐럿존','엔진존',
+      'cgv 특전','cgv 포카','라이브뷰잉 특전',
+    ],
   },
   {
     tag: 'fansign',
-    label: '팬싸 포카',
-    keywords: ['팬싸', '팬사인', '사인회', '팬미팅 포카', 'fansign'],
+    label: '팬사인 · 사인회',
+    icon: '✍️',
+    desc: '팬사인회 참석자 한정 · 직촬포 · POB',
+    color: '#3060C0',
+    keywords: [
+      '팬싸포','팬싸 포카','팬사인 포카','사인회포카','직촬포','직촬 포카','직찍',
+      '역조공','쇼케이스포','쇼케포카','쇼케 포카','쇼케이스 특전',
+      '위뮤포','위드뮤 포카','사운드웨이브 포카','사운드웨이브 럭키드로우','사운드웨이브 럭드',
+      '뮤직플랜트 포카','뮤플 포카','뮤직플랜트 럭드','뮤직플랜트 럭키드로우',
+      '예스24 포카','예스포','알라딘 포카','알라딘포','교보 포카','교보포',
+      '이즈위 포카','이즈위 특전','이즈위 럭드',
+      '팬싸','팬사인','사인회',
+    ],
   },
   {
-    tag: 'concert',
-    label: '콘서트 포카',
-    keywords: ['콘서트', '투어', 'concert', 'tour', '콘 포카', '아미존', '팬존', '중콘', '첫콘'],
+    tag: 'workshop',
+    label: '공방 · 공개방송',
+    icon: '🎬',
+    desc: '방청 한정 지급 · 300명 이하 극희귀',
+    color: '#B06000',
+    keywords: [
+      '공방포카','공방 포카','공방포','공방 특전',
+      '공개방송 포카','방청 포카','방청포카','방청특전',
+      '뮤직뱅크 포카','음악중심 포카','인기가요 포카','쇼챔피언 포카','엠카운트다운 포카',
+      '공방','공개방송','뮤직뱅크공방','음중공방','인기가요공방',
+    ],
   },
   {
-    tag: 'broadcast',
-    label: '방송 포카',
-    keywords: ['뮤직뱅크', '음악중심', '인기가요', '쇼챔피언', 'inkigayo', 'music bank', '시상식', '멜론뮤직', '엠마', '가온'],
+    tag: 'lucky',
+    label: '럭키드로우',
+    icon: '🎰',
+    desc: '추첨 한정 · 위버스 / 플랫폼 럭드',
+    color: '#7020B0',
+    keywords: [
+      '럭키드로우','럭드','lucky draw',
+      '위버스 럭드','위버스 럭키드로우','weverse 럭드',
+      '유니버셜 럭드','유니버셜 럭키드로우',
+    ],
+  },
+  {
+    tag: 'popup',
+    label: '팝업 · 전시 한정',
+    icon: '🏪',
+    desc: '팝업스토어 / 전시회 현장 한정',
+    color: '#905010',
+    keywords: [
+      '팝업 포카','팝업포카','팝업 특전','팝업한정','팝업스토어 포카',
+      '전시회 포카','전시 포카','전시한정','전시회팝업',
+      '하우스 오브 뱀파이어 포카','하우스오브뱀파이어',
+    ],
+  },
+  {
+    tag: 'membership',
+    label: '멤버십 한정',
+    icon: '🎫',
+    desc: '팬클럽 회원 전용 · 헌혈 포카',
+    color: '#0060A0',
+    keywords: [
+      '멤버십키트 포카','멤버십 포카','멤버십 특전','멤버십키트 특전',
+      '캐럿반 포카','캐럿반포카','엔진반 특전',
+      '헌혈포카','헌혈 포카',
+    ],
   },
   {
     tag: 'album',
     label: '앨범 버전 포카',
-    keywords: ['위드뮤', '사운드웨이브', '예스24', '알라딘', '교보', '핫트랙', 'weverse앨범', '버전포카', '버전 포카', '앨범 특전', '앨범특전'],
+    icon: '💿',
+    desc: '앨범 동봉 · 플랫폼 특전',
+    color: '#207040',
+    keywords: [
+      '위드뮤','사운드웨이브','예스24','알라딘','교보','핫트랙',
+      'weverse앨범','버전포카','버전 포카','앨범 특전','앨범특전',
+    ],
+  },
+  {
+    tag: 'broadcast',
+    label: '방송 포카',
+    icon: '📺',
+    desc: '음방 · 시상식 현장 특전',
+    color: '#8020C0',
+    keywords: [
+      '뮤직뱅크','음악중심','인기가요','쇼챔피언','inkigayo','music bank',
+      '시상식','멜론뮤직','엠마','가온',
+    ],
   },
 ];
 
@@ -799,19 +887,59 @@ function filtered() {
 }
 
 function updateCounts() {
-  const tags = ['all', 'concert', 'fansign', 'workshop', 'album', 'broadcast'];
-  tags.forEach(tag => {
-    const el = document.getElementById('cnt-' + tag);
-    if (!el) return;
-    let list = allGoods;
-    if (activeGroup !== 'all') list = list.filter(i => i.group === activeGroup);
-    if (tag === 'all') {
-      el.textContent = list.length + '개';
-    } else {
-      const n = list.filter(i => classifyItem(i.name).includes(tag)).length;
-      el.textContent = n + '개';
-    }
+  let list = allGoods;
+  if (activeGroup !== 'all') list = list.filter(i => i.group === activeGroup);
+
+  // 테마 카드 카운트 (기존 고정 ID)
+  const themeIds = { all: list.length };
+  TAG_RULES.forEach(rule => {
+    themeIds[rule.tag] = list.filter(i => classifyItem(i.name).includes(rule.tag)).length;
   });
+  Object.entries(themeIds).forEach(([tag, n]) => {
+    const el = document.getElementById('cnt-' + tag);
+    if (el) el.textContent = n + '개';
+  });
+
+  // 탭바 카운트
+  const tabAll = document.getElementById('cnt-tab-all');
+  if (tabAll) tabAll.textContent = list.length;
+  TAG_RULES.forEach(rule => {
+    const el = document.getElementById('cnt-tab-' + rule.tag);
+    if (!el) return;
+    const n = list.filter(i => classifyItem(i.name).includes(rule.tag)).length;
+    el.textContent = n > 0 ? n : '';
+  });
+
+  // 테마 카드 섹션을 TAG_RULES 기반으로 동적 재구성 (최초 1회)
+  if (!updateCounts._built) {
+    updateCounts._built = true;
+    const themeRow = document.getElementById('themeRow');
+    if (themeRow) {
+      themeRow.innerHTML = `
+        <div class="theme-card active" data-tag="all">
+          <div class="theme-card-icon">✨</div>
+          <div class="theme-card-label">전체 매물</div>
+          <div class="theme-card-desc">모든 이벤트의 굿즈를 한눈에</div>
+          <div class="theme-card-count" id="cnt-all">—</div>
+        </div>` +
+        TAG_RULES.map(rule => `
+        <div class="theme-card" data-tag="${rule.tag}">
+          <div class="theme-card-icon">${rule.icon}</div>
+          <div class="theme-card-label">${rule.label}</div>
+          <div class="theme-card-desc">${rule.desc}</div>
+          <div class="theme-card-count" id="cnt-${rule.tag}">—</div>
+        </div>`).join('');
+      // 테마카드 클릭 이벤트 재바인딩
+      themeRow.querySelectorAll('[data-tag]').forEach(card => {
+        card.addEventListener('click', () => setTag(card.dataset.tag));
+      });
+    }
+    // 카운트 재적용
+    Object.entries(themeIds).forEach(([tag, n]) => {
+      const el = document.getElementById('cnt-' + tag);
+      if (el) el.textContent = n + '개';
+    });
+  }
 }
 
 /* ══════════════════════════════════════
@@ -1205,6 +1333,88 @@ async function saveCompareImage() {
 
   btn.innerHTML = origText; btn.disabled = false;
 }
+
+// ── URL 파라미터 처리 ──
+// index.html 이벤트 클릭 → market.html?group=bts&live=concert&event=ARIRANG+World+Tour
+(function initFromURL() {
+  const params = new URLSearchParams(location.search);
+  const group = params.get('group');
+  const liveType = params.get('live');
+  const eventName = params.get('event');
+
+  // 그룹 자동 선택
+  if (group) {
+    activeGroup = group;
+    document.querySelectorAll('[data-group]').forEach(c => {
+      c.classList.toggle('on', c.dataset.group === group);
+    });
+  }
+
+  // LIVE 태그 자동 선택
+  if (liveType) {
+    const matchRule = TAG_RULES.find(r => r.tag === liveType);
+    if (matchRule) {
+      activeTag = liveType;
+      document.querySelectorAll('.tag-tab').forEach(el => {
+        el.classList.toggle('on', el.dataset.tag === liveType);
+      });
+      document.querySelectorAll('.theme-card').forEach(el => {
+        el.classList.toggle('active', el.dataset.tag === liveType);
+      });
+    }
+  }
+
+  // 컨텍스트 배너 표시
+  if (group || liveType || eventName) {
+    const banner = document.getElementById('contextBanner');
+    const eyebrow = document.getElementById('contextBannerEyebrow');
+    const title = document.getElementById('contextBannerTitle');
+    const desc = document.getElementById('contextBannerDesc');
+
+    const groupLabels = { bts:'BTS', seventeen:'SEVENTEEN', enhypen:'ENHYPEN' };
+    const groupLabel = groupLabels[group] || (group||'').toUpperCase();
+
+    const liveRule = TAG_RULES.find(r => r.tag === liveType);
+
+    if (liveRule) {
+      eyebrow.textContent = `📅 캘린더 연동 · ${groupLabel}`;
+      title.textContent = `${liveRule.icon} ${liveRule.label}`;
+      desc.textContent = eventName
+        ? `"${decodeURIComponent(eventName)}" · ${liveRule.desc}`
+        : liveRule.desc;
+      // 배너 색상을 LIVE 타입 컬러로
+      banner.style.borderColor = liveRule.color + '44';
+      banner.style.background = liveRule.color + '0F';
+      eyebrow.style.color = liveRule.color;
+    } else if (group) {
+      eyebrow.textContent = '📅 캘린더 연동';
+      title.textContent = `${groupLabel} 관련 굿즈`;
+      desc.textContent = eventName
+        ? `"${decodeURIComponent(eventName)}" 관련 매물`
+        : `${groupLabel} 전체 매물`;
+    }
+
+    banner.style.display = 'block';
+  }
+})();
+
+function clearContextBanner() {
+  document.getElementById('contextBanner').style.display = 'none';
+}
+
+// 탭바에 새 태그 동적 추가 (TAG_RULES 기반)
+(function buildTagBar() {
+  const row = document.getElementById('tagRow');
+  // 기존 탭 초기화 후 TAG_RULES로 재구성
+  row.innerHTML = `<div class="tag-tab on" data-tag="all"><span class="ticon">✨</span> 전체 <span id="cnt-tab-all" style="font-size:10px;opacity:.6"></span></div>`;
+  TAG_RULES.forEach(rule => {
+    const tab = document.createElement('div');
+    tab.className = 'tag-tab';
+    tab.dataset.tag = rule.tag;
+    tab.innerHTML = `<span class="ticon">${rule.icon}</span> ${rule.label.split('·')[0].trim()} <span id="cnt-tab-${rule.tag}" style="font-size:10px;opacity:.6"></span>`;
+    row.appendChild(tab);
+  });
+})();
 
 // 초기 로드
 loadGoods();

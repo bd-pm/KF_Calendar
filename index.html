@@ -457,6 +457,82 @@ body.theme-seventeen::before{
   padding:20px 16px;font-size:12.5px;color:var(--txt2);text-align:center;
 }
 
+/* ── LIVE 섹션 ── */
+.live-section{
+  margin:0 16px 12px;
+  border-radius:var(--r);
+  border:1.5px solid rgba(255,60,60,0.25);
+  background:rgba(255,245,245,0.7);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  overflow:hidden;
+}
+.live-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px 8px;
+  border-bottom:1px solid rgba(255,60,60,0.12);
+}
+.live-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:10px;font-weight:800;letter-spacing:.5px;
+  color:#CC2222;
+  padding:3px 8px 3px 6px;border-radius:6px;
+  background:rgba(255,60,60,0.1);border:1px solid rgba(255,60,60,0.2);
+}
+.live-badge-dot{
+  width:7px;height:7px;border-radius:50%;background:#FF3333;
+  animation:livePulse 1.4s ease-in-out infinite;
+}
+@keyframes livePulse{
+  0%,100%{opacity:1;transform:scale(1)}
+  50%{opacity:.5;transform:scale(.7)}
+}
+.live-label{
+  font-size:11.5px;font-weight:700;color:#991111;
+}
+.live-sub{
+  font-size:10px;color:rgba(150,50,50,.7);margin-top:1px;
+}
+.live-scroll{overflow-x:auto;scrollbar-width:none;padding:10px 12px 12px}
+.live-scroll::-webkit-scrollbar{display:none}
+.live-row{display:flex;gap:8px;width:max-content}
+.live-card{
+  width:105px;border-radius:var(--r-sm);
+  background:rgba(255,255,255,0.9);
+  border:1px solid rgba(255,100,100,0.2);
+  overflow:hidden;cursor:pointer;flex-shrink:0;
+  transition:all .18s;
+  text-decoration:none;display:block;color:inherit;
+  box-shadow:0 2px 8px rgba(255,80,80,0.08);
+  -webkit-tap-highlight-color:transparent;
+}
+.live-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(255,80,80,0.15)}
+.live-card-img{
+  width:100%;aspect-ratio:1/1;object-fit:cover;
+  background:rgba(255,240,240,0.6);display:block;
+}
+.live-card-body{padding:6px 8px 8px}
+.live-card-name{
+  font-size:10px;font-weight:600;color:#441111;
+  line-height:1.3;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  margin-bottom:4px;min-height:26px;
+}
+.live-card-price{font-size:12px;font-weight:800;color:#CC2222}
+
+/* ── 추천 섹션 헤더 ── */
+.rec-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:4px 16px 10px;
+}
+.rec-label{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:10px;font-weight:700;letter-spacing:.3px;
+  color:var(--accent);padding:3px 8px;border-radius:6px;
+  background:rgba(155,111,216,0.08);border:1px solid rgba(155,111,216,0.15);
+}
+.rec-title{font-size:13px;font-weight:700;color:var(--txt1);margin-top:3px}
+.rec-sub{font-size:11px;color:var(--txt2);margin-top:1px}
+
 /* type legend */
 .type-legend{
   position:sticky;top:144px;z-index:38;
@@ -972,33 +1048,162 @@ const GOODS_CATS = [
 ];
 
 // 실제 번장 카테고리ID + 상품명 키워드로 분류
-// catId 우선 → 키워드 보완
+// catId 우선 → 상품명 키워드 보완
 function classifyGoods(name, catId) {
   const c = String(catId||'');
   const n = (name||'').toLowerCase();
 
   // ── catId 기반 (정확도 높음) ──
-  if (c==='910100001') return 'photocard';   // 포토카드
-  if (c==='910100002') return 'lightstick';  // 응원봉/슬로건
-  if (c==='910100003') return 'photobook';   // 포토북/엽서
-  if (c==='910100004') return 'album';       // 앨범
-  if (c==='910100005') return 'poster';      // 포스터
-  if (c==='910100006') return 'md';          // 공방굿즈
-  if (c==='910100007') return 'photobook';   // 설정집/책자
-  if (c==='910100008') return 'plush';       // 인형
-  if (c==='910500001') return 'md';          // 위버스/공식MD
-  if (c==='910800008') return 'figure';      // 키링/파츠
+  if (c==='910100001') return 'photocard';
+  if (c==='910100002') return 'lightstick';
+  if (c==='910100003') return 'photobook';
+  if (c==='910100004') return 'album';
+  if (c==='910100005') return 'poster';
+  if (c==='910100006') return 'md';
+  if (c==='910100007') return 'photobook';
+  if (c==='910100008') return 'plush';
+  if (c==='910500001') return 'md';
+  if (c==='910800008') return 'figure';
 
-  // ── 키워드 보완 (catId 없거나 기타) ──
-  if (/포토카드|포카|photo\s?card/.test(n)) return 'photocard';
-  if (/응원봉|라이트스틱|lightstick|슬로건/.test(n)) return 'lightstick';
+  // ── 상품명 키워드 보완 ──
+  if (/포토카드|포카|photo\s?card|트레카/.test(n)) return 'photocard';
+  if (/응원봉|라이트스틱|lightstick|슬로건|우치와|이미지피켓/.test(n)) return 'lightstick';
   if (/앨범|album/.test(n)) return 'album';
-  if (/포토북|엽서|엽서북|photobook/.test(n)) return 'photobook';
+  if (/포토북|엽서|엽서북|photobook|도록|잡지/.test(n)) return 'photobook';
   if (/인형|doll|플러시/.test(n)) return 'plush';
   if (/포스터|poster/.test(n)) return 'poster';
   if (/키링|아크릴|배지|핀|파츠|keyring|acrylic/.test(n)) return 'figure';
   if (/후드|티셔츠|자켓|가방|수건|모자|cap|hoodie/.test(n)) return 'apparel';
   return 'md';
+}
+
+// ─────────────────────────────────────────
+//  LIVE 분류 엔진
+//  상품명(1순위) → catId/cat(2순위)로 LIVE 타입 판별
+// ─────────────────────────────────────────
+const LIVE_RULES = [
+  {
+    type: 'concert',
+    label: '콘서트 현장 한정',
+    desc: '이 공연 입장 특전 · 현장 한정 매물',
+    color: '#D04060',
+    bg: 'rgba(208,64,96,0.07)',
+    border: 'rgba(208,64,96,0.2)',
+    keywords: [
+      '아미존','armyzone','army zone','입장특전','현장수령','현장한정',
+      '콘서트 포카','콘포카','공연포카','아미부스',
+      '첫콘','중콘','막콘','고양콘','부산콘','캐럿존','엔진존',
+      'cgv 특전','cgv 포카','라이브뷰잉 특전',
+    ],
+    eventTypes: ['concert','tour'],
+  },
+  {
+    type: 'fansign',
+    label: '팬사인 · 사인회',
+    desc: '팬사인회 참석자 한정 · 행사 직후 매물',
+    color: '#3060C0',
+    bg: 'rgba(48,96,192,0.07)',
+    border: 'rgba(48,96,192,0.2)',
+    keywords: [
+      '팬싸포','팬싸 포카','팬사인 포카','사인회포카','직촬포','직촬 포카','직찍',
+      '역조공','쇼케이스포','쇼케포카','쇼케 포카','쇼케이스 특전',
+      // 응모용 앨범 포카 (플랫폼 POB)
+      '위뮤포','위드뮤 포카','사운드웨이브 포카','사운드웨이브 럭키드로우','사운드웨이브 럭드',
+      '뮤직플랜트 포카','뮤플 포카','뮤직플랜트 럭드','뮤직플랜트 럭키드로우',
+      '예스24 포카','예스포','알라딘 포카','알라딘포','교보 포카','교보포',
+      '이즈위 포카','이즈위 특전','이즈위 럭드',
+    ],
+    eventTypes: ['fansign'],
+  },
+  {
+    type: 'gonbang',
+    label: '공방 · 공개방송',
+    desc: '방청 한정 지급 · 300명 이하 극희귀',
+    color: '#B06000',
+    bg: 'rgba(176,96,0,0.07)',
+    border: 'rgba(176,96,0,0.2)',
+    keywords: [
+      '공방포카','공방 포카','공방포','공방 특전',
+      '공개방송 포카','방청 포카','방청포카','방청특전',
+      '뮤직뱅크 포카','음악중심 포카','인기가요 포카','쇼챔피언 포카','엠카운트다운 포카',
+    ],
+    eventTypes: ['special'],
+  },
+  {
+    type: 'fancon',
+    label: '팬콘 · 팬미팅',
+    desc: '팬콘 / 팬미팅 현장 한정 매물',
+    color: '#207040',
+    bg: 'rgba(32,112,64,0.07)',
+    border: 'rgba(32,112,64,0.2)',
+    keywords: [
+      '캐럿랜드 포카','캐럿랜드포카','캐럿랜드 특전',
+      '팬미팅 포카','팬미팅포카','팬미팅 특전',
+      '팬콘 포카','팬콘포카','팬콘 특전',
+      '엔진반 포카','엔진반포카',
+      '뉴 앙콘 캐럿존','앙콘 캐럿존','뉴앙콘 캐럿존',
+    ],
+    eventTypes: ['fancon','fanmeeting'],
+  },
+  {
+    type: 'lucky',
+    label: '럭키드로우',
+    desc: '추첨 한정 지급 · 위버스 / 플랫폼 럭드',
+    color: '#7020B0',
+    bg: 'rgba(112,32,176,0.07)',
+    border: 'rgba(112,32,176,0.2)',
+    keywords: [
+      '럭키드로우','럭드','lucky draw',
+      '위버스 럭드','위버스 럭키드로우','weverse 럭드',
+      '유니버셜 럭드','유니버셜 럭키드로우',
+    ],
+    eventTypes: ['comeback','release'],
+  },
+  {
+    type: 'popup',
+    label: '팝업 · 전시 한정',
+    desc: '팝업스토어 / 전시회 현장 한정 매물',
+    color: '#905010',
+    bg: 'rgba(144,80,16,0.07)',
+    border: 'rgba(144,80,16,0.2)',
+    keywords: [
+      '팝업 포카','팝업포카','팝업 특전','팝업한정','팝업스토어 포카',
+      '전시회 포카','전시 포카','전시한정','전시회팝업',
+      '하우스 오브 뱀파이어 포카','하우스오브뱀파이어',
+    ],
+    eventTypes: ['special'],
+  },
+  {
+    type: 'membership',
+    label: '멤버십 한정',
+    desc: '팬클럽 회원 전용 지급 굿즈',
+    color: '#0060A0',
+    bg: 'rgba(0,96,160,0.07)',
+    border: 'rgba(0,96,160,0.2)',
+    keywords: [
+      '멤버십키트 포카','멤버십 포카','멤버십 특전','멤버십키트 특전',
+      '캐럿반 포카','캐럿반포카','엔진반 특전',
+      '헌혈포카','헌혈 포카',
+    ],
+    eventTypes: ['special'],
+  },
+];
+
+// 상품명 → LIVE 타입 반환 (없으면 null)
+// 1순위: 상품명 키워드 / 2순위: cat 힌트
+function detectLiveType(name, cat) {
+  const n = (name||'').toLowerCase();
+  for (const rule of LIVE_RULES) {
+    if (rule.keywords.some(k => n.includes(k.toLowerCase()))) {
+      return rule.type;
+    }
+  }
+  return null;
+}
+
+// 이벤트 타입 → 매칭되는 LIVE 룰들
+function liveRulesForEventType(eventType) {
+  return LIVE_RULES.filter(r => r.eventTypes.includes(eventType));
 }
 
 function parseGoodsRow(row) {
@@ -1388,53 +1593,61 @@ function keywordScore(itemName, keywords) {
   return score;
 }
 
-function renderGoods(bot, evtsOnDay){
-  // ── 어떤 그룹·이벤트 기준으로 보여줄지 결정 ──
-  let featuredGroups=[];
-  let goodsTitle='', goodsSub='';
-  let priorityCats=[];
-  let matchKeywords=[];  // 키워드 매칭용
+function escHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
+function renderGoods(bot, evtsOnDay){
+  // ── 컨텍스트 결정 ──
+  let targetGroup = activeGroup;
+  let targetEvent = null;
   if(selectedEventId){
-    const evt=EVENTS.find(e=>e.id===selectedEventId);
-    if(evt){
-      featuredGroups=[evt.group];
-      const g=groupOf(evt.group);
-      priorityCats=TYPE_CAT_PRIORITY[evt.type]||[];
-      matchKeywords=extractKeywords(evt.name);
-      goodsTitle=`${g.label} · ${TYPE_LABEL[evt.type]||evt.type} Picks`;
-      goodsSub=evt.name;
-    }
-  } else if(evtsOnDay.length){
-    featuredGroups=[activeGroup];
-    const types=[...new Set(evtsOnDay.map(e=>e.type))];
-    const catScores={};
-    types.forEach(t=>{
-      (TYPE_CAT_PRIORITY[t]||[]).forEach((cat,i)=>{
-        catScores[cat]=(catScores[cat]||0)+(10-i);
-      });
-    });
-    priorityCats=Object.entries(catScores).sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
-    // 당일 모든 이벤트 키워드 합산
-    matchKeywords=[...new Set(evtsOnDay.flatMap(e=>extractKeywords(e.name)))];
-    goodsTitle='Today\'s Picks';
-    goodsSub=`Based on ${evtsOnDay.length} event${evtsOnDay.length>1?'s':''} · Tap an event to filter`;
-  } else {
-    featuredGroups=[activeGroup];
-    goodsTitle=`${groupOf(activeGroup).label} Popular Items`;
-    goodsSub='Latest listings on Bunjang Global';
+    targetEvent = EVENTS.find(e=>e.id===selectedEventId);
+    if(targetEvent) targetGroup = targetEvent.group;
+  } else if(evtsOnDay.length === 1){
+    targetEvent = evtsOnDay[0];
   }
 
-  // ── 상품 수집 ──
-  let goodsList=[];
-  featuredGroups.forEach(gid=>{
-    (GOODS[gid]||[]).forEach(item=>goodsList.push({...item,groupId:gid}));
+  const groupPool = (GOODS[targetGroup]||[]).map(i=>({...i, groupId:targetGroup}));
+
+  // ── LAYER 1: LIVE 매물 분류 ──
+  // 이벤트가 선택된 경우 해당 이벤트 타입에 맞는 LIVE 룰만, 없으면 모든 룰
+  const applicableRules = targetEvent
+    ? liveRulesForEventType(targetEvent.type)
+    : LIVE_RULES;
+
+  const liveItems = [];
+  const liveTypeMap = new Map(); // itemId → liveType
+  groupPool.forEach(item => {
+    const lt = detectLiveType(item.name, item.cat);
+    if(lt && applicableRules.some(r=>r.type===lt)){
+      liveItems.push(item);
+      liveTypeMap.set(item.id, lt);
+    }
   });
 
-  // ── 정렬: 키워드 매칭 점수 → 카테고리 우선순위 → 나머지 ──
-  goodsList.sort((a,b)=>{
-    const ks = keywordScore(b.name, matchKeywords) - keywordScore(a.name, matchKeywords);
-    if(ks !== 0) return ks;
+  // ── LAYER 2: 추천 매물 (LIVE 아닌 것) ──
+  const liveIds = new Set(liveItems.map(i=>i.id));
+  const recItems = groupPool.filter(i=>!liveIds.has(i.id));
+
+  // 추천 정렬: 이벤트 타입별 카테고리 우선순위 → 키워드 매칭
+  const evtTypes = targetEvent
+    ? [targetEvent.type]
+    : [...new Set(evtsOnDay.map(e=>e.type))];
+  const catScores={};
+  evtTypes.forEach(t=>{
+    (TYPE_CAT_PRIORITY[t]||[]).forEach((cat,i)=>{
+      catScores[cat]=(catScores[cat]||0)+(10-i);
+    });
+  });
+  const priorityCats=Object.entries(catScores).sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
+  const matchKeywords = targetEvent
+    ? extractKeywords(targetEvent.name)
+    : [...new Set(evtsOnDay.flatMap(e=>extractKeywords(e.name)))];
+
+  recItems.sort((a,b)=>{
+    const ks = keywordScore(b.name,matchKeywords) - keywordScore(a.name,matchKeywords);
+    if(ks!==0) return ks;
     if(priorityCats.length){
       const ai=priorityCats.indexOf(a.cat), bi=priorityCats.indexOf(b.cat);
       return (ai===-1?999:ai)-(bi===-1?999:bi);
@@ -1442,30 +1655,86 @@ function renderGoods(bot, evtsOnDay){
     return 0;
   });
 
-  // ── 카테고리 필터 적용 ──
-  const filtered = activeGoodsCat==='all'
-    ? goodsList
-    : goodsList.filter(item=>item.cat===activeGoodsCat);
+  const g = groupOf(targetGroup);
 
-  // ── 헤더 ──
-  const topMatched = goodsList.filter(i=>keywordScore(i.name,matchKeywords)>0).length;
-  const subText = matchKeywords.length && topMatched > 0
-    ? `${goodsSub} · ${topMatched} keyword matches`
-    : goodsSub;
-  const ghdr=document.createElement('div');
-  ghdr.className='goods-hdr';
-  ghdr.innerHTML=`
-    <div class="goods-hdr-l">
-      <div class="goods-hdr-title">${goodsTitle}</div>
-      <div class="goods-hdr-sub">${subText}</div>
+  // ── LIVE 섹션 렌더 ──
+  if(liveItems.length > 0){
+    const liveRule = applicableRules.find(r=>r.type===liveTypeMap.get(liveItems[0].id)) || LIVE_RULES[0];
+    const liveSection = document.createElement('div');
+    liveSection.className='live-section';
+    liveSection.style.borderColor = liveRule.border;
+    liveSection.style.background = liveRule.bg;
+
+    // 헤더
+    const lhdr = document.createElement('div');
+    lhdr.className='live-header';
+    lhdr.innerHTML=`
+      <div>
+        <div class="live-badge" style="color:${liveRule.color};background:${liveRule.bg};border-color:${liveRule.border}">
+          <span class="live-badge-dot" style="background:${liveRule.color}"></span>
+          LIVE · ${liveRule.label}
+        </div>
+        <div class="live-label" style="color:${liveRule.color}">${liveRule.desc}</div>
+        <div class="live-sub">${liveItems.length}개 매물 등록됨</div>
+      </div>
+      <a href="market.html?group=${targetGroup}&live=${liveRule.type}" target="_blank"
+         style="font-size:11px;font-weight:600;color:${liveRule.color};text-decoration:none;white-space:nowrap">전체 보기 →</a>
+    `;
+    liveSection.appendChild(lhdr);
+
+    // 가로 스크롤 카드
+    const scroll = document.createElement('div');
+    scroll.className='live-scroll';
+    const row = document.createElement('div');
+    row.className='live-row';
+    liveItems.slice(0,12).forEach(item=>{
+      const url=`https://bunjang.global/product/${item.id}`;
+      const imgSrc=item.imageUrl?(location.protocol==='file:'?item.imageUrl:`/api/image?url=${encodeURIComponent(item.imageUrl)}`):'';
+      const a=document.createElement('a');
+      a.className='live-card';
+      a.href=url; a.target='_blank'; a.rel='noopener';
+      a.innerHTML=`
+        ${imgSrc?`<img class="live-card-img" src="${imgSrc}" alt="${escHtml(item.name)}" loading="lazy" onerror="this.style.display='none'">`
+          :`<div class="live-card-img" style="display:flex;align-items:center;justify-content:center;font-size:28px">🃏</div>`}
+        <div class="live-card-body">
+          <div class="live-card-name">${escHtml(item.name)}</div>
+          <div class="live-card-price" style="color:${liveRule.color}">₩${item.price.toLocaleString()}</div>
+        </div>`;
+      row.appendChild(a);
+    });
+    scroll.appendChild(row);
+    liveSection.appendChild(scroll);
+    bot.appendChild(liveSection);
+  }
+
+  // ── 추천 섹션 헤더 ──
+  const recLabel = targetEvent
+    ? REC_LABEL[targetEvent.type] || '이 일정 관련 굿즈'
+    : evtsOnDay.length ? '오늘 일정 관련 굿즈' : `${g.label} 인기 매물`;
+  const recDesc = targetEvent
+    ? targetEvent.name
+    : evtsOnDay.length
+      ? `${evtsOnDay.length}개 일정 기준 · 이벤트를 탭하면 필터됩니다`
+      : 'Bunjang Global 최신 매물';
+
+  const recEyebrow = targetEvent
+    ? (REC_EYEBROW[targetEvent.type] || '💡 이 일정 관련 굿즈')
+    : (evtsOnDay.length ? '💡 오늘 일정 기준' : '🛍️ 인기 매물');
+
+  const rhdr=document.createElement('div');
+  rhdr.className='rec-header';
+  rhdr.innerHTML=`
+    <div>
+      <div class="rec-label">${recEyebrow}</div>
+      <div class="rec-title">${recLabel}</div>
+      <div class="rec-sub">${escHtml(recDesc)}</div>
     </div>
-    <button class="see-all" onclick="window.open('https://globalbunjang.com','_blank')">See all →</button>
+    <button class="see-all" onclick="window.open('market.html?group=${targetGroup}${targetEvent?'&event='+encodeURIComponent(targetEvent.name):''}','_blank')">See all →</button>
   `;
-  bot.appendChild(ghdr);
+  bot.appendChild(rhdr);
 
   // ── 카테고리 필터 칩 ──
-  // 현재 상품 목록에 실제로 있는 카테고리만 표시
-  const presentCats=new Set(goodsList.map(i=>i.cat));
+  const presentCats=new Set(recItems.map(i=>i.cat));
   const filterEl=document.createElement('div');
   filterEl.className='goods-filter';
   GOODS_CATS.forEach(cat=>{
@@ -1475,7 +1744,8 @@ function renderGoods(bot, evtsOnDay){
     chip.textContent=`${cat.emoji} ${cat.label}`;
     chip.onclick=()=>{
       activeGoodsCat=cat.id;
-      renderGoods_grid(gridContainer, activeGoodsCat==='all'?goodsList:goodsList.filter(i=>i.cat===activeGoodsCat));
+      const filtered2=activeGoodsCat==='all'?recItems:recItems.filter(i=>i.cat===activeGoodsCat);
+      renderGoods_grid(gridContainer, filtered2);
       filterEl.querySelectorAll('.gf-chip').forEach(c=>c.classList.remove('on'));
       chip.classList.add('on');
     };
@@ -1483,11 +1753,34 @@ function renderGoods(bot, evtsOnDay){
   });
   bot.appendChild(filterEl);
 
-  // ── 그리드 컨테이너 (칩 클릭 시 이 부분만 교체) ──
+  // ── 추천 그리드 ──
   const gridContainer=document.createElement('div');
   bot.appendChild(gridContainer);
-  renderGoods_grid(gridContainer, filtered);
+  const initFiltered = activeGoodsCat==='all'?recItems:recItems.filter(i=>i.cat===activeGoodsCat);
+  renderGoods_grid(gridContainer, initFiltered);
 }
+
+// 이벤트 타입별 추천 레이블
+const REC_LABEL = {
+  concert:    '이 공연에 가신다면',
+  tour:       '이 공연에 가신다면',
+  comeback:   '이 컴백 관련 굿즈',
+  release:    '이 발매 관련 굿즈',
+  fansign:    '팬사인 응모하려면',
+  fancon:     '이 팬미팅 관련 굿즈',
+  fanmeeting: '이 팬미팅 관련 굿즈',
+  special:    '이 이벤트 관련 굿즈',
+};
+const REC_EYEBROW = {
+  concert:    '🎤 공연 챙겨갈 것들',
+  tour:       '🎤 공연 챙겨갈 것들',
+  comeback:   '💿 이 컴백 관련 굿즈',
+  release:    '📦 이 발매 관련 굿즈',
+  fansign:    '✍️ 팬사인 응모하려면',
+  fancon:     '🎉 이 팬미팅 관련 굿즈',
+  fanmeeting: '🎉 이 팬미팅 관련 굿즈',
+  special:    '📺 이 이벤트 관련 굿즈',
+};
 
 function renderGoods_grid(container, list){
   container.innerHTML='';
