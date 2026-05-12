@@ -208,16 +208,14 @@ body{
 .bottom{
   flex:1;min-height:0;
   background:#FFFFFF;
-  border-top:1px solid var(--border);
   scrollbar-width:none;
 }
 .bottom::-webkit-scrollbar{display:none}
 
-/* sticky header + chip wrap */
-.bottom-sticky{
-  position:sticky;top:108px;z-index:20;
+/* chip-only sticky strip */
+.chip-sticky{
+  position:sticky;top:56px;z-index:20;
   background:#FFFFFF;
-  border-bottom:1px solid var(--border);
 }
 
 /* selected date header */
@@ -852,15 +850,16 @@ function renderBottom(){
       </div>
     `;
   }
-  // ── Sticky wrapper (date header + chips) ──
-  const stickyWrap = document.createElement('div');
-  stickyWrap.className = 'bottom-sticky';
-  stickyWrap.appendChild(hdr);
+  // date header는 일반 flow
+  bot.appendChild(hdr);
 
-  // ── Group chips (GDS Pill Tab) ──
+  // ── Group chips (GDS Pill Tab) — sticky ──
   if(lineup && chipCount > 0){
+    const stickyWrap = document.createElement('div');
+    stickyWrap.className = 'chip-sticky';
+
     const strip = document.createElement('div');
-    strip.style.cssText = 'padding:4px 16px 12px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;';
+    strip.style.cssText = 'padding:8px 16px 10px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;';
 
     const pillBase = 'display:inline-flex;align-items:center;flex-shrink:0;height:32px;padding:0 16px;border-radius:9999px;font-size:13px;font-weight:700;letter-spacing:0;cursor:pointer;user-select:none;transition:all .15s;-webkit-tap-highlight-color:transparent;border:none;outline:none;';
 
@@ -894,9 +893,8 @@ function renderBottom(){
     });
 
     stickyWrap.appendChild(strip);
+    bot.appendChild(stickyWrap);
   }
-
-  bot.appendChild(stickyWrap);
 
   // ── Divider ──
   const div=document.createElement('div');
