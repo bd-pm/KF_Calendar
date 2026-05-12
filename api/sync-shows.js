@@ -257,6 +257,7 @@ module.exports = async function handler(req, res) {
       const { raw, artists } = show.show_name === 'music_core'
         ? parseMusicCore(ep)
         : parseShowChampion(ep);
+      if (artists.length === 0) continue; // 출연진 없으면 저장 안 함
       const groups = mapArtists(artists);
       dataRows.push({
         show_name: show.show_name,
