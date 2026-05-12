@@ -8,12 +8,12 @@ const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
 const SYNC_SECRET     = process.env.SYNC_SECRET || '';
 const YT              = 'https://www.googleapis.com/youtube/v3';
 
-// dayOfWeek: 라인업 공개일 기준 (방송 전날)
-// music_bank 금 방송 → 목(4), inkigayo 일 방송 → 토(6), mcountdown 목 방송 → 수(3)
+// dayOfWeek: 방송일 기준
+// music_bank 금(5), inkigayo 일(0), mcountdown 목(4)
 const SHOWS = [
   {
     show_name:   'music_bank',
-    dayOfWeek:   4, // 목 (금 방송 전날)
+    dayOfWeek:   5, // 금
     channelId:   'UC5BMQOsAB8hKUyHu9KI6yig', // KBS WORLD TV
     searchQ:     'This Week Music Bank',
     titleMatch:  t => t.includes('Week') && t.includes('Music Bank'),
@@ -22,15 +22,11 @@ const SHOWS = [
       if (!m) return [];
       return m[1].split(/[,&]/).map(s => s.replace(/and\s*/i, '').trim()).filter(s => s.length > 1);
     },
-    parseDate: (title, publishedAt) => {
-      const m = title.match(/(\d{2})(\d{2})(\d{2})\s*$/);
-      if (m) return `20${m[1]}-${m[2]}-${m[3]}`;
-      return nearestWeekday(publishedAt, 4);
-    },
+    parseDate: (_title, publishedAt) => nearestWeekday(publishedAt, 5),
   },
   {
     show_name:   'inkigayo',
-    dayOfWeek:   6, // 토 (일 방송 전날)
+    dayOfWeek:   0, // 일
     channelId:   'UCfr3JYfElqMDbC30LpbXCJA', // SBS Inkigayo
     searchQ:     'Inkigayo line-up',
     titleMatch:  t => t.includes('Inkigayo') && (t.includes('line-up') || t.includes('lineup')),
@@ -58,12 +54,12 @@ const SHOWS = [
         const yr = new Date(publishedAt).getFullYear();
         if (mo) return `${yr}-${String(mo).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
       }
-      return nearestWeekday(publishedAt, 6);
+      return nearestWeekday(publishedAt, 0);
     },
   },
   {
     show_name:   'mcountdown',
-    dayOfWeek:   3, // 수 (목 방송 전날)
+    dayOfWeek:   4, // 목
     channelId:   'UCbD8EppRX3ZwJSou-TVo90A', // Mnet K-POP
     searchQ:     '엠카운트다운 라인업',
     titleMatch:  t => t.includes('라인업') && t.includes('엠카'),
@@ -95,9 +91,12 @@ const SHOWS = [
         const ep = parseInt(epMatch[1], 10);
         const base = new Date('2008-08-07');
         base.setDate(base.getDate() + (ep - 1) * 7);
-        return `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,'0')}-${String(base.getDate()).padStart(2,'0')}`;
+        // ep 번호가 터무니없이 크면 (예: 해상도 1080p 오매치) 무시
+        if (Math.abs(base - new Date()) < 5 * 365 * 86400000) {
+          return `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,'0')}-${String(base.getDate()).padStart(2,'0')}`;
+        }
       }
-      return nearestWeekday(publishedAt, 3);
+      return nearestWeekday(publishedAt, 4);
     },
   },
 ];
@@ -181,10 +180,13 @@ function mapToGroupIds(artists) {
   return Array.from(ids);
 }
 
+// 업로드일 기준 가장 가까운 방송일 (앞뒤 모두 고려)
 function nearestWeekday(isoStr, targetDay) {
   const d = new Date(isoStr);
-  const diff = (targetDay - d.getDay() + 7) % 7;
-  d.setDate(d.getDate() + diff);
+  const dow = d.getDay();
+  const fwd = (targetDay - dow + 7) % 7;
+  const bwd = (dow - targetDay + 7) % 7;
+  d.setDate(d.getDate() + (fwd <= bwd ? fwd : -bwd));
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 

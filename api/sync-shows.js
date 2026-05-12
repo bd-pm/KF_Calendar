@@ -9,6 +9,8 @@ const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
 const SYNC_SECRET      = process.env.SYNC_SECRET || '';
 
 const IMBC = 'https://playvod.imbc.com/api/PreviewList';
+// dayOfWeek: 방송일 기준 (iMBC BroadDate = 실제 방송일)
+// 음악중심 토(6), 쇼챔피언 수(3)
 const SHOWS_IMBC = [
   { show_name: 'music_core',    programId: '1000788100000100000', dayOfWeek: 6 }, // 토
   { show_name: 'show_champion', programId: '1003864100000100000', dayOfWeek: 3 }, // 수
@@ -134,11 +136,12 @@ function parseMusicCore(ep) {
 }
 
 // 쇼챔피언 파싱: "Show Champion (쇼 챔피언) - CRAVITY, TWS (투어스), ..."
+// 또는 " -CRAVITY" (대시 뒤 공백 없는 경우도 처리)
 function parseShowChampion(ep) {
   const raw = ep.ContentTitle || ep.contentTitle || '';
-  const dashIdx = raw.indexOf(' - ');
-  if (dashIdx === -1) return { raw, artists: [] };
-  const artists = raw.slice(dashIdx+3)
+  const m = raw.match(/ -\s*/);
+  if (!m) return { raw, artists: [] };
+  const artists = raw.slice(m.index + m[0].length)
     .replace(/\s+등\s*$/, '')
     .split(',')
     .map(s => s.replace(/\s*\([^)]*\)/g,'').trim())
