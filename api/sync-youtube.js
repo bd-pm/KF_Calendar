@@ -8,10 +8,12 @@ const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
 const SYNC_SECRET     = process.env.SYNC_SECRET || '';
 const YT              = 'https://www.googleapis.com/youtube/v3';
 
+// dayOfWeek: 라인업 공개일 기준 (방송 전날)
+// music_bank 금 방송 → 목(4), inkigayo 일 방송 → 토(6), mcountdown 목 방송 → 수(3)
 const SHOWS = [
   {
     show_name:   'music_bank',
-    dayOfWeek:   5, // 금
+    dayOfWeek:   4, // 목 (금 방송 전날)
     channelId:   'UC5BMQOsAB8hKUyHu9KI6yig', // KBS WORLD TV
     searchQ:     'This Week Music Bank',
     titleMatch:  t => t.includes('Week') && t.includes('Music Bank'),
@@ -23,12 +25,12 @@ const SHOWS = [
     parseDate: (title, publishedAt) => {
       const m = title.match(/(\d{2})(\d{2})(\d{2})\s*$/);
       if (m) return `20${m[1]}-${m[2]}-${m[3]}`;
-      return nearestWeekday(publishedAt, 5);
+      return nearestWeekday(publishedAt, 4);
     },
   },
   {
     show_name:   'inkigayo',
-    dayOfWeek:   0, // 일
+    dayOfWeek:   6, // 토 (일 방송 전날)
     channelId:   'UCfr3JYfElqMDbC30LpbXCJA', // SBS Inkigayo
     searchQ:     'Inkigayo line-up',
     titleMatch:  t => t.includes('Inkigayo') && (t.includes('line-up') || t.includes('lineup')),
@@ -56,12 +58,12 @@ const SHOWS = [
         const yr = new Date(publishedAt).getFullYear();
         if (mo) return `${yr}-${String(mo).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
       }
-      return nearestWeekday(publishedAt, 0);
+      return nearestWeekday(publishedAt, 6);
     },
   },
   {
     show_name:   'mcountdown',
-    dayOfWeek:   4, // 목
+    dayOfWeek:   3, // 수 (목 방송 전날)
     channelId:   'UCbD8EppRX3ZwJSou-TVo90A', // Mnet K-POP
     searchQ:     '엠카운트다운 라인업',
     titleMatch:  t => t.includes('라인업') && t.includes('엠카'),
@@ -95,7 +97,7 @@ const SHOWS = [
         base.setDate(base.getDate() + (ep - 1) * 7);
         return `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,'0')}-${String(base.getDate()).padStart(2,'0')}`;
       }
-      return nearestWeekday(publishedAt, 4);
+      return nearestWeekday(publishedAt, 3);
     },
   },
 ];
