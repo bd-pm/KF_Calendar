@@ -213,12 +213,17 @@ body{
 }
 .bottom::-webkit-scrollbar{display:none}
 
+/* sticky header + chip wrap */
+.bottom-sticky{
+  position:sticky;top:0;z-index:20;
+  background:#FFFFFF;
+  border-bottom:1px solid var(--border);
+}
+
 /* selected date header */
 .sel-hdr{
   display:flex;align-items:center;justify-content:space-between;
   padding:16px 16px 12px;
-  position:sticky;top:0;z-index:20;
-  background:#FFFFFF;
 }
 .sel-date{font-size:16px;font-weight:700;color:var(--txt1);letter-spacing:0}
 .sel-sub{font-size:12px;color:var(--txt2);margin-top:3px;letter-spacing:0;display:flex;align-items:center;gap:6px}
@@ -837,12 +842,15 @@ function renderBottom(){
       </div>
     `;
   }
-  bot.appendChild(hdr);
+  // ── Sticky wrapper (date header + chips) ──
+  const stickyWrap = document.createElement('div');
+  stickyWrap.className = 'bottom-sticky';
+  stickyWrap.appendChild(hdr);
 
   // ── Group chips (GDS Pill Tab) ──
   if(lineup && chipCount > 0){
     const strip = document.createElement('div');
-    strip.style.cssText = 'padding:12px 16px 8px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;';
+    strip.style.cssText = 'padding:4px 16px 12px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;';
 
     const pillBase = 'display:inline-flex;align-items:center;flex-shrink:0;height:32px;padding:0 16px;border-radius:9999px;font-size:13px;font-weight:700;letter-spacing:0;cursor:pointer;user-select:none;transition:all .15s;-webkit-tap-highlight-color:transparent;border:none;outline:none;';
 
@@ -875,8 +883,10 @@ function renderBottom(){
       strip.appendChild(chip);
     });
 
-    bot.appendChild(strip);
+    stickyWrap.appendChild(strip);
   }
+
+  bot.appendChild(stickyWrap);
 
   // ── Divider ──
   const div=document.createElement('div');
