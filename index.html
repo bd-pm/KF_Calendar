@@ -352,6 +352,103 @@ body{
 @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+/* ════════════════════════════════════════
+   MY GROUPS
+════════════════════════════════════════ */
+.myg-btn{
+  display:flex;align-items:center;justify-content:center;
+  width:34px;height:34px;border-radius:9999px;border:none;
+  background:#F6F6F6;color:var(--txt1);cursor:pointer;
+  transition:background .15s;position:relative;flex-shrink:0;
+}
+.myg-btn:hover{background:#EBEBEB}
+.myg-btn.active{background:var(--accent);color:#fff}
+.myg-dot{
+  position:absolute;top:5px;right:5px;
+  width:6px;height:6px;border-radius:50%;
+  background:var(--accent);border:1.5px solid #fff;
+  pointer-events:none;
+}
+/* 팝업 오버레이 */
+.myg-overlay{
+  position:fixed;inset:0;z-index:9990;
+  display:flex;align-items:flex-end;justify-content:center;
+  padding:0;
+}
+.myg-backdrop{
+  position:absolute;inset:0;
+  background:rgba(0,0,0,0.45);
+  backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);
+}
+.myg-sheet{
+  position:relative;z-index:1;
+  width:100%;max-width:480px;
+  background:#fff;
+  border-radius:20px 20px 0 0;
+  padding:0 0 env(safe-area-inset-bottom,0);
+  box-shadow:0 -4px 40px rgba(0,0,0,0.18);
+  transform:translateY(100%);
+  animation:sheetUp .32s cubic-bezier(.32,1,.36,1) forwards;
+}
+@keyframes sheetUp{to{transform:translateY(0)}}
+@keyframes sheetDown{from{transform:translateY(0)}to{transform:translateY(100%)}}
+.myg-handle{
+  width:36px;height:4px;border-radius:2px;
+  background:rgba(25,25,25,0.12);
+  margin:12px auto 0;
+}
+.myg-head{
+  padding:16px 20px 0;
+  display:flex;align-items:flex-start;justify-content:space-between;
+}
+.myg-title{font-size:18px;font-weight:800;letter-spacing:-0.2px;line-height:1.25}
+.myg-sub{font-size:13px;color:var(--txt2);margin-top:4px}
+.myg-close{
+  width:30px;height:30px;border-radius:50%;border:none;
+  background:#F6F6F6;color:var(--txt2);font-size:18px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:2px;
+}
+.myg-list{
+  display:flex;flex-wrap:wrap;gap:8px;
+  padding:16px 20px 20px;max-height:52vh;overflow-y:auto;
+}
+.myg-chip{
+  display:inline-flex;align-items:center;height:34px;
+  padding:0 14px;border-radius:9999px;font-size:13px;font-weight:700;
+  border:1.5px solid var(--border2);background:#fff;color:var(--txt2);
+  cursor:pointer;transition:all .15s;user-select:none;white-space:nowrap;
+}
+.myg-chip.sel{
+  background:#191919;color:#fff;border-color:#191919;
+}
+.myg-chip.disabled{opacity:0.35;pointer-events:none}
+.myg-footer{
+  padding:12px 20px 20px;display:flex;gap:10px;
+  border-top:1px solid var(--border);
+}
+.myg-skip{
+  flex:1;height:46px;border-radius:10px;border:1.5px solid var(--border2);
+  background:#fff;color:var(--txt2);font-size:14px;font-weight:700;cursor:pointer;
+  transition:background .15s;
+}
+.myg-skip:hover{background:#F6F6F6}
+.myg-save{
+  flex:2;height:46px;border-radius:10px;border:none;
+  background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer;
+  transition:opacity .15s;
+}
+.myg-save:hover{opacity:.88}
+.myg-save:disabled{opacity:.4;cursor:default}
+/* 빨려드는 애니메이션 */
+@keyframes suckedIn{
+  0%{opacity:1;transform:scale(1)}
+  60%{opacity:0.7;transform:scale(0.4)}
+  100%{opacity:0;transform:scale(0.05)}
+}
+.myg-sucking{animation:suckedIn .38s cubic-bezier(.4,0,1,1) forwards}
+
 /* feedback btn — app 컨테이너 안에 위치 */
 .fb-btn{
   position:fixed;
@@ -388,6 +485,11 @@ body{
     </svg>
   </div>
   <div class="hdr-r">
+    <button id="myGroupsBtn" class="myg-btn" onclick="openMyGroups()" title="My Groups">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+    </button>
     <button onclick="openSubmitModal()" style="
       background:#F6F6F6;color:#191919;border:1px solid rgba(25,25,25,0.12);border-radius:8px;
       padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;letter-spacing:0;
@@ -712,7 +814,7 @@ function buildWeek(area){
     cell.appendChild(num);
 
     const lineup = LINEUP_BY_DATE[ds];
-    if(lineup){
+    if(lineup && dateHasMyGroup(ds)){
       const dc=document.createElement('div');
       dc.className='dots-col';
       const show = SHOW_LABELS[lineup.showName];
@@ -783,7 +885,7 @@ function buildMonth(area){
     cell.appendChild(num);
 
     const mLineup = LINEUP_BY_DATE[ds];
-    if(mLineup){
+    if(mLineup && dateHasMyGroup(ds)){
       const show = SHOW_LABELS[mLineup.showName];
       const showColor = show ? show.color : '#9B6FD8';
       const dotsEl=document.createElement('div');
@@ -1026,7 +1128,11 @@ function renderBottom(){
     strip.appendChild(allChip);
 
     // ── 개별 그룹 칩 ──
-    const rawList = rawArtists.length > 0 ? rawArtists : lineup.groups;
+    const allRawList = rawArtists.length > 0 ? rawArtists : lineup.groups;
+    // My Groups 설정 시 해당 그룹만 표시, 아니면 전체
+    const rawList = (myGroups && myGroups.length > 0)
+      ? allRawList.filter(a => myGroups.includes(a))
+      : allRawList;
 
     function makeChip(artistName) {
       const chip = document.createElement('button');
@@ -1334,9 +1440,201 @@ async function fetchMusicShowLineups() {
       buildCal();
       renderBottom();
     }
+    // 데이터 로드 완료 후 첫 방문 팝업
+    if (!localStorage.getItem(MY_GROUPS_SEEN_KEY)) {
+      setTimeout(() => openMyGroups(), 600);
+    }
   } catch(e) {
     console.warn('[KF_Calendar] fetchLineups 실패:', e.message);
   }
+}
+
+// ─────────────────────────────────────────
+//  MY GROUPS
+// ─────────────────────────────────────────
+const MY_GROUPS_KEY = 'kf_my_groups'; // localStorage key
+const MY_GROUPS_SEEN_KEY = 'kf_my_groups_seen';
+const MAX_SELECTION = 3;
+
+// 저장된 내 그룹 (artist 원본명 배열), null이면 전체 모드
+function loadMyGroups() {
+  try {
+    const v = localStorage.getItem(MY_GROUPS_KEY);
+    return v ? JSON.parse(v) : null;
+  } catch { return null; }
+}
+function saveMyGroups(groups) {
+  localStorage.setItem(MY_GROUPS_KEY, JSON.stringify(groups));
+  localStorage.setItem(MY_GROUPS_SEEN_KEY, '1');
+}
+function clearMyGroups() {
+  localStorage.removeItem(MY_GROUPS_KEY);
+  localStorage.setItem(MY_GROUPS_SEEN_KEY, '1');
+}
+
+let myGroups = loadMyGroups(); // null = 전체, [] or [...] = 필터
+
+// 버튼 상태 업데이트
+function updateMyGroupsBtn() {
+  const btn = document.getElementById('myGroupsBtn');
+  if (!btn) return;
+  const dot = btn.querySelector('.myg-dot');
+  if (myGroups && myGroups.length > 0) {
+    btn.classList.add('active');
+    if (!dot) {
+      const d = document.createElement('span');
+      d.className = 'myg-dot';
+      btn.appendChild(d);
+    }
+  } else {
+    btn.classList.remove('active');
+    if (dot) dot.remove();
+  }
+}
+
+// 팝업 닫기 — 버튼으로 빨려드는 애니메이션
+function closeMyGroups(sheetEl) {
+  if (!sheetEl) return;
+  const overlay = sheetEl.closest('.myg-overlay');
+  if (!overlay) return;
+
+  const btn = document.getElementById('myGroupsBtn');
+  const btnRect = btn ? btn.getBoundingClientRect() : null;
+  const sheetRect = sheetEl.getBoundingClientRect();
+
+  // 시트를 버튼 위치로 이동시키는 transform 목적지 계산
+  if (btnRect) {
+    const tx = btnRect.left + btnRect.width / 2 - (sheetRect.left + sheetRect.width / 2);
+    const ty = btnRect.top + btnRect.height / 2 - (sheetRect.top + sheetRect.height / 2);
+    sheetEl.style.transformOrigin = `calc(50% - ${tx}px) calc(50% - ${ty}px)`;
+  }
+  sheetEl.classList.add('myg-sucking');
+
+  // 백드롭 페이드
+  const backdrop = overlay.querySelector('.myg-backdrop');
+  if (backdrop) backdrop.style.transition = 'opacity .35s';
+  if (backdrop) backdrop.style.opacity = '0';
+
+  setTimeout(() => {
+    overlay.remove();
+    updateMyGroupsBtn();
+  }, 380);
+}
+
+// 전체 그룹 목록 수집 (현재 LINEUP_BY_DATE 기준)
+function getAllArtistsFromLineups() {
+  const set = new Set();
+  for (const lineup of Object.values(LINEUP_BY_DATE)) {
+    const artists = parseRawTitleStatic(lineup.rawTitle);
+    const list = artists.length > 0 ? artists : lineup.groups;
+    list.forEach(a => set.add(a));
+  }
+  return [...set].sort((a, b) => {
+    // GROUP_RANK 기준 정렬, 없으면 뒤
+    const ga = ARTIST_TO_GROUP_FRONT[a], gb = ARTIST_TO_GROUP_FRONT[b];
+    const ra = ga ? (GROUP_RANK[ga] ?? 999) : 999;
+    const rb = gb ? (GROUP_RANK[gb] ?? 999) : 999;
+    return ra - rb;
+  });
+}
+
+function openMyGroups() {
+  if (document.querySelector('.myg-overlay')) return;
+
+  const allArtists = getAllArtistsFromLineups();
+  let selected = new Set(myGroups || []);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'myg-overlay';
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'myg-backdrop';
+  backdrop.onclick = () => {
+    // 백드롭 클릭 = skip
+    myGroups = null;
+    clearMyGroups();
+    applyMyGroups();
+    closeMyGroups(sheet);
+  };
+
+  const sheet = document.createElement('div');
+  sheet.className = 'myg-sheet';
+
+  function renderSheet() {
+    sheet.innerHTML = `
+      <div class="myg-handle"></div>
+      <div class="myg-head">
+        <div>
+          <div class="myg-title">My Groups</div>
+          <div class="myg-sub">Pick up to ${MAX_SELECTION} groups to follow. Only their schedules will be highlighted.</div>
+        </div>
+        <button class="myg-close" id="myg-close-btn">✕</button>
+      </div>
+      <div class="myg-list" id="myg-list"></div>
+      <div class="myg-footer">
+        <button class="myg-skip" id="myg-skip">Skip for now</button>
+        <button class="myg-save" id="myg-save" ${selected.size === 0 ? 'disabled' : ''}>
+          ${selected.size > 0 ? `Follow ${selected.size} Group${selected.size > 1 ? 's' : ''}` : 'Select a Group'}
+        </button>
+      </div>
+    `;
+
+    const list = sheet.querySelector('#myg-list');
+    allArtists.forEach(artistName => {
+      const isSel = selected.has(artistName);
+      const isDisabled = !isSel && selected.size >= MAX_SELECTION;
+      const chip = document.createElement('button');
+      chip.className = `myg-chip${isSel ? ' sel' : ''}${isDisabled ? ' disabled' : ''}`;
+      chip.textContent = artistDisplayName(artistName);
+      chip.onclick = () => {
+        if (selected.has(artistName)) selected.delete(artistName);
+        else if (selected.size < MAX_SELECTION) selected.add(artistName);
+        renderSheet();
+      };
+      list.appendChild(chip);
+    });
+
+    sheet.querySelector('#myg-close-btn').onclick = () => {
+      myGroups = null;
+      clearMyGroups();
+      applyMyGroups();
+      closeMyGroups(sheet);
+    };
+    sheet.querySelector('#myg-skip').onclick = () => {
+      myGroups = null;
+      clearMyGroups();
+      applyMyGroups();
+      closeMyGroups(sheet);
+    };
+    sheet.querySelector('#myg-save').onclick = () => {
+      if (selected.size === 0) return;
+      myGroups = [...selected];
+      saveMyGroups(myGroups);
+      applyMyGroups();
+      closeMyGroups(sheet);
+    };
+  }
+
+  renderSheet();
+  overlay.appendChild(backdrop);
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+}
+
+// 내 그룹 필터 적용 — 캘린더 + 하단 섹션 재렌더
+function applyMyGroups() {
+  buildCal();
+  renderBottom();
+}
+
+// 캘린더 dot/날짜 필터: 내 그룹 설정 시 해당 그룹 포함 날짜만 강조
+function dateHasMyGroup(ds) {
+  if (!myGroups || myGroups.length === 0) return true; // 전체 모드
+  const lineup = LINEUP_BY_DATE[ds];
+  if (!lineup) return false;
+  const artists = parseRawTitleStatic(lineup.rawTitle);
+  const list = artists.length > 0 ? artists : lineup.groups;
+  return myGroups.some(g => list.includes(g));
 }
 
 // ─────────────────────────────────────────
@@ -1345,6 +1643,8 @@ async function fetchMusicShowLineups() {
 buildCal();
 renderBottom();
 fetchMusicShowLineups();
+
+updateMyGroupsBtn();
 
 // ─────────────────────────────────────────
 //  FAN SUBMISSION MODAL
