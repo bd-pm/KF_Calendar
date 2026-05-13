@@ -1579,7 +1579,10 @@ function openMyGroups() {
           <div class="myg-title">My Groups</div>
           <div class="myg-sub">Search and pick up to 3 groups — your personal K-pop lineup.</div>
         </div>
-        <button class="myg-close" id="myg-close-btn">✕</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${selArr.length > 0 ? `<button id="myg-clear-btn" style="border:none;background:none;padding:0;cursor:pointer;font-size:12px;font-weight:700;color:var(--txt2);letter-spacing:0;">Clear all</button>` : ''}
+          <button class="myg-close" id="myg-close-btn">✕</button>
+        </div>
       </div>
 
       <!-- 선택 슬롯 3개 -->
@@ -1590,11 +1593,11 @@ function openMyGroups() {
                min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;
                gap:2px;cursor:${name ? 'pointer' : 'default'};transition:all .15s;position:relative;"
                ${name ? `data-remove="${escHtml(name)}"` : ''}>
-            <span style="font-size:10px;font-weight:700;color:${name ? 'rgba(255,255,255,0.5)' : 'var(--txt3)'};letter-spacing:.5px;">${i+1}</span>
             ${name
               ? `<span style="font-size:12px;font-weight:800;color:#fff;text-align:center;padding:0 6px;line-height:1.2;">${escHtml(artistDisplayName(name))}</span>
                  <span style="position:absolute;top:4px;right:6px;font-size:11px;color:rgba(255,255,255,0.5);line-height:1;">✕</span>`
-              : `<span style="font-size:11px;color:var(--txt3);">empty</span>`
+              : `<span style="font-size:10px;font-weight:700;color:var(--txt3);letter-spacing:.5px;">${i+1}</span>
+                 <span style="font-size:11px;color:var(--txt3);">empty</span>`
             }
           </div>
         `).join('')}
@@ -1624,6 +1627,10 @@ function openMyGroups() {
         </button>
       </div>
     `;
+
+    // Clear all 버튼
+    const clearAllBtn = sheet.querySelector('#myg-clear-btn');
+    if (clearAllBtn) clearAllBtn.onclick = () => { selArr.splice(0); renderSheet(); };
 
     // 슬롯 클릭 → 해당 그룹 제거
     sheet.querySelectorAll('[data-remove]').forEach(el => {
@@ -1684,7 +1691,7 @@ function openMyGroups() {
     }
 
     sheet.querySelector('#myg-close-btn').onclick = () => {
-      myGroups = null; clearMyGroups(); applyMyGroups(); closeMyGroups(sheet);
+      closeMyGroups(sheet);
     };
     sheet.querySelector('#myg-skip').onclick = () => {
       myGroups = null; clearMyGroups(); applyMyGroups(); closeMyGroups(sheet);
