@@ -79,7 +79,8 @@ body{
   background:#FFFFFF;
   border-bottom:1px solid var(--border);
 }
-.view-title{font-size:17px;font-weight:700;letter-spacing:0;color:var(--txt1)}
+.view-l{display:flex;align-items:center;gap:2px}
+.view-title{font-size:17px;font-weight:700;letter-spacing:0;color:var(--txt1);min-width:48px;text-align:center}
 .view-r{display:flex;align-items:center;gap:6px}
 .toggle-wrap{
   display:flex;gap:2px;
@@ -117,7 +118,6 @@ body{
   padding:14px 16px;
   background:#FFFFFF;
   border-bottom:1px solid var(--border);
-  border-left:3px solid var(--txt1);
 }
 .hero-strip-icon{
   width:36px;height:36px;border-radius:10px;
@@ -128,21 +128,8 @@ body{
 .hero-strip-text{flex:1;letter-spacing:0}
 .hero-strip-title{font-size:13px;font-weight:700;color:var(--txt1);line-height:1.35}
 .hero-strip-sub{
-  display:flex;align-items:center;gap:4px;
   font-size:11px;color:var(--txt2);margin-top:3px;line-height:1.3;
-  flex-wrap:wrap;
 }
-.hero-strip-step{
-  display:inline-flex;align-items:center;gap:3px;
-}
-.hero-strip-step-num{
-  width:14px;height:14px;border-radius:50%;
-  background:#F2F2F2;color:var(--txt2);
-  font-size:9px;font-weight:700;
-  display:inline-flex;align-items:center;justify-content:center;
-  flex-shrink:0;
-}
-.hero-strip-arrow{color:var(--txt3);font-size:9px}
 
 /* ════════════════════════════════════════
    CALENDAR AREA
@@ -535,18 +522,20 @@ body{
 
 <!-- VIEW BAR -->
 <div class="view-bar">
-  <div class="view-title" id="viewTitle"></div>
-  <div class="view-r">
-    <button class="today-btn" onclick="goToday()">Today</button>
+  <div class="view-l">
     <button class="nav-btn" onclick="navPrev()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
     </button>
+    <div class="view-title" id="viewTitle"></div>
     <button class="nav-btn" onclick="navNext()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
     </button>
+  </div>
+  <div class="view-r">
+    <button class="today-btn" onclick="goToday()">Today</button>
     <div class="toggle-wrap">
-      <button class="toggle-btn" id="btnWeek" onclick="setView('week')">Week</button>
-      <button class="toggle-btn on" id="btnMonth" onclick="setView('month')">Month</button>
+      <button class="toggle-btn on" id="btnWeek" onclick="setView('week')">Week</button>
+      <button class="toggle-btn" id="btnMonth" onclick="setView('month')">Month</button>
     </div>
   </div>
 </div>
@@ -557,14 +546,8 @@ body{
     🎤
   </div>
   <div class="hero-strip-text">
-    <div class="hero-strip-title">K-pop Fan Goods & Postcards, All in One Place</div>
-    <div class="hero-strip-sub">
-      <span class="hero-strip-step"><span class="hero-strip-step-num">1</span> Pick a date</span>
-      <span class="hero-strip-arrow">›</span>
-      <span class="hero-strip-step"><span class="hero-strip-step-num">2</span> Select an artist</span>
-      <span class="hero-strip-arrow">›</span>
-      <span class="hero-strip-step"><span class="hero-strip-step-num">3</span> Shop live on Bunjang</span>
-    </div>
+    <div class="hero-strip-title">Fan goods from K-pop music shows</div>
+    <div class="hero-strip-sub">Pick a date · Select an artist · Shop on Bunjang</div>
   </div>
 </div>
 
@@ -612,7 +595,7 @@ async function supaFetch(path, opts={}) {
 // ─────────────────────────────────────────
 //  STATE
 // ─────────────────────────────────────────
-let view = 'month';
+let view = 'week';
 let selectedDate = dKey(TODAY);
 let weekStart = getWeekStart(TODAY);
 let monthPivot = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
@@ -812,14 +795,11 @@ function goToday(){
 function updateTitle(){
   const t=document.getElementById('viewTitle');
   if(view==='week'){
-    const ws=weekStart, we=addDays(weekStart,6);
-    if(ws.getMonth()===we.getMonth()){
-      t.textContent=`${MONTH_NAMES[ws.getMonth()]} ${ws.getDate()}–${we.getDate()}, ${ws.getFullYear()}`;
-    } else {
-      t.textContent=`${MONTH_NAMES[ws.getMonth()].slice(0,3)} ${ws.getDate()} – ${MONTH_NAMES[we.getMonth()].slice(0,3)} ${we.getDate()}, ${ws.getFullYear()}`;
-    }
+    // Show the month that has the majority of days in this week (Thu = day 4)
+    const midWeek=addDays(weekStart,3);
+    t.textContent=MONTH_NAMES[midWeek.getMonth()];
   } else {
-    t.textContent=`${MONTH_NAMES[monthPivot.getMonth()]} ${monthPivot.getFullYear()}`;
+    t.textContent=MONTH_NAMES[monthPivot.getMonth()];
   }
 }
 
