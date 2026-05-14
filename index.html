@@ -1860,96 +1860,50 @@ function openFeedbackModal() {
   sheet.className = 'myg-sheet';
   sheet.style.cssText = 'padding-bottom:env(safe-area-inset-bottom,16px);display:flex;flex-direction:column;overflow:hidden;';
   sheet.innerHTML = `
-    <!-- GDS TopNavigation: 48px, close btn top-right -->
-    <div style="
-      height:48px;padding:16px 20px 8px;
-      display:flex;align-items:flex-start;justify-content:flex-end;
-      flex-shrink:0;
-    ">
-      <button onclick="closeFeedbackModal()" style="
-        width:24px;height:24px;border-radius:50%;border:none;
-        background:#7F7F7F;color:#FFFFFF;
-        font-size:13px;font-weight:500;line-height:1;
-        cursor:pointer;display:flex;align-items:center;justify-content:center;
-        flex-shrink:0;padding:0;
-      ">✕</button>
+    <!-- GDS TopNavigation: 48px, gray-500 circle + SVG × -->
+    <div style="height:48px;padding:16px 20px 8px;display:flex;align-items:flex-start;justify-content:flex-end;flex-shrink:0;">
+      <button onclick="closeFeedbackModal()" style="width:24px;height:24px;border:none;background:none;padding:0;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="12" fill="#7F7F7F"/>
+          <path d="M8 8L16 16M16 8L8 16" stroke="white" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </div>
 
     <!-- GDS Body: gap 20px, padding 20px h / 30px bottom -->
-    <div style="
-      padding:0 20px 30px;
-      display:flex;flex-direction:column;gap:20px;
-      overflow-y:auto;flex:1;
-    ">
-      <!-- Title section: gap 6px -->
+    <div style="padding:0 20px 30px;display:flex;flex-direction:column;gap:20px;overflow-y:auto;flex:1;">
+
+      <!-- Title section: H4_Bold_20 + P2_Regular_15, gap 6px -->
       <div style="display:flex;flex-direction:column;gap:6px;">
-        <div style="font-size:20px;font-weight:700;letter-spacing:0;color:#191919;line-height:1.2;">
-          Share Feedback
-        </div>
-        <div style="font-size:15px;font-weight:400;letter-spacing:0;color:#4C4C4C;line-height:1.4;">
-          How was your experience with Bunjang Global?
-        </div>
+        <div style="font-size:20px;font-weight:700;letter-spacing:0;color:#191919;line-height:1.2;">Share Feedback</div>
+        <div style="font-size:15px;font-weight:400;letter-spacing:0;color:#4C4C4C;line-height:1.4;">How was your experience with Bunjang Global?</div>
       </div>
 
-      <!-- Content area: #F6F6F6 bg, 별점 + textarea -->
+      <!-- Content area: gray-50 bg, radius 12 -->
       <div style="background:#F6F6F6;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:16px;">
-        <!-- Star rating -->
+
+        <!-- Star rating — P2_Medium_15 label, yellow-500(#FFC200) active -->
         <div>
-          <div style="font-size:13px;font-weight:500;letter-spacing:0;color:#666666;margin-bottom:10px;">How would you rate this?</div>
+          <div style="font-size:15px;font-weight:500;letter-spacing:0;color:#666666;line-height:1.4;margin-bottom:10px;">How would you rate this?</div>
           <div id="fb-stars" style="display:flex;gap:6px;">
-            ${[1,2,3,4,5].map(n=>`
-              <button data-s="${n}" onclick="setRating(${n})" style="
-                flex:1;height:44px;border-radius:8px;border:1.5px solid #E0E0E0;
-                background:#FFFFFF;font-size:20px;cursor:pointer;
-                transition:all .15s ease;display:flex;align-items:center;justify-content:center;
-              ">★</button>
-            `).join('')}
+            ${[1,2,3,4,5].map(n=>`<button data-s="${n}" onclick="setRating(${n})" style="flex:1;height:44px;border-radius:8px;border:1.5px solid #E0E0E0;background:#FFFFFF;font-size:20px;color:#E0E0E0;cursor:pointer;transition:all .15s ease;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;">★</button>`).join('')}
           </div>
         </div>
-        <!-- Textarea -->
+
+        <!-- GDS Input (textarea): border rgba(25,25,25,0.14), focus brand-solid #D80C18, 15px/400, padding 12px 16px -->
         <div>
-          <div style="font-size:13px;font-weight:500;letter-spacing:0;color:#666666;margin-bottom:8px;">Any thoughts?</div>
-          <textarea id="fb-text" placeholder="Feature requests, bugs, anything…"
-            style="
-              width:100%;min-height:88px;padding:12px;
-              background:#FFFFFF;border:1.5px solid transparent;border-radius:8px;
-              color:#191919;font-size:14px;letter-spacing:0;line-height:1.5;
-              resize:none;outline:none;font-family:inherit;box-sizing:border-box;
-              transition:border-color .15s;
-            "
-            onfocus="this.style.borderColor='#191919'"
-            onblur="this.style.borderColor='transparent'"></textarea>
+          <div style="font-size:15px;font-weight:500;letter-spacing:0;color:#666666;line-height:1.4;margin-bottom:8px;">Any thoughts?</div>
+          <textarea id="fb-text" placeholder="Feature requests, bugs, anything…" style="width:100%;min-height:88px;padding:12px 16px;background:#FFFFFF;border:1.5px solid rgba(25,25,25,0.14);border-radius:8px;color:#191919;font-size:15px;font-weight:400;letter-spacing:0;line-height:1.4;resize:none;outline:none;font-family:inherit;box-sizing:border-box;transition:border-color .15s;-webkit-appearance:none;" onfocus="this.style.borderColor='#D80C18'" onblur="this.style.borderColor='rgba(25,25,25,0.14)'"></textarea>
         </div>
       </div>
 
-      <div id="fb-msg" style="font-size:13px;text-align:center;color:var(--txt2);min-height:16px;letter-spacing:0;margin-top:-12px;"></div>
+      <div id="fb-msg" style="font-size:13px;text-align:center;color:#8C8C8C;min-height:16px;letter-spacing:0;margin-top:-12px;"></div>
     </div>
 
-    <!-- GDS Sticky Action Button: border-top, padding 12px v / 20px h, gap 6px -->
-    <div style="
-      border-top:1.5px solid #F6F6F6;
-      padding:12px 20px;
-      display:flex;gap:6px;
-      flex-shrink:0;
-    ">
-      <button onclick="closeFeedbackModal()" style="
-        flex:1;height:48px;
-        background:#F6F6F6;color:#4C4C4C;
-        border:none;border-radius:6px;
-        font-size:14px;font-weight:700;letter-spacing:0;
-        cursor:pointer;transition:background .15s;
-      " onmouseover="this.style.background='#EBEBEB'" onmouseout="this.style.background='#F6F6F6'">
-        Cancel
-      </button>
-      <button onclick="submitFeedback()" style="
-        flex:1;height:48px;
-        background:#191919;color:#FFFFFF;
-        border:none;border-radius:6px;
-        font-size:14px;font-weight:700;letter-spacing:0;
-        cursor:pointer;transition:background .15s;
-      " onmouseover="this.style.background='#333333'" onmouseout="this.style.background='#191919'">
-        Submit
-      </button>
+    <!-- GDS Sticky Action Button: border-top gray-50, 12px v / 20px h, gap 6px, T4_Bold_14 -->
+    <div style="border-top:1.5px solid #F6F6F6;padding:12px 20px;display:flex;gap:6px;flex-shrink:0;">
+      <button onclick="closeFeedbackModal()" style="flex:1;height:48px;background:#F6F6F6;color:#4C4C4C;border:none;border-radius:6px;font-size:14px;font-weight:700;letter-spacing:0;line-height:1.25;cursor:pointer;transition:background .15s;-webkit-tap-highlight-color:transparent;" onmouseover="this.style.background='#EBEBEB'" onmouseout="this.style.background='#F6F6F6'">Cancel</button>
+      <button onclick="submitFeedback()" style="flex:1;height:48px;background:#191919;color:#FFFFFF;border:none;border-radius:6px;font-size:14px;font-weight:700;letter-spacing:0;line-height:1.25;cursor:pointer;transition:background .15s;-webkit-tap-highlight-color:transparent;" onmouseover="this.style.background='#333333'" onmouseout="this.style.background='#191919'">Submit</button>
     </div>
   `;
   overlay.appendChild(sheet);
@@ -1969,9 +1923,9 @@ function setRating(n) {
   _fbRating = n;
   document.querySelectorAll('#fb-stars button').forEach(s => {
     const active = Number(s.dataset.s) <= n;
-    s.style.background   = active ? '#191919' : '#FAFAFA';
-    s.style.color        = active ? '#FFFFFF' : 'var(--txt1)';
-    s.style.borderColor  = active ? '#191919' : '#E8E8E8';
+    s.style.color       = active ? '#FFC200' : '#E0E0E0';
+    s.style.borderColor = active ? '#FFC200' : '#E0E0E0';
+    s.style.background  = active ? '#FFFCE8' : '#FFFFFF';
   });
 }
 
