@@ -1227,7 +1227,7 @@ function renderBottom(){
     liveGoodsArea.id = 'live-goods-area';
     liveGoodsArea.style.cssText = 'padding:20px 0 0;text-align:center;color:var(--txt2);font-size:13px;background:#FFFFFF';
     const label = selectedArtistName || 'All';
-    liveGoodsArea.innerHTML = `<div style="display:inline-block;width:20px;height:20px;border:2px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px"></div>Searching ${escHtml(label)} listings…`;
+    liveGoodsArea.innerHTML = `<div style="padding:40px 0;display:flex;justify-content:center;"><div style="width:20px;height:20px;border:2px solid #E0E0E0;border-top-color:#191919;border-radius:50%;animation:spin .7s linear infinite;"></div></div>`;
     bot.appendChild(liveGoodsArea);
 
     // DOM에 붙인 직후 즉시 fetch
