@@ -503,11 +503,6 @@ body{
         <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
       </svg>
     </button>
-    <button onclick="openSubmitModal()" style="
-      background:#F6F6F6;color:#191919;border:1px solid rgba(25,25,25,0.12);border-radius:8px;
-      padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;letter-spacing:0;
-      transition:background .18s;
-    " onmouseover="this.style.background='#EBEBEB'" onmouseout="this.style.background='#F6F6F6'">+ Submit Event</button>
   </div>
 </header>
 
@@ -1751,87 +1746,6 @@ fetchMusicShowLineups();
 
 updateMyGroupsBtn();
 
-// ─────────────────────────────────────────
-//  FAN SUBMISSION MODAL
-// ─────────────────────────────────────────
-function openSubmitModal() {
-  const existing = document.getElementById('submit-modal');
-  if (existing) { existing.remove(); return; }
-
-  const overlay = document.createElement('div');
-  overlay.id = 'submit-modal';
-  overlay.style.cssText = `
-    position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;
-    display:flex;align-items:center;justify-content:center;padding:16px;
-  `;
-  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
-
-  overlay.innerHTML = `
-    <div style="background:#FFFFFF;border-radius:var(--r);padding:24px;width:100%;max-width:420px;
-                box-shadow:0 8px 40px rgba(0,0,0,0.2);color:var(--txt1);">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-        <div style="font-size:16px;font-weight:700;letter-spacing:0">Submit an Event</div>
-        <div onclick="document.getElementById('submit-modal').remove()"
-             style="cursor:pointer;font-size:20px;color:var(--txt2);">×</div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <input id="sf-name" placeholder="Event name" style="${inputStyle()}">
-        <input id="sf-date" type="text" placeholder="Date (YYYY-MM-DD)" style="${inputStyle()}"
-          onfocus="this.type='date'" onblur="if(!this.value)this.type='text'">
-        <input id="sf-nick" placeholder="Your nickname (optional)" style="${inputStyle()}">
-        <input id="sf-url" placeholder="Source URL (official notice, article…)" style="${inputStyle()}">
-        <button onclick="submitEvent()" style="
-          background:var(--accent);color:#fff;border:none;border-radius:var(--r-sm);
-          padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;letter-spacing:0;
-        ">Submit for Review</button>
-        <div id="sf-msg" style="font-size:12px;text-align:center;color:var(--txt2);min-height:16px;"></div>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-
-}
-
-function inputStyle() {
-  return `width:100%;padding:10px 12px;border-radius:var(--r-sm);border:1px solid var(--border2);
-          background:var(--bg3);color:var(--txt1);font-size:14px;font-family:inherit;
-          outline:none;box-sizing:border-box;appearance:none;-webkit-appearance:none;
-          height:42px;display:block;`;
-}
-
-async function submitEvent() {
-  const name  = document.getElementById('sf-name').value.trim();
-  const date  = document.getElementById('sf-date').value;
-  const nick  = document.getElementById('sf-nick').value.trim();
-  const url   = document.getElementById('sf-url').value.trim();
-  const msg   = document.getElementById('sf-msg');
-
-  if (!name || !date) {
-    msg.style.color = '#e05'; msg.textContent = 'Please fill in Name and Date.'; return;
-  }
-
-  msg.style.color = 'var(--txt2)'; msg.textContent = 'Submitting…';
-
-  try {
-    const res = await supaFetch('event_submissions', {
-      method: 'POST',
-      body: JSON.stringify({
-        name, date_start: date,
-        submitted_by: nick,
-        evidence_url: url,
-      }),
-    });
-    if (res.ok || res.status === 201) {
-      msg.style.color = '#0a0'; msg.textContent = '✓ Submitted! We will review it shortly.';
-      setTimeout(() => document.getElementById('submit-modal')?.remove(), 2000);
-    } else {
-      const err = await res.json();
-      msg.style.color = '#e05'; msg.textContent = 'Error: ' + (err.message || res.status);
-    }
-  } catch(e) {
-    msg.style.color = '#e05'; msg.textContent = 'Network error. Please try again.';
-  }
-}
 
 // ─────────────────────────────────────────
 //  FEEDBACK
