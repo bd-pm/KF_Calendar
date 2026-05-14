@@ -1674,7 +1674,7 @@ function openMyGroups(fromBtn) {
 
     // Clear all 버튼 (fromBtn 진입 시 footer 좌측)
     const clearAllBtn = sheet.querySelector('#myg-clear-btn');
-    if (clearAllBtn) clearAllBtn.onclick = () => { selArr.splice(0); renderSheet(); };
+    if (clearAllBtn) clearAllBtn.onclick = () => { myGroups = null; clearMyGroups(); applyMyGroups(); closeMyGroups(sheet); };
 
     // Skip 버튼 (첫 방문 진입 시 footer 좌측)
     const skipBtn = sheet.querySelector('#myg-skip');
