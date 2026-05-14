@@ -227,11 +227,20 @@ body{
 
 /* chip-only sticky strip */
 .chip-sticky{
-  position:sticky;top:108px;z-index:20;
+  position:fixed;
+  top:108px;
+  left:0;right:0;
+  margin:0 auto;
+  width:100%;
+  max-width:600px;
+  z-index:20;
   background:#FFFFFF;
   border-bottom:1px solid var(--border);
-  -webkit-transform:translateZ(0);
-  transform:translateZ(0);
+}
+.chip-placeholder{
+  /* matches chip-sticky height so content doesn't jump under it */
+  height:44px;
+  flex-shrink:0;
 }
 
 /* selected date header */
@@ -1182,6 +1191,11 @@ function renderBottom(){
 
     stickyWrap.appendChild(strip);
     bot.appendChild(stickyWrap);
+
+    // fixed 포지셔닝으로 flow에서 빠지므로 동일 높이 spacer 삽입
+    const chipPlaceholder = document.createElement('div');
+    chipPlaceholder.className = 'chip-placeholder';
+    bot.appendChild(chipPlaceholder);
 
     requestAnimationFrame(() => {
       const activeChip = strip.querySelector('[data-active="true"]');
