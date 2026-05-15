@@ -459,8 +459,13 @@ async function loadAllEvents() {
   const statsEl = document.getElementById('topbar-stats');
   try {
     statsEl.textContent = '불러오는 중…';
+    // 1년 전 ~ 2년 후 범위만 가져와 1000행 limit 문제 회피
+    const from = new Date(); from.setFullYear(from.getFullYear() - 1);
+    const to   = new Date(); to.setFullYear(to.getFullYear() + 2);
+    const fromStr = from.toISOString().slice(0,10);
+    const toStr   = to.toISOString().slice(0,10);
     const res = await fetch(
-      `${SUPA_URL}/rest/v1/music_show_lineups?select=*&order=broad_date.asc`,
+      `${SUPA_URL}/rest/v1/music_show_lineups?select=*&broad_date=gte.${fromStr}&broad_date=lte.${toStr}&order=broad_date.asc&limit=2000`,
       { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`, 'Accept': 'application/json' } }
     );
     const text = await res.text();
@@ -470,10 +475,8 @@ async function loadAllEvents() {
     }
     const data = JSON.parse(text);
     allEvents = Array.isArray(data) ? data : [];
-    console.log('[admin] loaded', allEvents.length, 'lineups, sample:', allEvents[0]);
   } catch(e) {
     document.getElementById('topbar-stats').textContent = `Fetch 오류: ${e.message}`;
-    console.error('[admin] loadAllEvents:', e);
     allEvents = [];
   }
 }
