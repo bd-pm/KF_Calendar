@@ -1620,10 +1620,7 @@ async function fetchMusicShowLineups() {
       buildCal();
       renderBottom();
     }
-    // 데이터 로드 완료 후 첫 방문 팝업
-    if (!localStorage.getItem(MY_GROUPS_SEEN_KEY)) {
-      setTimeout(() => openMyGroups(), 600);
-    }
+    // 데이터 로드 완료 후 첫 방문 팝업 — 검색 모달로 전환되어 자동 오픈 제거
   } catch(e) {
     console.warn('[KF_Calendar] fetchLineups 실패:', e.message);
   }
@@ -1652,7 +1649,8 @@ function clearMyGroups() {
   localStorage.setItem(MY_GROUPS_SEEN_KEY, '1');
 }
 
-let myGroups = loadMyGroups(); // null = 전체, [] or [...] = 필터
+localStorage.removeItem(MY_GROUPS_KEY); // 기존 저장된 그룹 필터 초기화
+let myGroups = null; // 그룹 필터 비활성화 (검색 → Bunjang 이동으로 전환)
 
 // 버튼 상태 업데이트
 function updateMyGroupsBtn() {
