@@ -70,3 +70,26 @@ create policy "public read artist_name_map"
 create policy "service write artist_name_map"
   on public.artist_name_map for all
   using (auth.role() = 'service_role');
+
+-- ─────────────────────────────────────────
+--  feedbacks 테이블
+--  유저 피드백 (별점 + 메시지) 저장
+-- ─────────────────────────────────────────
+create table if not exists public.feedbacks (
+  id         bigserial primary key,
+  rating     smallint    not null check (rating between 1 and 5),
+  message    text,
+  created_at timestamptz default now()
+);
+
+alter table public.feedbacks enable row level security;
+
+-- anon: INSERT 허용 (앱에서 피드백 제출)
+create policy "anon insert feedbacks"
+  on public.feedbacks for insert to anon
+  with check (true);
+
+-- anon: SELECT 허용 (어드민 페이지에서 조회)
+create policy "anon read feedbacks"
+  on public.feedbacks for select
+  using (true);

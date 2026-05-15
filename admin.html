@@ -132,8 +132,6 @@ select option{background:#0d0d14}
 <div class="tabs">
   <div class="tab on"  onclick="showTab('calendar')">📅 Calendar</div>
   <div class="tab"     onclick="showTab('lineups')">🎤 공방 일정</div>
-  <div class="tab"     onclick="showTab('submissions')">Fan Submissions <span id="pending-cnt" class="badge-count" style="display:none"></span></div>
-  <div class="tab"     onclick="showTab('history')">Review History</div>
   <div class="tab"     onclick="showTab('feedback')">Feedback</div>
   <div class="tab"     onclick="showTab('add')">+ Add Event</div>
 </div>
@@ -157,7 +155,6 @@ select option{background:#0d0d14}
         <div class="fchip crawl on"    onclick="toggleFilter('src','crawl')">Crawled</div>
         <div class="fchip manual on"   onclick="toggleFilter('src','manual')">Manual</div>
         <div class="fchip fan on"      onclick="toggleFilter('src','fan')">Fan-approved</div>
-        <div class="fchip pending on"  onclick="toggleFilter('src','pending')">⏳ Pending</div>
       </div>
     </div>
 
@@ -240,27 +237,6 @@ select option{background:#0d0d14}
     </div>
   </div>
 
-  <!-- ═══════════════ SUBMISSIONS TAB ═══════════════ -->
-  <div id="tab-submissions" style="display:none">
-    <div class="sec-hdr">
-      <h2>Pending Fan Submissions</h2>
-    </div>
-    <div id="sub-list"><div class="empty">Loading…</div></div>
-  </div>
-
-  <!-- ═══════════════ HISTORY TAB ═══════════════ -->
-  <div id="tab-history" style="display:none">
-    <div class="sec-hdr"><h2>Review History</h2></div>
-    <div class="filter-bar">
-      <select id="hist-filter" onchange="loadHistory()">
-        <option value="all">All</option>
-        <option value="approved">Approved</option>
-        <option value="rejected">Rejected</option>
-      </select>
-    </div>
-    <div id="hist-list"><div class="empty">Loading…</div></div>
-  </div>
-
   <!-- ═══════════════ FEEDBACK TAB ═══════════════ -->
   <div id="tab-feedback" style="display:none">
     <div class="sec-hdr"><h2>User Feedback</h2></div>
@@ -322,14 +298,13 @@ async function api(path, opts={}) {
 }
 
 // ── STATE ──
-const TABS = ['calendar','lineups','submissions','history','feedback','add'];
+const TABS = ['calendar','lineups','feedback','add'];
 let allEvents = [];
 let calYear, calMonth;
 let filterGroup = 'all';
-let filterSrc = new Set(['crawl','manual','fan','pending']);
+let filterSrc = new Set(['crawl','manual','fan']);
 let detailEvent = null;
 let editingId = null;
-let allSubmissions = [];
 
 const GC = {bts:'badge-bts',enhypen:'badge-enhypen',seventeen:'badge-seventeen'};
 const SC = {crawl:'badge-crawl',manual:'badge-manual',fan:'badge-fan'};
@@ -344,8 +319,6 @@ function showTab(name) {
   });
   if(name==='calendar')    renderCal();
   if(name==='lineups')     loadLineups();
-  if(name==='submissions') loadSubmissions();
-  if(name==='history')     loadHistory();
   if(name==='feedback')    loadFeedback();
 }
 
@@ -482,30 +455,21 @@ async function syncImbc() {
   }
 }
 
+// supaFetch alias (admin에서 lineup 기능에 사용)
+const supaFetch = (path, opts={}) => api(path, opts);
+
 // ── INIT ──
 (async function init() {
   const now = new Date();
   calYear = now.getFullYear(); calMonth = now.getMonth();
-  await Promise.all([loadAllEvents(), loadAllSubmissions()]);
+  await loadAllEvents();
   renderCal();
   updateTopbar();
-  loadSubmissions(); // pre-load badge count
 })();
 
 async function loadAllEvents() {
   const res = await api('events?select=*&order=date_start.asc', {prefer:''});
   allEvents = await res.json();
-}
-
-async function loadAllSubmissions() {
-  const res = await api('event_submissions?select=*&status=eq.pending&order=date_start.asc', {prefer:''});
-  const rows = await res.json();
-  // normalize to same shape as events, mark source='pending'
-  allSubmissions = Array.isArray(rows) ? rows.map(r => ({
-    ...r,
-    source: 'pending',
-    _isPending: true,
-  })) : [];
 }
 
 function updateTopbar() {
@@ -534,16 +498,10 @@ function toggleFilter(type, val) {
 }
 
 function visibleEvents() {
-  const approved = allEvents.filter(e =>
+  return allEvents.filter(e =>
     (filterGroup==='all' || e.group_id===filterGroup) &&
     filterSrc.has(e.source||'manual')
   );
-  const pending = filterSrc.has('pending')
-    ? allSubmissions.filter(e =>
-        filterGroup==='all' || e.group_id===filterGroup
-      )
-    : [];
-  return [...approved, ...pending];
 }
 
 function renderCal() {
@@ -694,126 +652,14 @@ async function deleteEvent(id) {
 }
 
 // ── SUBMISSIONS ──
-async function loadSubmissions() {
-  const el = document.getElementById('sub-list');
-  if(el) el.innerHTML='<div class="empty">Loading…</div>';
-  const res = await api('event_submissions?select=*&status=eq.pending&order=created_at.desc', {prefer:''});
-  const rows = await res.json();
-
-  // 1년 지난 것 자동 만료 처리 (클라이언트 필터)
-  const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
-  const active = rows.filter(r => new Date(r.created_at) > cutoff);
-
-  const cnt = document.getElementById('pending-cnt');
-  if(cnt) { cnt.textContent=active.length; cnt.style.display=active.length?'inline-block':'none'; }
-
-  if(!el) return;
-  if(!active.length){ el.innerHTML='<div class="empty">No pending submissions.</div>'; return; }
-  el.innerHTML='';
-  active.forEach(r => el.appendChild(makeSubCard(r, true)));
-}
-
-function makeSubCard(r, showActions) {
-  const card = document.createElement('div');
-  card.className='card';
-  card.innerHTML=`
-    <div class="card-row">
-      <div class="card-info">
-        <div class="card-badges">
-          <span class="badge ${GC[r.group_id]||'badge-type'}">${(r.group_id||'').toUpperCase()}</span>
-          <span class="badge badge-type">${r.type}</span>
-          <span class="badge badge-${r.status}">${r.status.toUpperCase()}</span>
-        </div>
-        <div class="card-name">${r.name}</div>
-        <div class="card-meta">
-          📅 ${r.date_start}${r.date_end?' → '+r.date_end:''} &nbsp; 📍 ${r.venue||'—'}<br>
-          👤 ${r.submitted_by||'anonymous'} · ${new Date(r.created_at).toLocaleDateString()}<br>
-          ${r.evidence_url?`🔗 <a href="${r.evidence_url}" target="_blank">${r.evidence_url.slice(0,50)}…</a>`:'' }
-          ${r.reject_reason?`<br>❌ ${r.reject_reason}`:''}
-        </div>
-      </div>
-      ${showActions ? `
-      <div class="card-actions">
-        <button class="btn-approve btn-sm" onclick="approveSubmission('${r.id}',this)">✓ Approve</button>
-        <button class="btn-reject btn-sm"  onclick="rejectSubmission('${r.id}',this)">✕ Reject</button>
-      </div>` : ''}
-    </div>
-  `;
-  return card;
-}
-
-// Called from calendar detail panel for pending submissions
-async function reviewSubmission(id, action) {
-  const panel = document.getElementById('detail-panel');
-  if(action === 'approved') {
-    const row = allSubmissions.find(s => s.id === id);
-    if(!row) return;
-    await api('events', {method:'POST', prefer:'return=minimal', body:JSON.stringify({
-      group_id:row.group_id, type:row.type, name:row.name, venue:row.venue||'',
-      date_start:row.date_start, date_end:row.date_end||null, source:'fan', source_url:row.evidence_url||'',
-    })});
-    await api(`event_submissions?id=eq.${id}`, {method:'PATCH', prefer:'return=minimal',
-      body:JSON.stringify({status:'approved', reviewed_at:new Date().toISOString()})});
-  } else {
-    const reason = prompt('Rejection reason (optional):') ?? '';
-    await api(`event_submissions?id=eq.${id}`, {method:'PATCH', prefer:'return=minimal',
-      body:JSON.stringify({status:'rejected', reject_reason:reason, reviewed_at:new Date().toISOString()})});
-  }
-  panel.classList.remove('open');
-  await Promise.all([loadAllEvents(), loadAllSubmissions()]);
-  renderCal();
-  updateTopbar();
-}
-
-async function approveSubmission(id, btn) {
-  btn.disabled=true; btn.textContent='…';
-  const res = await api(`event_submissions?id=eq.${id}`, {prefer:'return=representation'});
-  const [row] = await res.json();
-  // insert into events
-  await api('events', {method:'POST', prefer:'return=minimal', body:JSON.stringify({
-    group_id:row.group_id, type:row.type, name:row.name, venue:row.venue||'',
-    date_start:row.date_start, date_end:row.date_end||null, source:'fan', source_url:row.evidence_url||'',
-  })});
-  await api(`event_submissions?id=eq.${id}`, {method:'PATCH', prefer:'return=minimal',
-    body:JSON.stringify({status:'approved', reviewed_at:new Date().toISOString()})});
-  await loadAllEvents();
-  loadSubmissions();
-  updateTopbar();
-}
-
-async function rejectSubmission(id, btn) {
-  const reason = prompt('Rejection reason (optional):') ?? '';
-  btn.disabled=true;
-  await api(`event_submissions?id=eq.${id}`, {method:'PATCH', prefer:'return=minimal',
-    body:JSON.stringify({status:'rejected', reject_reason:reason, reviewed_at:new Date().toISOString()})});
-  loadSubmissions();
-}
-
-// ── HISTORY ──
-async function loadHistory() {
-  const el = document.getElementById('hist-list');
-  el.innerHTML='<div class="empty">Loading…</div>';
-  const status = document.getElementById('hist-filter').value;
-  const q = status==='all'
-    ? 'event_submissions?select=*&status=neq.pending&order=reviewed_at.desc'
-    : `event_submissions?select=*&status=eq.${status}&order=reviewed_at.desc`;
-  const res = await api(q, {prefer:''});
-  const rows = await res.json();
-  // 1년 필터
-  const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
-  const active = rows.filter(r => new Date(r.created_at) > cutoff);
-  if(!active.length){ el.innerHTML='<div class="empty">No records.</div>'; return; }
-  el.innerHTML='';
-  active.forEach(r => el.appendChild(makeSubCard(r, false)));
-}
-
 // ── FEEDBACK ──
 async function loadFeedback() {
   const el = document.getElementById('fb-list');
   el.innerHTML='<div class="empty">Loading…</div>';
   const res = await api('feedbacks?select=*&order=created_at.desc', {prefer:''});
+  if(!res.ok){ el.innerHTML=`<div class="empty" style="color:#f08080">오류 ${res.status}: feedbacks 테이블을 확인하세요.</div>`; return; }
   const rows = await res.json();
-  if(!rows.length){ el.innerHTML='<div class="empty">No feedback yet.</div>'; return; }
+  if(!Array.isArray(rows)||!rows.length){ el.innerHTML='<div class="empty">No feedback yet.</div>'; return; }
 
   // summary
   const avg = (rows.reduce((s,r)=>s+(r.rating||0),0)/rows.length).toFixed(1);
