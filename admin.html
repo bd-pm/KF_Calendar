@@ -143,9 +143,8 @@ select option{background:#0d0d14}
           style="padding:4px 10px;border-radius:16px;font-size:12px;background:#1a1a28;border:1.5px solid #2a2a40;color:#e0e0f0;width:180px;outline:none"
           oninput="filterGroupInput(this.value)">
         <div style="width:1px;background:#333;margin:0 2px"></div>
-        <div class="fchip crawl on"  onclick="toggleFilter('src','crawl')">Crawled</div>
+        <div class="fchip crawl on"  onclick="toggleFilter('src','naver')">Crawled</div>
         <div class="fchip manual on" onclick="toggleFilter('src','manual')">Manual</div>
-        <div class="fchip fan on"    onclick="toggleFilter('src','fan')">Fan-approved</div>
       </div>
     </div>
 
@@ -293,14 +292,12 @@ const TABS = ['calendar','lineups','feedback','add'];
 let allEvents = [];
 let calYear, calMonth;
 let filterGroup = '';
-let filterSrc = new Set(['crawl','manual','fan']);
+let filterSrc = new Set(['naver','manual']);
 let detailEvent = null;
 let editingId = null;
 
-const GC = {bts:'badge-bts',enhypen:'badge-enhypen',seventeen:'badge-seventeen'};
-const SC = {crawl:'badge-crawl',manual:'badge-manual',fan:'badge-fan'};
-const PC = {crawl:'src-crawl',manual:'src-manual',fan:'src-fan',pending:'src-pending'};
-const TYPE_EMOJI = {comeback:'🎵',concert:'🎤',tour:'🌏',fansign:'✍️',fancon:'🎉',release:'💿',special:'⭐'};
+const SC = {naver:'badge-crawl',manual:'badge-manual'};
+const PC = {naver:'src-crawl',manual:'src-manual'};
 
 // ── TABS ──
 function showTab(name) {
@@ -459,13 +456,21 @@ const supaFetch = (path, opts={}) => api(path, opts);
 })();
 
 async function loadAllEvents() {
-  const res = await api('events?select=*&order=date_start.asc', {prefer:''});
-  allEvents = await res.json();
+  try {
+    const res = await supaFetch('music_show_lineups?select=*&order=broad_date.asc', {prefer:''});
+    const data = await res.json();
+    allEvents = Array.isArray(data) ? data : [];
+  } catch(e) {
+    console.error('loadAllEvents:', e);
+    allEvents = [];
+  }
 }
 
 function updateTopbar() {
+  const naver  = allEvents.filter(e=>e.source==='naver').length;
+  const manual = allEvents.filter(e=>e.source==='manual').length;
   document.getElementById('topbar-stats').textContent =
-    `${allEvents.length} events · ${allEvents.filter(e=>e.source==='fan').length} fan-approved`;
+    `${allEvents.length} lineups · ${naver} crawled · ${manual} manual`;
 }
 
 // ── CALENDAR ──
@@ -481,16 +486,21 @@ function filterGroupInput(val) {
 
 function toggleFilter(type, val) {
   if(filterSrc.has(val)) filterSrc.delete(val); else filterSrc.add(val);
-  document.querySelectorAll(`.fchip.${val}`).forEach(el=>el.classList.toggle('on', filterSrc.has(val)));
+  const cls = val === 'naver' ? 'crawl' : val;
+  document.querySelectorAll(`.fchip.${cls}`).forEach(el=>el.classList.toggle('on', filterSrc.has(val)));
   renderCal();
 }
 
 function visibleEvents() {
   const q = filterGroup.toLowerCase();
-  return allEvents.filter(e =>
-    (!q || (e.group_id||'').toLowerCase().includes(q)) &&
-    filterSrc.has(e.source||'manual')
-  );
+  return allEvents.filter(e => {
+    const srcMatch = filterSrc.has(e.source || 'manual');
+    if (!srcMatch) return false;
+    if (!q) return true;
+    const inGroups = (e.groups||[]).some(g => g.toLowerCase().includes(q));
+    const inRaw = (e.raw_title||'').toLowerCase().includes(q);
+    return inGroups || inRaw;
+  });
 }
 
 function renderCal() {
@@ -523,23 +533,29 @@ function renderCal() {
     const dateStr = `${c.yr}-${String(c.mo+1).padStart(2,'0')}-${String(c.day).padStart(2,'0')}`;
     const cellDate = new Date(c.yr, c.mo, c.day);
     const isToday  = cellDate.getTime()===today.getTime();
-    const dayEvts  = evts.filter(e => e.date_start===dateStr);
+    const dayEvts  = evts.filter(e => e.broad_date===dateStr);
 
     const cell = document.createElement('div');
     cell.className = ['cal-cell', c.other?'other':'', isToday?'today':''].filter(Boolean).join(' ');
 
     const num = document.createElement('div');
     num.className = 'cal-num';
-    if(isToday) { const wrap=document.createElement('div');wrap.textContent=c.day;cell.appendChild(Object.assign(num,{}));num.appendChild(wrap); }
-    else num.textContent = c.day;
+    num.textContent = c.day;
+    if(isToday) { const w=document.createElement('div');w.textContent=c.day;num.textContent='';num.appendChild(w); }
     cell.appendChild(num);
 
-    const MAX_PILLS = 2;
+    const MAX_PILLS = 3;
     dayEvts.slice(0, MAX_PILLS).forEach(e => {
       const pill = document.createElement('div');
       pill.className = `cal-pill ${PC[e.source]||'src-manual'}`;
-      pill.textContent = `${TYPE_EMOJI[e.type]||''} ${e.name}`;
-      pill.title = e.name;
+      const showColor = SHOW_COLORS_ADMIN[e.show_name];
+      if(showColor) pill.style.borderLeft = `2px solid ${showColor}`;
+      const showShort = (SHOW_LABELS_ADMIN[e.show_name]||e.show_name).replace('🎵 ','').replace(/^[A-Z]+ /,'');
+      const artists = e.raw_title
+        ? e.raw_title.split(/[·,]/).slice(0,2).map(s=>s.trim()).join(', ')
+        : (e.groups||[]).slice(0,2).join(', ');
+      pill.textContent = `${showShort}`;
+      pill.title = `${SHOW_LABELS_ADMIN[e.show_name]||e.show_name}\n${e.raw_title||e.groups.join(', ')}`;
       pill.onclick = () => openDetail(e);
       cell.appendChild(pill);
     });
@@ -556,65 +572,31 @@ function renderCal() {
 
 // ── DETAIL PANEL ──
 function openDetail(e) {
-  detailEvent = e; editingId = null;
+  detailEvent = e;
   const panel = document.getElementById('detail-panel');
   panel.classList.add('open');
   document.getElementById('dp-edit').style.display='none';
-  document.getElementById('dp-name').textContent = e.name;
-  const srcLabel = e._isPending ? '⏳ Pending Fan Submission' : (e.source||'manual');
-  const srcBadge = e._isPending ? 'badge-pending' : (SC[e.source]||'badge-type');
+
+  const showLabel = SHOW_LABELS_ADMIN[e.show_name] || e.show_name;
+  const srcBadge  = SC[e.source] || 'badge-type';
+  const artists   = e.raw_title || (e.groups||[]).join(' · ');
+
+  document.getElementById('dp-name').textContent = showLabel;
   document.getElementById('dp-meta').innerHTML = `
-    <span class="badge ${GC[e.group_id]||'badge-type'}">${(e.group_id||'').toUpperCase()}</span>
-    <span class="badge ${srcBadge}">${srcLabel}</span>
-    <span class="badge badge-type">${e.type}</span><br>
-    📅 ${e.date_start}${e.date_end?' → '+e.date_end:''} &nbsp; 📍 ${e.venue||'—'}
-    ${e.evidence_url?`<br>🔗 <a href="${e.evidence_url}" target="_blank">${e.evidence_url.slice(0,60)}</a>`:
-      e.source_url?`<br>🔗 <a href="${e.source_url}" target="_blank">${e.source_url.slice(0,60)}</a>`:''}
-    ${e.submitted_by?`<br>👤 Submitted by: ${e.submitted_by}`:''}
+    <span class="badge ${srcBadge}">${e.source}</span><br>
+    📅 ${e.broad_date}${e.episode_number ? ` &nbsp;·&nbsp; EP ${e.episode_number}회` : ''}
+    <br>🎤 ${artists}
   `;
+
   const actions = document.getElementById('dp-actions');
   actions.innerHTML='';
+  const btnGoLineups = document.createElement('button');
+  btnGoLineups.className='btn-edit'; btnGoLineups.textContent='공방 일정 탭에서 편집';
+  btnGoLineups.onclick = () => { panel.classList.remove('open'); showTab('lineups'); };
   const btnClose = document.createElement('button');
-  btnClose.className='btn-sm'; btnClose.style.background='#222'; btnClose.style.color='#888';
+  btnClose.className='btn-sm'; btnClose.style.cssText='background:#222;color:#888';
   btnClose.textContent='Close'; btnClose.onclick = () => panel.classList.remove('open');
-
-  if(e._isPending) {
-    // Pending submission: show Approve / Reject
-    const btnApp = document.createElement('button');
-    btnApp.className='btn-approve'; btnApp.textContent='✓ Approve';
-    btnApp.onclick = () => reviewSubmission(e.id, 'approved');
-    const btnRej = document.createElement('button');
-    btnRej.className='btn-reject'; btnRej.textContent='✗ Reject';
-    btnRej.onclick = () => reviewSubmission(e.id, 'rejected');
-    actions.append(btnApp, btnRej, btnClose);
-  } else {
-    const btnEdit = document.createElement('button');
-    btnEdit.className='btn-edit'; btnEdit.textContent='Edit';
-    btnEdit.onclick = () => toggleEditForm(e);
-    const btnDel = document.createElement('button');
-    btnDel.className='btn-delete'; btnDel.textContent='Delete';
-    btnDel.onclick = () => deleteEvent(e.id);
-    actions.append(btnEdit, btnDel, btnClose);
-  }
-}
-
-function toggleEditForm(e) {
-  const editDiv = document.getElementById('dp-edit');
-  if(editDiv.style.display==='block') { editDiv.style.display='none'; return; }
-  document.getElementById('ep-name').value  = e.name;
-  document.getElementById('ep-venue').value = e.venue||'';
-  document.getElementById('ep-date').value  = e.date_start;
-  document.getElementById('ep-type').value  = e.type;
-  editDiv.style.display='block';
-  editingId = e.id;
-  // add save button if not present
-  const actions = document.getElementById('dp-actions');
-  if(!document.getElementById('btn-save-edit')) {
-    const btn = document.createElement('button');
-    btn.id='btn-save-edit'; btn.className='btn-approve'; btn.textContent='Save';
-    btn.onclick = saveEdit;
-    actions.prepend(btn);
-  }
+  actions.append(btnGoLineups, btnClose);
 }
 
 async function saveEdit() {
