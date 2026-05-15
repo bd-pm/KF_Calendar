@@ -1889,7 +1889,7 @@ function openFeedbackModal() {
   sheet.style.cssText = 'padding-bottom:env(safe-area-inset-bottom,16px);display:flex;flex-direction:column;overflow:hidden;';
   sheet.innerHTML = `
     <!-- GDS TopNavigation: 48px, close button 오른쪽 정렬 -->
-    <div style="height:48px;padding:12px 20px;display:flex;align-items:center;justify-content:flex-end;flex-shrink:0;">
+    <div style="height:48px;padding:16px 20px 8px;display:flex;align-items:flex-start;justify-content:flex-end;flex-shrink:0;">
       <button onclick="closeFeedbackModal()" style="width:24px;height:24px;border:none;background:none;padding:0;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;outline:none;">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="12" cy="12" r="12" fill="#EBEBEB"/>
