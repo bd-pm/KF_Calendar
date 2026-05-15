@@ -2,8 +2,10 @@
 // 로컬 실행: node scripts/sync-naver.js [--since YYYY-MM-DD] [--debug]
 // 예) node scripts/sync-naver.js --since 2026-01-01
 
-// dotenv 선택적 로드 (.env.local 있을 때만)
-try { require('dotenv').config({ path: require('path').join(__dirname, '../.env.local') }); } catch {}
+// dotenv 선택적 로드 (.env → .env.local 순서)
+const path = require('path');
+try { require('dotenv').config({ path: path.join(__dirname, '../.env') }); } catch {}
+try { require('dotenv').config({ path: path.join(__dirname, '../.env.local'), override: true }); } catch {}
 
 const handler = require('../api/sync-naver');
 

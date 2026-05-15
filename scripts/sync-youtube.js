@@ -10,6 +10,11 @@
 //   엠카운트다운: Mnet K-POP (UCbD8EppRX3ZwJSou-TVo90A) — "알려주는 이번 주 엠카운트다운 라인업"
 //               description: "ARTIST ✶ ARTIST ✶ ARTIST"
 
+// dotenv 선택적 로드 (.env → .env.local 순서)
+const path = require('path');
+try { require('dotenv').config({ path: path.join(__dirname, '../.env') }); } catch {}
+try { require('dotenv').config({ path: path.join(__dirname, '../.env.local'), override: true }); } catch {}
+
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 const SUPA_URL         = 'https://kzffotlfdtubkbxsjqiv.supabase.co';
 const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
