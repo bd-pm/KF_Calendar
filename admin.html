@@ -27,14 +27,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .cal-month-label{font-size:16px;font-weight:700;color:#e0e0f0;min-width:140px;text-align:center}
 .filter-chips{display:flex;gap:6px;flex-wrap:wrap}
 .fchip{padding:4px 12px;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all .15s}
-.fchip.all{border-color:#555;color:#aaa}
-.fchip.all.on{background:#555;color:#fff}
-.fchip.bts{border-color:#9040d0;color:#c080f0}
-.fchip.bts.on{background:#9040d0;color:#fff}
-.fchip.enhypen{border-color:#d07030;color:#f0a060}
-.fchip.enhypen.on{background:#d07030;color:#fff}
-.fchip.seventeen{border-color:#6050c0;color:#a090e0}
-.fchip.seventeen.on{background:#6050c0;color:#fff}
 .fchip.crawl{border-color:#306090;color:#70a0d0}
 .fchip.crawl.on{background:#306090;color:#fff}
 .fchip.manual{border-color:#306050;color:#60d090}
@@ -146,15 +138,14 @@ select option{background:#0d0d14}
         <div class="cal-month-label" id="cal-label"></div>
         <button onclick="calMove(1)">›</button>
       </div>
-      <div class="filter-chips">
-        <div class="fchip all on"      onclick="toggleFilter('group','all')">All Groups</div>
-        <div class="fchip bts"         onclick="toggleFilter('group','bts')">BTS</div>
-        <div class="fchip enhypen"     onclick="toggleFilter('group','enhypen')">ENHYPEN</div>
-        <div class="fchip seventeen"   onclick="toggleFilter('group','seventeen')">SEVENTEEN</div>
-        <div style="width:1px;background:#333;margin:0 4px"></div>
-        <div class="fchip crawl on"    onclick="toggleFilter('src','crawl')">Crawled</div>
-        <div class="fchip manual on"   onclick="toggleFilter('src','manual')">Manual</div>
-        <div class="fchip fan on"      onclick="toggleFilter('src','fan')">Fan-approved</div>
+      <div class="filter-chips" style="align-items:center">
+        <input id="group-search" type="text" placeholder="그룹 검색 (예: bts, ive…)"
+          style="padding:4px 10px;border-radius:16px;font-size:12px;background:#1a1a28;border:1.5px solid #2a2a40;color:#e0e0f0;width:180px;outline:none"
+          oninput="filterGroupInput(this.value)">
+        <div style="width:1px;background:#333;margin:0 2px"></div>
+        <div class="fchip crawl on"  onclick="toggleFilter('src','crawl')">Crawled</div>
+        <div class="fchip manual on" onclick="toggleFilter('src','manual')">Manual</div>
+        <div class="fchip fan on"    onclick="toggleFilter('src','fan')">Fan-approved</div>
       </div>
     </div>
 
@@ -301,7 +292,7 @@ async function api(path, opts={}) {
 const TABS = ['calendar','lineups','feedback','add'];
 let allEvents = [];
 let calYear, calMonth;
-let filterGroup = 'all';
+let filterGroup = '';
 let filterSrc = new Set(['crawl','manual','fan']);
 let detailEvent = null;
 let editingId = null;
@@ -483,23 +474,21 @@ const DOWS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 function calMove(d) { calMonth += d; if(calMonth>11){calMonth=0;calYear++} if(calMonth<0){calMonth=11;calYear--} renderCal(); }
 
+function filterGroupInput(val) {
+  filterGroup = val.trim();
+  renderCal();
+}
+
 function toggleFilter(type, val) {
-  if(type==='group') {
-    filterGroup = val;
-    document.querySelectorAll('.fchip.all,.fchip.bts,.fchip.enhypen,.fchip.seventeen').forEach(el=>{
-      el.classList.toggle('on', el.classList.contains(val==='all'?'all':val));
-    });
-    if(val==='all') document.querySelector('.fchip.all').classList.add('on');
-  } else {
-    if(filterSrc.has(val)) filterSrc.delete(val); else filterSrc.add(val);
-    document.querySelectorAll(`.fchip.${val}`).forEach(el=>el.classList.toggle('on', filterSrc.has(val)));
-  }
+  if(filterSrc.has(val)) filterSrc.delete(val); else filterSrc.add(val);
+  document.querySelectorAll(`.fchip.${val}`).forEach(el=>el.classList.toggle('on', filterSrc.has(val)));
   renderCal();
 }
 
 function visibleEvents() {
+  const q = filterGroup.toLowerCase();
   return allEvents.filter(e =>
-    (filterGroup==='all' || e.group_id===filterGroup) &&
+    (!q || (e.group_id||'').toLowerCase().includes(q)) &&
     filterSrc.has(e.source||'manual')
   );
 }
