@@ -63,6 +63,26 @@ module.exports = async function handler(req, res) {
     signal: AbortSignal.timeout(15000),
   });
 
+  if (upRes.status === 409 || upRes.status === 400) {
+    // 중복 시 PATCH로 업데이트
+    const patchRes = await fetch(
+      `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${encodeURIComponent(row.show_name)}&broad_date=eq.${row.broad_date}`,
+      {
+        method: 'PATCH',
+        headers: {
+          apikey: SUPA_SERVICE_KEY,
+          Authorization: `Bearer ${SUPA_SERVICE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({ groups: row.groups, raw_title: row.raw_title, episode_number: row.episode_number, source: 'manual' }),
+        signal: AbortSignal.timeout(15000),
+      }
+    );
+    if (!patchRes.ok) return res.status(patchRes.status).json({ error: await patchRes.text() });
+    return res.status(200).json({ ok: true, updated: true });
+  }
+
   if (!upRes.ok) {
     const txt = await upRes.text();
     return res.status(upRes.status).json({ error: txt });
