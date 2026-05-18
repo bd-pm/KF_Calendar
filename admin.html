@@ -420,16 +420,15 @@ async function submitLineup() {
 
   msg.style.color='#888'; msg.textContent='저장 중...';
   try {
-    const res = await supaFetch('music_show_lineups', {
+    const res = await fetch('/api/lineup-upsert', {
       method: 'POST',
-      prefer: 'resolution=merge-duplicates',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         show_name: show,
         broad_date: date,
         episode_number: episode || null,
         groups,
         raw_title: artists.join(' · '),
-        source: 'manual',
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
