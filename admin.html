@@ -721,8 +721,13 @@ function openDetail(e) {
   const actions = document.getElementById('dp-actions');
   actions.innerHTML='';
   const btnGoLineups = document.createElement('button');
-  btnGoLineups.className='btn-edit btn-sm'; btnGoLineups.textContent='공방 일정 탭 편집';
-  btnGoLineups.onclick = () => { panel.classList.remove('open'); showTab('lineups'); };
+  btnGoLineups.className='btn-edit btn-sm'; btnGoLineups.textContent='공방 일정 편집';
+  btnGoLineups.onclick = () => {
+    panel.classList.remove('open');
+    showTab('lineups');
+    // 폼에 현재 이벤트 데이터 채우기
+    editLineup(e.id, e.show_name, e.broad_date, e.episode_number, e.raw_title || '');
+  };
   const btnClose = document.createElement('button');
   btnClose.className='btn-sm'; btnClose.style.cssText='background:#222;color:#888';
   btnClose.textContent='닫기'; btnClose.onclick = () => panel.classList.remove('open');
