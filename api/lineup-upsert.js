@@ -21,8 +21,9 @@ module.exports = async function handler(req, res) {
         return res.status(401).json({ error: 'unauthorized' });
       }
       const hdrs = { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}`, Prefer: 'return=minimal' };
+      const before = req.query.before || '2026-05-01';
       const [r1, r2] = await Promise.all([
-        fetch(`${SUPA_URL}/rest/v1/music_show_lineups?broad_date=lt.2020-01-01`, { method:'DELETE', headers: hdrs, signal: AbortSignal.timeout(30000) }),
+        fetch(`${SUPA_URL}/rest/v1/music_show_lineups?broad_date=lt.${before}`, { method:'DELETE', headers: hdrs, signal: AbortSignal.timeout(30000) }),
         fetch(`${SUPA_URL}/rest/v1/music_show_lineups?broad_date=gt.2027-12-31`, { method:'DELETE', headers: hdrs, signal: AbortSignal.timeout(30000) }),
       ]);
       return res.status(200).json({ ok: true, old: r1.ok, future: r2.ok });
