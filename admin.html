@@ -428,7 +428,7 @@ async function submitLineup() {
         broad_date: date,
         episode_number: episode || null,
         groups,
-        raw_title: artists.join(' · '),
+        raw_title: `${show} - ${artists.join(', ')}`,
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);

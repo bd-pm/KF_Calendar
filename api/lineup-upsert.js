@@ -47,7 +47,10 @@ module.exports = async function handler(req, res) {
     broad_date:     body.broad_date,
     episode_number: body.episode_number || null,
     groups:         body.groups || [],
-    raw_title:      body.raw_title || '',
+    // raw_title은 반드시 "show_name - artist1, artist2, ..." 포맷이어야 파싱됨
+    raw_title: (body.raw_title && body.raw_title.includes(' - '))
+      ? body.raw_title
+      : `${body.show_name} - ${body.raw_title || ''}`,
     source:         'manual',
   };
 
