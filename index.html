@@ -1287,7 +1287,9 @@ function renderBottom(){
     allChip.onclick = () => {
       selectedArtistName = null;
       allGroupsSelected = true;
+      const sy = window.scrollY;
       renderBottom();
+      requestAnimationFrame(() => window.scrollTo({top: sy, behavior: 'instant'}));
     };
     strip.appendChild(allChip);
 
@@ -1309,7 +1311,9 @@ function renderBottom(){
         const toggling = !allGroupsSelected && selectedArtistName === artistName;
         selectedArtistName = toggling ? null : artistName;
         allGroupsSelected = false;
+        const sy = window.scrollY;
         renderBottom();
+        requestAnimationFrame(() => window.scrollTo({top: sy, behavior: 'instant'}));
       };
       return chip;
     }
