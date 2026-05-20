@@ -1574,9 +1574,9 @@ async function fetchMusicShowLineups() {
     rows.forEach(r => {
       const dateKey = (r.broad_date || '').slice(0, 10);
       if (!dateKey) return;
-      // 같은 날짜에 여러 row가 있으면 naver > manual 우선, date_rule 제외
+      // 같은 날짜에 여러 row가 있으면 manual > naver > imbc/youtube > date_rule 순
       const existing = LINEUP_BY_DATE[dateKey];
-      const priority = { naver: 3, manual: 2, imbc_api: 1, youtube_api: 1, date_rule: 0 };
+      const priority = { manual: 4, naver: 3, imbc_api: 1, youtube_api: 1, imbc: 1, date_rule: 0 };
       if (!existing || (priority[r.source] ?? 0) >= (priority[existing.source] ?? 0)) {
         LINEUP_BY_DATE[dateKey] = {
           showName: r.show_name,
