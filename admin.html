@@ -344,6 +344,9 @@ async function loadLineups(onDone) {
       const color = SHOW_COLORS_ADMIN[r.show_name] || '#9B6FD8';
       const label = SHOW_LABELS_ADMIN[r.show_name] || r.show_name;
       const row = document.createElement('div');
+      row.className = 'lrow';
+      row.dataset.show = r.show_name;
+      row.dataset.date = r.broad_date;
       row.style.cssText = `background:#13131f;border:1px solid #22223a;border-left:3px solid ${color};border-radius:8px;padding:10px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px`;
       row.innerHTML = `
         <div style="flex:1;min-width:0">
@@ -484,8 +487,19 @@ async function submitLineup() {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
     msg.style.color='#60d090'; msg.textContent= editId ? '✓ 수정됨' : '✓ 저장됨';
+    const savedShow = show;
+    const savedDate = date;
     cancelEditLineup();
-    loadLineups();
+    loadLineups(() => {
+      // 저장된 항목 찾아서 하이라이트 + 스크롤
+      const target = document.querySelector(`#lineup-list .lrow[data-show="${savedShow}"][data-date="${savedDate}"]`);
+      if (target) {
+        target.style.transition = 'background 0.4s';
+        target.style.background = '#1a3a20';
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => { target.style.background = ''; }, 2500);
+      }
+    });
   } catch(e) {
     msg.style.color='#f08080'; msg.textContent='오류: ' + e.message;
   }
