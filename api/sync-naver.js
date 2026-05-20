@@ -210,7 +210,7 @@ function parseNaverEpisodes(html, descFormat = 'dt_dd') {
   return episodes;
 }
 
-// Supabase upsert (naver source는 기존 imbc/youtube_api 덮어쓰기)
+// Supabase upsert — manual source는 절대 덮어쓰지 않음
 async function upsertRows(rows) {
   if (!rows.length) return 0;
   const CHUNK = 50;
@@ -219,35 +219,35 @@ async function upsertRows(rows) {
     apikey: SUPA_SERVICE_KEY,
     Authorization: `Bearer ${SUPA_SERVICE_KEY}`,
     'Content-Type': 'application/json',
-    Prefer: 'resolution=merge-duplicates,return=minimal',
+    Prefer: 'return=minimal',
   };
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const chunk = rows.slice(i, i + CHUNK);
-    const res = await fetch(`${SUPA_URL}/rest/v1/music_show_lineups`, {
-      method: 'POST', headers: hdrs, body: JSON.stringify(chunk),
-      signal: AbortSignal.timeout(20000),
-    });
-    if (res.ok) { ok += chunk.length; continue; }
-    for (const row of chunk) {
-      const ex = await fetch(
-        `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${row.show_name}&broad_date=eq.${row.broad_date}&select=id,source`,
-        { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` } }
-      ).then(r => r.json()).catch(() => []);
-      if (ex.length > 0) {
-        if (row.source === 'date_rule' && ex[0].source !== 'date_rule') { ok++; continue; }
-        await fetch(`${SUPA_URL}/rest/v1/music_show_lineups?id=eq.${ex[0].id}`, {
-          method: 'PATCH',
-          headers: { ...hdrs, Prefer: 'return=minimal' },
-          body: JSON.stringify({ groups: row.groups, raw_title: row.raw_title, episode_number: row.episode_number, source: row.source }),
-        });
-        ok++;
-      } else {
-        const ins = await fetch(`${SUPA_URL}/rest/v1/music_show_lineups`, {
-          method: 'POST', headers: hdrs, body: JSON.stringify([row]),
-          signal: AbortSignal.timeout(10000),
-        });
-        if (ins.ok) ok++;
-      }
+
+  for (const row of rows) {
+    // 기존 row 확인
+    const ex = await fetch(
+      `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${row.show_name}&broad_date=eq.${row.broad_date}&select=id,source`,
+      { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` },
+        signal: AbortSignal.timeout(10000) }
+    ).then(r => r.json()).catch(() => []);
+
+    if (ex.length > 0) {
+      const existingSource = ex[0].source;
+      // manual은 절대 덮어쓰지 않음; date_rule은 더 나은 소스가 있을 때만 덮어씀
+      if (existingSource === 'manual') { ok++; continue; }
+      if (row.source === 'date_rule' && existingSource !== 'date_rule') { ok++; continue; }
+      await fetch(`${SUPA_URL}/rest/v1/music_show_lineups?id=eq.${ex[0].id}`, {
+        method: 'PATCH',
+        headers: { ...hdrs },
+        body: JSON.stringify({ groups: row.groups, raw_title: row.raw_title, episode_number: row.episode_number, source: row.source }),
+        signal: AbortSignal.timeout(10000),
+      });
+      ok++;
+    } else {
+      const ins = await fetch(`${SUPA_URL}/rest/v1/music_show_lineups`, {
+        method: 'POST', headers: hdrs, body: JSON.stringify([row]),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (ins.ok) ok++;
     }
   }
   return ok;

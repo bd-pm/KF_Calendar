@@ -197,7 +197,9 @@ async function upsertRows(rows) {
       ).then(r=>r.json()).catch(()=>[]);
 
       if (existing.length > 0) {
-        // naver source 우선 — imbc/date_rule이 덮어쓰지 않음
+        // manual 최우선 보호 — 어떤 자동 소스도 덮어쓰지 않음
+        if (existing[0].source === 'manual') { ok++; continue; }
+        // naver source 보호 — imbc/date_rule이 덮어쓰지 않음
         if (existing[0].source === 'naver' && row.source !== 'naver') { ok++; continue; }
         if (row.source === 'date_rule' && existing[0].groups?.length > 0) { ok++; continue; }
         await fetch(`${SUPA_URL}/rest/v1/music_show_lineups?id=eq.${existing[0].id}`, {
