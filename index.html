@@ -756,6 +756,26 @@ const KR_TO_EN = {
   '직캠':'Fancam','영상':'Video','사진':'Photo','싸인':'Signed','사인':'Signed',
   '포토카드세트':'Photocard Set','멤버별':'By Member','전멤버':'All Members',
   '랜덤':'Random','보증':'Guaranteed',
+  // ── 장소/행사 ──
+  '입장권':'Entry Ticket','티켓':'Ticket','입장':'Entry','행사':'Event',
+  '무대':'Stage','방청권':'Audience Ticket','방청':'Audience',
+  '생일카페':'Birthday Cafe','생카':'Birthday Cafe','기념일':'Anniversary',
+  '팝업스토어':'Pop-up Store','팝업':'Pop-up',
+  // ── 패키지/구성 ──
+  '버전':'Version','버젼':'Version','타입':'Type','종류':'Type',
+  '전종류':'All Types','선착순':'First Come','한정수량':'Limited Qty',
+  '미공개':'Unreleased','비공개':'Unreleased','스페셜':'Special',
+  '콜렉션':'Collection','컬렉션':'Collection','에디션':'Edition',
+  '공식MD':'Official MD','MD':'Merch',
+  // ── 숫자/수량 ──
+  '장':'pcs','개':'ea','묶음':'Bundle',
+  // ── 상태 추가 ──
+  '실사':'Print','양면':'Double-sided','단면':'Single-sided',
+  '홀로그램':'Hologram','투명':'Clear','반투명':'Translucent',
+  '대형':'Large','소형':'Small','미니':'Mini',
+  // ── 멤버 표현 ──
+  '솔로':'Solo','유닛':'Unit','그룹':'Group','전체':'All',
+  '본인':'Self','본명':'Real Name',
 };
 function translateName(name){
   let result = name;
@@ -1236,7 +1256,7 @@ function renderBottom(){
         <div class="sel-date">${dayNames[dateObj.getDay()]}, ${MONTH_NAMES[mo-1]} ${d}</div>
         <div class="sel-sub" style="display:flex;align-items:center;gap:6px;margin-top:3px">
           <span class="show-badge" style="background:${show.color}">${show.short}</span>
-          <span style="color:var(--txt2);font-size:12px">${chipCount > 0 ? (lineup.episode ? 'EP '+lineup.episode+' · ' : '')+chipCount+' Artists' : '출연진 업데이트 예정'}</span>
+          <span style="color:var(--txt2);font-size:12px">${chipCount > 0 ? (lineup.episode ? 'EP '+lineup.episode+' · ' : '')+chipCount+' Artists' : 'Lineup TBA'}</span>
         </div>
       </div>
       ${chipCount > 0 ? `<div class="evt-badge" style="background:${show.color}">${chipCount}</div>` : ''}
