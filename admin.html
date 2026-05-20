@@ -189,7 +189,7 @@ select option{background:#0d0d14}
     </div>
 
     <!-- 수동 입력 폼 -->
-    <div style="background:#13131f;border:1px solid #22223a;border-radius:12px;padding:20px;margin-bottom:24px">
+    <div id="lf-form-wrap" style="background:#13131f;border:1px solid #22223a;border-radius:12px;padding:20px;margin-bottom:24px">
       <input type="hidden" id="lf-edit-id" value="">
       <h3 id="lf-form-title" style="font-size:13px;font-weight:700;color:#aaa;margin-bottom:14px;text-transform:uppercase;letter-spacing:.05em">수동 입력 (음악중심 외 방송사)</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px">
@@ -227,7 +227,10 @@ select option{background:#0d0d14}
 
     <!-- 최근 입력된 공방 일정 목록 -->
     <div>
-      <h3 style="font-size:13px;font-weight:700;color:#aaa;margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em">최근 공방 일정</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <h3 style="font-size:13px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em">최근 공방 일정</h3>
+        <button onclick="document.getElementById('lf-form-wrap').style.display='';document.getElementById('lf-form-wrap').scrollIntoView({behavior:'smooth'})" style="background:#1e2a40;border:1px solid #2a4060;color:#80b0f0;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer">+ 새 일정 등록</button>
+      </div>
       <div id="lineup-list" style="display:flex;flex-direction:column;gap:8px">
         <div style="color:#555;font-size:13px">불러오는 중...</div>
       </div>
@@ -410,8 +413,9 @@ function editLineup(id, showName, broadDate, episodeNo, rawTitle) {
   document.getElementById('lf-submit-btn').textContent = '수정 저장';
   document.getElementById('lf-cancel-btn').style.display = 'inline-block';
   document.getElementById('lf-msg').textContent = '';
-  // 폼으로 스크롤
-  document.getElementById('lf-show').closest('div[style*="background:#13131f"]').scrollIntoView({ behavior:'smooth' });
+  // 폼 표시 + 스크롤
+  document.getElementById('lf-form-wrap').style.display = '';
+  document.getElementById('lf-form-wrap').scrollIntoView({ behavior:'smooth' });
 }
 
 function cancelEditLineup() {
@@ -490,8 +494,9 @@ async function submitLineup() {
     const savedShow = show;
     const savedDate = date;
     cancelEditLineup();
+    // 폼 숨기기
+    document.getElementById('lf-form-wrap').style.display = 'none';
     loadLineups(() => {
-      // 저장된 항목 찾아서 하이라이트 + 스크롤
       const target = document.querySelector(`#lineup-list .lrow[data-show="${savedShow}"][data-date="${savedDate}"]`);
       if (target) {
         target.style.transition = 'background 0.4s';
