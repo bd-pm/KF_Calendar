@@ -3,6 +3,7 @@
 // Vercel Cron: 0 0 * * * (매일 09:00 KST)
 
 const { resolveEnNames, normalizeArtistName } = require('./artist-en-name');
+const { getSpecialLineupRow } = require('./show-status');
 
 const SUPA_URL         = 'https://kzffotlfdtubkbxsjqiv.supabase.co';
 const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
@@ -128,6 +129,27 @@ function todayKstKey() {
 
 function maxDateKey(a, b) {
   return a > b ? a : b;
+}
+
+function isSpecialCancelled(showName, broadDate) {
+  return getSpecialLineupRow(showName, broadDate)?.source === 'cancelled';
+}
+
+async function deleteRowsByDates(showName, dates) {
+  if (!dates.length) return 0;
+  const url = new URL(`${SUPA_URL}/rest/v1/music_show_lineups`);
+  url.searchParams.set('show_name', `eq.${showName}`);
+  url.searchParams.set('broad_date', `in.(${dates.join(',')})`);
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      apikey: SUPA_SERVICE_KEY,
+      Authorization: `Bearer ${SUPA_SERVICE_KEY}`,
+    },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`Supabase delete HTTP ${res.status}`);
+  return 1;
 }
 
 function datesForDay(dayOfWeek, sinceDate, cutoffDate) {
@@ -345,6 +367,7 @@ async function upsertRows(rows) {
       const existingSource = ex[0].source;
       // manual은 절대 덮어쓰지 않음; date_rule은 더 나은 소스가 있을 때만 덮어씀
       if (existingSource === 'manual') { ok++; continue; }
+      if (existingSource === 'cancelled' && row.source !== 'manual') { ok++; continue; }
       if (row.source === 'date_rule' && existingSource !== 'date_rule') { ok++; continue; }
       await fetch(`${SUPA_URL}/rest/v1/music_show_lineups?id=eq.${ex[0].id}`, {
         method: 'PATCH',
@@ -423,12 +446,20 @@ module.exports = async function handler(req, res) {
     try {
       // ① 날짜 뼈대 (skeleton rows)
       const dates = datesForDay(show.dayOfWeek, since, cutoffDate);
+      const cancelledDates = dates.filter(d => isSpecialCancelled(show.show_name, d));
+      if (cancelledDates.length > 0) {
+        await deleteRowsByDates(show.show_name, cancelledDates);
+      }
       const skelRows = dates.map(d => ({
-        show_name: show.show_name, broad_date: d,
-        groups: [], raw_title: '', episode_number: null, source: 'date_rule',
+        show_name: show.show_name,
+        broad_date: d,
+        groups: [],
+        raw_title: '',
+        episode_number: null,
+        source: 'date_rule',
       }));
-      const skelOk = await upsertRows(skelRows);
-      log.push(`[${show.show_name}] 뼈대 ${skelOk}/${dates.length}개`);
+      const skelOk = await upsertRows(skelRows.filter(row => !cancelledDates.includes(row.broad_date)));
+      log.push(`[${show.show_name}] 뼈대 ${skelOk}/${dates.length - cancelledDates.length}개`);
 
       // ② Naver 회차정보 크롤링
       const html = await fetchNaverEpisodeTab(show);
@@ -440,7 +471,8 @@ module.exports = async function handler(req, res) {
         continue;
       }
 
-      let futureEpisodes = episodes.filter(ep => ep.date >= cutoffDate);
+      const cancelledSet = new Set(cancelledDates);
+      let futureEpisodes = episodes.filter(ep => ep.date >= cutoffDate && !cancelledSet.has(ep.date));
       const skippedPast = episodes.length - futureEpisodes.length;
       if (futureEpisodes.length === 0) {
         log.push(`[${show.show_name}] Naver 업데이트 0/0개 (기준일 ${cutoffDate}, 과거 ${skippedPast}개 스킵)`);

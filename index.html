@@ -979,23 +979,22 @@ function buildWeek(area){
     cell.appendChild(num);
 
     const lineup = LINEUP_BY_DATE[ds];
-    if(lineup && dateHasMyGroup(ds)){
+    const isCancelled = lineup?.source === 'cancelled';
+    if(lineup && (isCancelled || dateHasMyGroup(ds))){
       const dc=document.createElement('div');
       dc.className='dots-col';
       const show = SHOW_LABELS[lineup.showName];
-      const showColor = show ? show.color : '#9B6FD8';
+      const showColor = isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8');
       const dot=document.createElement('div');
       dot.className='evt-dot';
       dot.style.background=showColor;
-      dot.title=(show?show.short:lineup.showName)+' Lineup';
+      dot.title=(show?show.short:lineup.showName)+(isCancelled ? ' Canceled' : ' Lineup');
       dc.appendChild(dot);
-      const wRaw = parseRawTitleStatic(lineup.rawTitle);
-      const wCount = wRaw.length > 0 ? wRaw.length : lineup.groups.length;
       const showShort = show ? show.short : lineup.showName;
       if(showShort){
         const cnt=document.createElement('div');
         cnt.style.cssText=`font-size:8px;color:${showColor};font-weight:700;line-height:1;margin-top:2px;letter-spacing:0;text-align:center;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap`;
-        cnt.textContent=showShort;
+        cnt.textContent=isCancelled ? 'Canceled' : showShort;
         dc.appendChild(cnt);
       }
       cell.appendChild(dc);
@@ -1051,9 +1050,10 @@ function buildMonth(area){
     cell.appendChild(num);
 
     const mLineup = LINEUP_BY_DATE[ds];
-    if(mLineup && dateHasMyGroup(ds)){
+    const isCancelled = mLineup?.source === 'cancelled';
+    if(mLineup && (isCancelled || dateHasMyGroup(ds))){
       const show = SHOW_LABELS[mLineup.showName];
-      const showColor = show ? show.color : '#9B6FD8';
+      const showColor = isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8');
       const dotsEl=document.createElement('div');
       dotsEl.className='mday-dots';
       const dot=document.createElement('div');
@@ -1070,7 +1070,7 @@ function buildMonth(area){
       pill.style.color=showColor;
       const mRaw = parseRawTitleStatic(mLineup.rawTitle);
       const mCount = mRaw.length > 0 ? mRaw.length : mLineup.groups.length;
-      pill.textContent=(show?show.short:mLineup.showName)+(mCount?` · ${mCount}`:'');
+      pill.textContent=isCancelled ? `${show?show.short:mLineup.showName} · Canceled` : (show?show.short:mLineup.showName)+(mCount?` · ${mCount}`:'');
       pillsEl.appendChild(pill);
       cell.appendChild(pillsEl);
     }
@@ -1245,6 +1245,7 @@ function renderBottom(){
 
   const lineup = LINEUP_BY_DATE[selectedDate];
   const show   = lineup ? (SHOW_LABELS[lineup.showName] || { name: lineup.showName, color:'#9B6FD8', short: lineup.showName }) : null;
+  const isCancelled = lineup?.source === 'cancelled';
 
   const rawArtists = lineup ? parseRawTitleStatic(lineup.rawTitle) : [];
   const chipCount = rawArtists.length > 0 ? rawArtists.length : (lineup ? lineup.groups.length : 0);
@@ -1257,11 +1258,11 @@ function renderBottom(){
       <div>
         <div class="sel-date">${dayNames[dateObj.getDay()]}, ${MONTH_NAMES[mo-1]} ${d}</div>
         <div class="sel-sub" style="display:flex;align-items:center;gap:6px;margin-top:3px">
-          <span class="show-badge" style="background:${show.color}">${show.short}</span>
-          <span style="color:var(--txt2);font-size:12px">${chipCount > 0 ? (lineup.episode ? 'EP '+lineup.episode+' · ' : '')+chipCount+' Artists' : 'Lineup TBA'}</span>
+          <span class="show-badge" style="background:${isCancelled ? '#7A7A7A' : show.color}">${show.short}</span>
+          <span class="show-badge" style="background:${isCancelled ? '#5A5A5A' : show.color}">${isCancelled ? 'Canceled' : (chipCount > 0 ? (lineup.episode ? 'EP '+lineup.episode+' · ' : '')+chipCount+' Artists' : 'Lineup TBA')}</span>
         </div>
       </div>
-      ${chipCount > 0 ? `<div class="evt-badge" style="background:${show.color}">${chipCount}</div>` : ''}
+      ${isCancelled ? `<div class="evt-badge" style="background:#5A5A5A">Canceled</div>` : (chipCount > 0 ? `<div class="evt-badge" style="background:${show.color}">${chipCount}</div>` : '')}
     `;
   } else {
     hdr.innerHTML=`
@@ -1272,6 +1273,14 @@ function renderBottom(){
     `;
   }
   dateHeader.appendChild(hdr);
+
+  if (isCancelled) {
+    const notice = document.createElement('div');
+    notice.style.cssText = 'margin:14px 0 18px;padding:14px 16px;border:1px solid #3f3f4f;border-radius:8px;background:#191919;color:#cfcfcf;font-size:13px;line-height:1.6';
+    notice.innerHTML = '<strong style="color:#e6e6e6">Canceled</strong><br>This episode did not air.';
+    bot.appendChild(notice);
+    return;
+  }
 
   // ── Group chips → #chipBar (.app 직속 sticky) ──
   if(lineup && chipCount > 0){
@@ -1598,11 +1607,12 @@ async function fetchMusicShowLineups() {
 
     LINEUP_BY_DATE = {};
     rows.forEach(r => {
+      if (r.source === 'cancelled') return;
       const dateKey = (r.broad_date || '').slice(0, 10);
       if (!dateKey) return;
       // 같은 날짜에 여러 row가 있으면 manual > naver > imbc/youtube > date_rule 순
       const existing = LINEUP_BY_DATE[dateKey];
-      const priority = { manual: 4, naver: 3, imbc_api: 1, youtube_api: 1, imbc: 1, date_rule: 0 };
+      const priority = { manual: 5, naver: 3, imbc_api: 1, youtube_api: 1, imbc: 1, date_rule: 0 };
       if (!existing || (priority[r.source] ?? 0) >= (priority[existing.source] ?? 0)) {
         LINEUP_BY_DATE[dateKey] = {
           showName: r.show_name,

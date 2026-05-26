@@ -123,7 +123,7 @@ select option{background:#0d0d14}
 
 <div class="tabs">
   <div class="tab on"  onclick="showTab('calendar')">📅 Calendar</div>
-  <div class="tab"     onclick="showTab('lineups')">🎤 공방 일정</div>
+  <div class="tab"     onclick="showTab('lineups')">🎤 Lineups</div>
   <div class="tab"     onclick="showTab('feedback')">Feedback</div>
   <div class="tab"     onclick="showTab('add')">+ Add Event</div>
 </div>
@@ -139,7 +139,7 @@ select option{background:#0d0d14}
         <button onclick="calMove(1)">›</button>
       </div>
       <div class="filter-chips" style="align-items:center">
-        <input id="group-search" type="text" placeholder="그룹 검색 (예: bts, ive…)"
+        <input id="group-search" type="text" placeholder="Search groups (e.g. bts, ive...)"
           style="padding:4px 10px;border-radius:16px;font-size:12px;background:#1a1a28;border:1.5px solid #2a2a40;color:#e0e0f0;width:180px;outline:none"
           oninput="filterGroupInput(this.value)">
         <div style="width:1px;background:#333;margin:0 2px"></div>
@@ -177,10 +177,10 @@ select option{background:#0d0d14}
   <!-- ═══════════════ 공방 일정 TAB ═══════════════ -->
   <div id="tab-lineups" style="display:none">
     <div class="sec-hdr" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <h2 style="font-size:16px;font-weight:700;color:#c4a0f0">공방 일정 관리</h2>
+      <h2 style="font-size:16px;font-weight:700;color:#c4a0f0">Music Show Lineups</h2>
       <div style="display:flex;gap:8px">
         <button onclick="syncNaver()" style="background:#1a6b3a;border:none;color:#fff;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
-          🔄 전체 방송 자동 수집 (Naver)
+          🔄 Sync All Shows (Naver)
         </button>
       </div>
     </div>
@@ -188,36 +188,36 @@ select option{background:#0d0d14}
     <!-- 수동 입력 폼 -->
     <div id="lf-form-wrap" style="background:#13131f;border:1px solid #22223a;border-radius:12px;padding:20px;margin-bottom:24px">
       <input type="hidden" id="lf-edit-id" value="">
-      <h3 id="lf-form-title" style="font-size:13px;font-weight:700;color:#aaa;margin-bottom:14px;text-transform:uppercase;letter-spacing:.05em">수동 입력 (음악중심 외 방송사)</h3>
+      <h3 id="lf-form-title" style="font-size:13px;font-weight:700;color:#aaa;margin-bottom:14px;text-transform:uppercase;letter-spacing:.05em">Manual Entry (non-Music Core shows)</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px">
         <div>
-          <label style="font-size:11px;color:#666;display:block;margin-bottom:4px">방송 프로그램</label>
+          <label style="font-size:11px;color:#666;display:block;margin-bottom:4px">Show</label>
           <select id="lf-show" style="width:100%;background:#1e1e30;border:1px solid #2a2a40;color:#e0e0f0;padding:8px 10px;border-radius:8px;font-size:13px">
-            <option value="inkigayo">SBS 인기가요</option>
-            <option value="music_bank">KBS 뮤직뱅크</option>
-            <option value="mcountdown">Mnet 엠카운트다운</option>
-            <option value="show_champion">MBC M 쇼챔피언</option>
-            <option value="the_show">SBS M 더쇼</option>
-            <option value="music_core">MBC 음악중심</option>
+            <option value="inkigayo">Inkigayo</option>
+            <option value="music_bank">Music Bank</option>
+            <option value="mcountdown">M Countdown</option>
+            <option value="show_champion">Show Champion</option>
+            <option value="the_show">The Show</option>
+            <option value="music_core">Music Core</option>
           </select>
         </div>
         <div>
-          <label style="font-size:11px;color:#666;display:block;margin-bottom:4px">방송일</label>
+          <label style="font-size:11px;color:#666;display:block;margin-bottom:4px">Air date</label>
           <input id="lf-date" type="date" style="width:100%;background:#1e1e30;border:1px solid #2a2a40;color:#e0e0f0;padding:8px 10px;border-radius:8px;font-size:13px">
         </div>
         <div>
-          <label style="font-size:11px;color:#666;display:block;margin-bottom:4px">회차 번호 (선택)</label>
-          <input id="lf-episode" type="text" placeholder="예: 1299" style="width:100%;background:#1e1e30;border:1px solid #2a2a40;color:#e0e0f0;padding:8px 10px;border-radius:8px;font-size:13px">
+          <label style="font-size:11px;color:#666;display:block;margin-bottom:4px">Episode number (optional)</label>
+          <input id="lf-episode" type="text" placeholder="e.g. 1299" style="width:100%;background:#1e1e30;border:1px solid #2a2a40;color:#e0e0f0;padding:8px 10px;border-radius:8px;font-size:13px">
         </div>
       </div>
       <div style="margin-bottom:14px">
-        <label style="font-size:11px;color:#666;display:block;margin-bottom:6px">출연 아티스트 (줄바꿈 또는 점(·) 구분으로 입력)</label>
-        <textarea id="lf-artists" rows="4" placeholder="예:&#10;BTS&#10;IVE&#10;LE SSERAFIM&#10;aespa" style="width:100%;background:#1e1e30;border:1px solid #2a2a40;color:#e0e0f0;padding:10px;border-radius:8px;font-size:13px;resize:vertical;line-height:1.5"></textarea>
-        <div style="font-size:11px;color:#555;margin-top:4px">네이버 검색에서 복사한 출연진 목록을 그대로 붙여넣어도 됩니다.</div>
+        <label style="font-size:11px;color:#666;display:block;margin-bottom:6px">Artists (separate with line breaks or dots)</label>
+        <textarea id="lf-artists" rows="4" placeholder="e.g.&#10;BTS&#10;IVE&#10;LE SSERAFIM&#10;aespa" style="width:100%;background:#1e1e30;border:1px solid #2a2a40;color:#e0e0f0;padding:10px;border-radius:8px;font-size:13px;resize:vertical;line-height:1.5"></textarea>
+        <div style="font-size:11px;color:#555;margin-top:4px">You can paste the lineup copied from Naver as-is.</div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
-        <button onclick="submitLineup()" id="lf-submit-btn" style="background:#9040d0;border:none;color:#fff;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">저장</button>
-        <button onclick="cancelEditLineup()" id="lf-cancel-btn" style="display:none;background:#333;border:none;color:#aaa;padding:9px 16px;border-radius:8px;font-size:13px;cursor:pointer">취소</button>
+        <button onclick="submitLineup()" id="lf-submit-btn" style="background:#9040d0;border:none;color:#fff;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Save</button>
+        <button onclick="cancelEditLineup()" id="lf-cancel-btn" style="display:none;background:#333;border:none;color:#aaa;padding:9px 16px;border-radius:8px;font-size:13px;cursor:pointer">Cancel</button>
         <span id="lf-msg" style="font-size:12px;color:#888"></span>
       </div>
     </div>
@@ -225,11 +225,11 @@ select option{background:#0d0d14}
     <!-- 최근 입력된 공방 일정 목록 -->
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <h3 style="font-size:13px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em">최근 공방 일정</h3>
-        <button onclick="document.getElementById('lf-form-wrap').style.display='';document.getElementById('lf-form-wrap').scrollIntoView({behavior:'smooth'})" style="background:#1e2a40;border:1px solid #2a4060;color:#80b0f0;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer">+ 새 일정 등록</button>
+        <h3 style="font-size:13px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em">Recent lineups</h3>
+        <button onclick="document.getElementById('lf-form-wrap').style.display='';document.getElementById('lf-form-wrap').scrollIntoView({behavior:'smooth'})" style="background:#1e2a40;border:1px solid #2a4060;color:#80b0f0;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer">+ Add New Lineup</button>
       </div>
       <div id="lineup-list" style="display:flex;flex-direction:column;gap:8px">
-        <div style="color:#555;font-size:13px">불러오는 중...</div>
+        <div style="color:#555;font-size:13px">Loading...</div>
       </div>
     </div>
   </div>
@@ -319,12 +319,12 @@ function showTab(name) {
 
 // ── 공방 일정 ──
 const SHOW_LABELS_ADMIN = {
-  music_core:    '🎵 MBC 음악중심',
-  inkigayo:      '🎵 SBS 인기가요',
-  music_bank:    '🎵 KBS 뮤직뱅크',
-  mcountdown:    '🎵 Mnet 엠카운트다운',
-  show_champion: '🎵 MBC M 쇼챔피언',
-  the_show:      '🎵 SBS M 더쇼',
+  music_core:    '🎵 Show! Music Core',
+  inkigayo:      '🎵 Inkigayo',
+  music_bank:    '🎵 Music Bank',
+  mcountdown:    '🎵 M Countdown',
+  show_champion: '🎵 Show Champion',
+  the_show:      '🎵 The Show',
 };
 const SHOW_COLORS_ADMIN = {
   music_core:'#E8823A', inkigayo:'#A855C8', music_bank:'#4CAF50',
@@ -333,16 +333,18 @@ const SHOW_COLORS_ADMIN = {
 
 async function loadLineups(onDone) {
   const el = document.getElementById('lineup-list');
-  el.innerHTML = '<div style="color:#555;font-size:13px">불러오는 중...</div>';
+  el.innerHTML = '<div style="color:#555;font-size:13px">Loading...</div>';
   try {
     const res = await supaFetch('music_show_lineups?select=*&order=broad_date.desc&limit=50');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const rows = await res.json();
-    if (!rows.length) { el.innerHTML = '<div style="color:#555;font-size:13px">데이터 없음</div>'; return; }
+    const visibleRows = rows.filter(r => r.source !== 'cancelled');
+    if (!visibleRows.length) { el.innerHTML = '<div style="color:#555;font-size:13px">No data</div>'; return; }
     el.innerHTML = '';
-    rows.forEach(r => {
+    visibleRows.forEach(r => {
       const color = SHOW_COLORS_ADMIN[r.show_name] || '#9B6FD8';
       const label = SHOW_LABELS_ADMIN[r.show_name] || r.show_name;
+      const sourceLabel = r.source === 'date_rule' ? 'TBA' : (r.source || '');
       const row = document.createElement('div');
       row.className = 'lrow';
       row.dataset.show = r.show_name;
@@ -352,35 +354,35 @@ async function loadLineups(onDone) {
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
             <span style="color:${color};font-size:12px;font-weight:700">${label}</span>
-            ${r.episode_number ? `<span style="color:#555;font-size:11px">${r.episode_number}회</span>` : ''}
+            ${r.episode_number ? `<span style="color:#555;font-size:11px">EP ${r.episode_number}</span>` : ''}
             <span style="color:#444;font-size:11px">${r.broad_date}</span>
-            <span style="color:#333;font-size:10px;padding:1px 6px;border:1px solid #333;border-radius:10px">${r.source}</span>
+            <span style="color:#333;font-size:10px;padding:1px 6px;border:1px solid #333;border-radius:10px">${sourceLabel}</span>
           </div>
           <div style="color:#888;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.raw_title || r.groups.join(' · ')}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
-          <button onclick="editLineupById(${r.id})" data-id="${r.id}" data-show="${r.show_name}" data-date="${r.broad_date}" data-ep="${r.episode_number||''}" data-title="${(r.raw_title||'').replace(/"/g,'&quot;')}" style="background:#1e2a40;border:1px solid #2a4060;color:#80b0f0;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">편집</button>
-          <button onclick="deleteLineup(${r.id}, this)" style="background:#3a1010;border:1px solid #6a2020;color:#f08080;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">삭제</button>
+          <button onclick="editLineupById(${r.id})" data-id="${r.id}" data-show="${r.show_name}" data-date="${r.broad_date}" data-ep="${r.episode_number||''}" data-title="${(r.raw_title||'').replace(/"/g,'&quot;')}" style="background:#1e2a40;border:1px solid #2a4060;color:#80b0f0;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">Edit</button>
+          <button onclick="deleteLineup(${r.id}, this)" style="background:#3a1010;border:1px solid #6a2020;color:#f08080;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">Delete</button>
         </div>
       `;
       el.appendChild(row);
     });
     if (typeof onDone === 'function') onDone();
   } catch(e) {
-    el.innerHTML = `<div style="color:#f08080;font-size:13px">오류: ${e.message}</div>`;
+    el.innerHTML = `<div style="color:#f08080;font-size:13px">Error: ${e.message}</div>`;
   }
 }
 
 async function deleteLineup(id, btn) {
-  if (!confirm('삭제하시겠습니까?')) return;
+  if (!confirm('Delete this lineup?')) return;
   btn.textContent = '...';
   try {
     const res = await fetch(`/api/lineup-upsert?id=${id}`, { method:'DELETE' });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
     btn.closest('div[style]').remove();
   } catch(e) {
-    alert('삭제 실패: ' + e.message);
-    btn.textContent = '삭제';
+    alert('Delete failed: ' + e.message);
+    btn.textContent = 'Delete';
   }
 }
 
@@ -395,7 +397,7 @@ function editLineupById(id) {
 }
 
 function editLineup(id, showName, broadDate, episodeNo, rawTitle) {
-  // raw_title에서 아티스트 목록 추출 ("show - art1, art2" → "art1\nart2")
+  // Extract artists from raw_title ("show - art1, art2" → "art1\nart2")
   const prefix = showName + ' - ';
   const artistStr = rawTitle.startsWith(prefix) ? rawTitle.slice(prefix.length) : rawTitle;
   const artists = artistStr.split(',').map(s => s.trim()).filter(Boolean).join('\n');
@@ -405,12 +407,12 @@ function editLineup(id, showName, broadDate, episodeNo, rawTitle) {
   document.getElementById('lf-date').value = broadDate;
   document.getElementById('lf-episode').value = episodeNo || '';
   document.getElementById('lf-artists').value = artists;
-  document.getElementById('lf-form-title').textContent = '편집 중';
+  document.getElementById('lf-form-title').textContent = 'Editing lineup';
   document.getElementById('lf-form-title').style.color = '#80b0f0';
-  document.getElementById('lf-submit-btn').textContent = '수정 저장';
+  document.getElementById('lf-submit-btn').textContent = 'Save changes';
   document.getElementById('lf-cancel-btn').style.display = 'inline-block';
   document.getElementById('lf-msg').textContent = '';
-  // 폼 표시 + 스크롤
+  // Show form and scroll into view
   document.getElementById('lf-form-wrap').style.display = '';
   document.getElementById('lf-form-wrap').scrollIntoView({ behavior:'smooth' });
 }
@@ -421,9 +423,9 @@ function cancelEditLineup() {
   document.getElementById('lf-date').value = '';
   document.getElementById('lf-episode').value = '';
   document.getElementById('lf-artists').value = '';
-  document.getElementById('lf-form-title').textContent = '수동 입력 (음악중심 외 방송사)';
+  document.getElementById('lf-form-title').textContent = 'Manual Entry (non-Music Core shows)';
   document.getElementById('lf-form-title').style.color = '#aaa';
-  document.getElementById('lf-submit-btn').textContent = '저장';
+  document.getElementById('lf-submit-btn').textContent = 'Save';
   document.getElementById('lf-cancel-btn').style.display = 'none';
   document.getElementById('lf-msg').textContent = '';
 }
@@ -436,13 +438,13 @@ async function submitLineup() {
   const raw     = document.getElementById('lf-artists').value;
   const msg     = document.getElementById('lf-msg');
 
-  if (!show || !date) { msg.style.color='#f08080'; msg.textContent='방송과 날짜는 필수입니다.'; return; }
+  if (!show || !date) { msg.style.color='#f08080'; msg.textContent='Show and date are required.'; return; }
 
-  // 아티스트 파싱 (줄바꿈 또는 점 구분)
+  // Parse artists (line breaks or dots)
   const artists = raw.split(/[\n·.]+/).map(s=>s.trim()).filter(s=>s.length>0);
-  if (!artists.length) { msg.style.color='#f08080'; msg.textContent='아티스트를 한 명 이상 입력하세요.'; return; }
+  if (!artists.length) { msg.style.color='#f08080'; msg.textContent='Enter at least one artist.'; return; }
 
-  // 그룹 ID 매핑 (index.html의 ARTIST_TO_GROUP_FRONT와 동일)
+  // Group ID mapping (same as index.html ARTIST_TO_GROUP_FRONT)
   const ARTIST_MAP = {
     'BTS':'bts','방탄소년단':'bts','SEVENTEEN':'seventeen','세븐틴':'seventeen',
     'ENHYPEN':'enhypen','엔하이픈':'enhypen','aespa':'aespa','IVE':'ive',
@@ -472,7 +474,7 @@ async function submitLineup() {
   };
   const groups = [...new Set(artists.map(a=>ARTIST_MAP[a]).filter(Boolean))];
 
-  msg.style.color='#888'; msg.textContent='저장 중...';
+  msg.style.color='#888'; msg.textContent='Saving...';
   try {
     const url = editId ? `/api/lineup-upsert?id=${editId}` : '/api/lineup-upsert';
     const res = await fetch(url, {
@@ -487,11 +489,11 @@ async function submitLineup() {
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-    msg.style.color='#60d090'; msg.textContent= editId ? '✓ 수정됨' : '✓ 저장됨';
+    msg.style.color='#60d090'; msg.textContent= editId ? '✓ Updated' : '✓ Saved';
     const savedShow = show;
     const savedDate = date;
     cancelEditLineup();
-    // 폼 숨기기
+    // Hide form
     document.getElementById('lf-form-wrap').style.display = 'none';
     loadLineups(() => {
       const target = document.querySelector(`#lineup-list .lrow[data-show="${savedShow}"][data-date="${savedDate}"]`);
@@ -503,24 +505,24 @@ async function submitLineup() {
       }
     });
   } catch(e) {
-    msg.style.color='#f08080'; msg.textContent='오류: ' + e.message;
+    msg.style.color='#f08080'; msg.textContent='Error: ' + e.message;
   }
 }
 
 async function syncNaver() {
   const btn = event.target;
-  btn.textContent = '수집 중...'; btn.disabled = true;
+  btn.textContent = 'Syncing...'; btn.disabled = true;
   try {
-    const secret = prompt('SYNC_SECRET을 입력하세요 (없으면 Enter)') || '';
+    const secret = prompt('Enter SYNC_SECRET (press Enter if none)') || '';
     const res = await fetch(`/api/sync-naver?secret=${encodeURIComponent(secret)}`);
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-    alert(`✓ 수집 완료\n${(json.log||[]).join('\n')}`);
+    alert(`✓ Sync complete\n${(json.log||[]).join('\n')}`);
     loadLineups();
   } catch(e) {
-    alert('수집 실패: ' + e.message);
+    alert('Sync failed: ' + e.message);
   } finally {
-    btn.textContent = '🔄 전체 방송 자동 수집 (Naver)'; btn.disabled = false;
+    btn.textContent = '🔄 Sync All Shows (Naver)'; btn.disabled = false;
   }
 }
 
@@ -539,7 +541,7 @@ const supaFetch = (path, opts={}) => api(path, opts);
 async function loadAllEvents() {
   const statsEl = document.getElementById('topbar-stats');
   try {
-    statsEl.textContent = '불러오는 중…';
+    statsEl.textContent = 'Loading...';
     // 1년 전 ~ 2년 후 범위만 가져와 1000행 limit 문제 회피
     const from = new Date(); from.setFullYear(from.getFullYear() - 1);
     const to   = new Date(); to.setFullYear(to.getFullYear() + 2);
@@ -551,13 +553,13 @@ async function loadAllEvents() {
     );
     const text = await res.text();
     if (!res.ok) {
-      statsEl.textContent = `API 오류 ${res.status}: ${text.slice(0,100)}`;
+      statsEl.textContent = `API error ${res.status}: ${text.slice(0,100)}`;
       allEvents = []; return;
     }
     const data = JSON.parse(text);
-    allEvents = Array.isArray(data) ? data : [];
+    allEvents = Array.isArray(data) ? data.filter(e => e.source !== 'cancelled') : [];
   } catch(e) {
-    document.getElementById('topbar-stats').textContent = `Fetch 오류: ${e.message}`;
+    document.getElementById('topbar-stats').textContent = `Fetch error: ${e.message}`;
     allEvents = [];
   }
 }
@@ -567,7 +569,7 @@ function updateTopbar() {
   const manual  = allEvents.filter(e=>e.source==='manual').length;
   const visible = visibleEvents().length;
   document.getElementById('topbar-stats').textContent =
-    `총 ${allEvents.length}개 (크롤 ${crawled} · 수동 ${manual}) · 표시 ${visible}개`;
+    `Total ${allEvents.length} (Crawled ${crawled} · Manual ${manual}) · Visible ${visible}`;
 }
 
 // ── CALENDAR ──
@@ -591,7 +593,7 @@ function toggleFilter(type, val) {
 function visibleEvents() {
   const q = filterGroup.toLowerCase();
   return allEvents.filter(e => {
-    // 'manual' = 어드민 입력, 그 외('naver','date_rule','imbc_api' 등) = Crawled 버킷
+    // 'manual' = admin input, everything else ('naver','date_rule','imbc_api', etc.) = Crawled bucket
     const isCrawled = (e.source || 'manual') !== 'manual';
     const srcMatch = isCrawled ? filterSrc.has('naver') : filterSrc.has('manual');
     if (!srcMatch) return false;
@@ -650,7 +652,7 @@ function renderCal() {
       pill.className = `cal-pill ${isCrawled ? 'src-crawl' : 'src-manual'}`;
       const showColor = SHOW_COLORS_ADMIN[e.show_name];
       if(showColor) pill.style.cssText += `;border-left:3px solid ${showColor}`;
-      // 방송명 축약: 'MBC 음악중심' → '음악중심'
+      // Shorten show label: 'MBC Music Core' → 'Music Core'
       const fullLabel = SHOW_LABELS_ADMIN[e.show_name] || e.show_name;
       const shortName = fullLabel.replace(/🎵 /,'').replace(/^[A-Za-z]+ M? /,'').replace(/^[A-Za-z]+ /,'');
       const artistCount = (e.groups||[]).length;
@@ -693,17 +695,18 @@ function openDetail(e) {
 
   const showLabel = SHOW_LABELS_ADMIN[e.show_name] || e.show_name;
   const showColor = SHOW_COLORS_ADMIN[e.show_name] || '#9B6FD8';
-  const isCrawled = (e.source||'manual') !== 'manual';
-  const srcText   = isCrawled ? '자동수집' : '수동입력';
-  const srcClass  = isCrawled ? 'badge-crawl' : 'badge-manual';
+  const isCancelled = e.source === 'cancelled';
+  const isCrawled = (e.source||'manual') !== 'manual' && !isCancelled;
+  const srcText   = isCancelled ? 'Canceled' : (isCrawled ? 'Crawled' : 'Manual');
+  const srcClass  = isCancelled ? '' : (isCrawled ? 'badge-crawl' : 'badge-manual');
 
-  // 아티스트: raw_title이 있으면 파싱, 없으면 groups[]
+  // Artists: parse raw_title first, fallback to groups[]
   const rawParts = e.raw_title
     ? e.raw_title.replace(/^[^-]+-\s*/, '').split(/[,·]/).map(s=>s.trim()).filter(Boolean)
     : [];
   const artistList = rawParts.length ? rawParts : (e.groups||[]);
 
-  // 그룹 뱃지 HTML
+  // Group badge HTML
   const groupBadges = (e.groups||[]).map(g => {
     const c = GROUP_COLORS[g] || '#555';
     return `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${c}22;color:${c};border:1px solid ${c}55;margin:2px">${g.toUpperCase()}</span>`;
@@ -712,31 +715,31 @@ function openDetail(e) {
   document.getElementById('dp-name').innerHTML =
     `<span style="color:${showColor}">${showLabel}</span>`;
   document.getElementById('dp-meta').innerHTML = `
-    <span class="badge ${srcClass}">${srcText}</span>
-    &nbsp;📅 ${e.broad_date}${e.episode_number ? ` &nbsp;·&nbsp; EP ${e.episode_number}회` : ''}<br><br>
-    ${groupBadges || '<span style="color:#555;font-size:12px">그룹 매핑 없음</span>'}
+    <span class="badge ${srcClass}" style="${isCancelled ? 'background:#5A5A5A;color:#fff' : ''}">${srcText}</span>
+    &nbsp;📅 ${e.broad_date}${e.episode_number ? ` &nbsp;·&nbsp; EP ${e.episode_number}` : ''}<br><br>
+    ${groupBadges || '<span style="color:#555;font-size:12px">No group mapping</span>'}
     ${artistList.length ? `<div style="margin-top:8px;font-size:11px;color:#777;line-height:1.8">${artistList.join(' · ')}</div>` : ''}
   `;
 
   const actions = document.getElementById('dp-actions');
   actions.innerHTML='';
   const btnGoLineups = document.createElement('button');
-  btnGoLineups.className='btn-edit btn-sm'; btnGoLineups.textContent='공방 일정 편집';
+  btnGoLineups.className='btn-edit btn-sm'; btnGoLineups.textContent='Edit lineup';
   btnGoLineups.onclick = () => {
     panel.classList.remove('open');
-    // 탭 전환 (loadLineups 직접 호출하지 않음)
+    // Switch tabs (do not call loadLineups directly)
     TABS.forEach(t => {
       document.getElementById(`tab-${t}`).style.display = t==='lineups' ? 'block' : 'none';
       document.querySelectorAll('.tab')[TABS.indexOf(t)].classList.toggle('on', t==='lineups');
     });
-    // loadLineups 완료 후 폼에 데이터 채우기
+    // Populate the form after loadLineups completes
     loadLineups(() => {
       editLineup(e.id, e.show_name, e.broad_date, e.episode_number, e.raw_title || '');
     });
   };
   const btnClose = document.createElement('button');
   btnClose.className='btn-sm'; btnClose.style.cssText='background:#222;color:#888';
-  btnClose.textContent='닫기'; btnClose.onclick = () => panel.classList.remove('open');
+  btnClose.textContent='Close'; btnClose.onclick = () => panel.classList.remove('open');
   actions.append(btnGoLineups, btnClose);
 }
 
@@ -769,7 +772,7 @@ async function loadFeedback() {
   const el = document.getElementById('fb-list');
   el.innerHTML='<div class="empty">Loading…</div>';
   const res = await api('feedbacks?select=*&order=created_at.desc', {prefer:''});
-  if(!res.ok){ el.innerHTML=`<div class="empty" style="color:#f08080">오류 ${res.status}: feedbacks 테이블을 확인하세요.</div>`; return; }
+  if(!res.ok){ el.innerHTML=`<div class="empty" style="color:#f08080">Error ${res.status}: check the feedbacks table.</div>`; return; }
   const rows = await res.json();
   if(!Array.isArray(rows)||!rows.length){ el.innerHTML='<div class="empty">No feedback yet.</div>'; return; }
 
@@ -780,7 +783,7 @@ async function loadFeedback() {
     `<strong style="font-size:22px;color:#f0b040">${avg}</strong> / 5 &nbsp; (${rows.length} responses) &nbsp;
      ${[5,4,3,2,1].map(n=>`★${n}: ${dist[n-1]}`).join(' · ')}`;
 
-  // 1년 필터
+  // 1-year filter
   const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
   el.innerHTML='';
   rows.filter(r=>new Date(r.created_at)>cutoff).forEach(r => {
