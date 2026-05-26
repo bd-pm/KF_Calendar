@@ -167,55 +167,46 @@ async function getNaverProtectedDates(showName) {
   return new Set((res || []).map(r => r.broad_date));
 }
 
-// Supabase helpers
-async function supaHeaders() {
-  return {
+// 우선순위: manual > naver > imbc/date_rule
+// 항상 개별 체크 후 write — bulk merge-duplicates 절대 사용 안 함
+async function upsertRows(rows) {
+  const hdrs = {
     'apikey': SUPA_SERVICE_KEY,
     'Authorization': `Bearer ${SUPA_SERVICE_KEY}`,
     'Content-Type': 'application/json',
-    'Prefer': 'resolution=merge-duplicates,return=minimal',
+    'Prefer': 'return=minimal',
   };
-}
-
-async function upsertRows(rows) {
-  const CHUNK = 50;
   let ok = 0;
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const chunk = rows.slice(i, i+CHUNK);
-    const res = await fetch(`${SUPA_URL}/rest/v1/music_show_lineups`, {
-      method: 'POST',
-      headers: await supaHeaders(),
-      body: JSON.stringify(chunk),
-      signal: AbortSignal.timeout(20000),
-    });
-    if (res.ok) { ok += chunk.length; continue; }
-    // fallback: 개별 upsert
-    for (const row of chunk) {
-      const existing = await fetch(
-        `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${row.show_name}&broad_date=eq.${row.broad_date}&select=id,groups,source`,
-        { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` } }
-      ).then(r=>r.json()).catch(()=>[]);
+  for (const row of rows) {
+    const existing = await fetch(
+      `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${row.show_name}&broad_date=eq.${row.broad_date}&select=id,groups,source`,
+      { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` },
+        signal: AbortSignal.timeout(10000) }
+    ).then(r=>r.json()).catch(()=>[]);
 
-      if (existing.length > 0) {
-        // manual 최우선 보호 — 어떤 자동 소스도 덮어쓰지 않음
-        if (existing[0].source === 'manual') { ok++; continue; }
-        // naver source 보호 — imbc/date_rule이 덮어쓰지 않음
-        if (existing[0].source === 'naver' && row.source !== 'naver') { ok++; continue; }
-        if (row.source === 'date_rule' && existing[0].groups?.length > 0) { ok++; continue; }
-        await fetch(`${SUPA_URL}/rest/v1/music_show_lineups?id=eq.${existing[0].id}`, {
-          method: 'PATCH',
-          headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({ groups: row.groups, raw_title: row.raw_title, source: row.source }),
-        });
-        ok++;
-      } else {
-        const ins = await fetch(`${SUPA_URL}/rest/v1/music_show_lineups`, {
-          method: 'POST',
-          headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify([row]),
-        });
-        if (ins.ok) ok++;
-      }
+    if (existing.length > 0) {
+      const es = existing[0].source;
+      // manual 최우선 보호 — 어떤 자동 소스도 덮어쓰지 않음
+      if (es === 'manual') { ok++; continue; }
+      // naver 보호 — imbc/date_rule이 덮어쓰지 않음
+      if (es === 'naver' && row.source !== 'naver') { ok++; continue; }
+      // date_rule이 이미 실제 데이터 있으면 스킵
+      if (row.source === 'date_rule' && existing[0].groups?.length > 0) { ok++; continue; }
+      await fetch(`${SUPA_URL}/rest/v1/music_show_lineups?id=eq.${existing[0].id}`, {
+        method: 'PATCH',
+        headers: hdrs,
+        body: JSON.stringify({ groups: row.groups, raw_title: row.raw_title, source: row.source }),
+        signal: AbortSignal.timeout(10000),
+      });
+      ok++;
+    } else {
+      const ins = await fetch(`${SUPA_URL}/rest/v1/music_show_lineups`, {
+        method: 'POST',
+        headers: hdrs,
+        body: JSON.stringify([row]),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (ins.ok) ok++;
     }
   }
   return ok;

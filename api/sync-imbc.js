@@ -115,23 +115,45 @@ async function fetchAllEpisodes() {
   return episodes;
 }
 
+// 우선순위: manual > naver > imbc_api
+// 항상 개별 체크 후 write — bulk merge-duplicates 절대 사용 안 함
 async function upsertToSupabase(rows) {
-  const res = await fetch(`${SUPA_URL}/rest/v1/music_show_lineups`, {
-    method: 'POST',
-    headers: {
-      'apikey': SUPA_SERVICE_KEY,
-      'Authorization': `Bearer ${SUPA_SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates',
-    },
-    body: JSON.stringify(rows),
-    signal: AbortSignal.timeout(30000),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Supabase upsert HTTP ${res.status}: ${body}`);
+  const hdrs = {
+    'apikey': SUPA_SERVICE_KEY,
+    'Authorization': `Bearer ${SUPA_SERVICE_KEY}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=minimal',
+  };
+  let ok = 0;
+  for (const row of rows) {
+    const existing = await fetch(
+      `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${row.show_name}&broad_date=eq.${row.broad_date}&select=id,source`,
+      { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` },
+        signal: AbortSignal.timeout(10000) }
+    ).then(r => r.json()).catch(() => []);
+
+    if (existing.length > 0) {
+      const es = existing[0].source;
+      if (es === 'manual') { ok++; continue; }
+      if (es === 'naver') { ok++; continue; }
+      await fetch(`${SUPA_URL}/rest/v1/music_show_lineups?id=eq.${existing[0].id}`, {
+        method: 'PATCH',
+        headers: hdrs,
+        body: JSON.stringify({ groups: row.groups, raw_title: row.raw_title, episode_number: row.episode_number, source: row.source }),
+        signal: AbortSignal.timeout(10000),
+      });
+      ok++;
+    } else {
+      const ins = await fetch(`${SUPA_URL}/rest/v1/music_show_lineups`, {
+        method: 'POST',
+        headers: hdrs,
+        body: JSON.stringify([row]),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (ins.ok) ok++;
+    }
   }
-  return res;
+  return ok;
 }
 
 module.exports = async function handler(req, res) {
@@ -163,7 +185,7 @@ module.exports = async function handler(req, res) {
         episode_number: ep.ContentNumber || null,
         broad_date:     ep.BroadDate,
         groups:         groupIds,
-        raw_title:      enArtists.join(' · '),
+        raw_title:      `music_core - ${enArtists.join(', ')}`,
         source:         'imbc_api',
       };
     }).filter(r => r.broad_date);
