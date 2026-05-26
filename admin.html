@@ -182,9 +182,6 @@ select option{background:#0d0d14}
         <button onclick="syncNaver()" style="background:#1a6b3a;border:none;color:#fff;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
           🔄 전체 방송 자동 수집 (Naver)
         </button>
-        <button onclick="syncImbc()" style="background:#306090;border:none;color:#fff;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
-          🔄 음악중심 자동 수집
-        </button>
       </div>
     </div>
 
@@ -524,23 +521,6 @@ async function syncNaver() {
     alert('수집 실패: ' + e.message);
   } finally {
     btn.textContent = '🔄 전체 방송 자동 수집 (Naver)'; btn.disabled = false;
-  }
-}
-
-async function syncImbc() {
-  const btn = event.target;
-  btn.textContent = '수집 중...'; btn.disabled = true;
-  try {
-    const secret = prompt('SYNC_SECRET을 입력하세요 (없으면 Enter)') || '';
-    const res = await fetch(`/api/sync-imbc?secret=${encodeURIComponent(secret)}`);
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-    alert(`✓ 음악중심 ${json.synced}회차 수집 완료`);
-    loadLineups();
-  } catch(e) {
-    alert('수집 실패: ' + e.message);
-  } finally {
-    btn.textContent = '🔄 음악중심 자동 수집'; btn.disabled = false;
   }
 }
 

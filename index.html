@@ -1075,7 +1075,7 @@ function buildMonth(area){
       cell.appendChild(pillsEl);
     }
 
-    cell.onclick=()=>{ selectDate(ds); };
+    cell.onclick=()=>{ selectDate(ds, { scrollToDetails: true }); };
     grid.appendChild(cell);
   });
   area.appendChild(grid);
@@ -1084,15 +1084,17 @@ function buildMonth(area){
 // ─────────────────────────────────────────
 //  SELECT DATE — 날짜 선택 + 전체 탭 자동 활성
 // ─────────────────────────────────────────
-function selectDate(ds){
+function selectDate(ds, opts = {}){
   selectedDate = ds;
   selectedArtistName = null;
   const lineup = LINEUP_BY_DATE[ds];
   allGroupsSelected = !!(lineup && (lineup.rawTitle || lineup.groups.length > 0));
   buildCal();
   renderBottom();
-  // sel-hdr가 sticky 헤더 바로 아래 오도록 한 번만 스크롤
-  requestAnimationFrame(() => scrollToBottom());
+  if (opts.scrollToDetails) {
+    // 월간 캘린더에서 날짜를 직접 고른 경우에만 하단 상세/매물 타이틀로 이동
+    requestAnimationFrame(() => scrollToBottom());
+  }
 }
 
 function triggerAllGoods(ds){

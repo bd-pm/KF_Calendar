@@ -2,7 +2,7 @@
 // 전체 5개 음악방송 — Naver 회차정보 탭 크롤링 → Supabase upsert (최우선 소스)
 // Vercel Cron: 0 0 * * * (매일 09:00 KST)
 
-const { resolveEnNames } = require('./artist-en-name');
+const { resolveEnNames, normalizeArtistName } = require('./artist-en-name');
 
 const SUPA_URL         = 'https://kzffotlfdtubkbxsjqiv.supabase.co';
 const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
@@ -117,10 +117,24 @@ function dKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-function datesForDay(dayOfWeek, sinceDate) {
+function todayKstKey() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function maxDateKey(a, b) {
+  return a > b ? a : b;
+}
+
+function datesForDay(dayOfWeek, sinceDate, cutoffDate) {
   // 오늘부터 다음 2주만 뼈대 생성 (불필요한 과거/먼 미래 row 방지)
   const today = new Date(); today.setHours(0,0,0,0);
-  const start = sinceDate ? new Date(sinceDate) : today;
+  const startKey = maxDateKey(cutoffDate || todayKstKey(), sinceDate || '');
+  const start = new Date(startKey);
   start.setHours(0,0,0,0);
   const end = new Date(today);
   end.setDate(today.getDate() + 14);
@@ -131,6 +145,76 @@ function datesForDay(dayOfWeek, sinceDate) {
     cur.setDate(cur.getDate()+1);
   }
   return dates;
+}
+
+function decodeHtml(s) {
+  return String(s || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+}
+
+function textFromHtml(html) {
+  return decodeHtml(html)
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h\d)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\r/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s+/g, '\n')
+    .trim();
+}
+
+function extractSbsVodId(section) {
+  const decoded = decodeHtml(section).replace(/\\\//g, '/');
+  const patterns = [
+    /programs\.sbs\.co\.kr\/programTemplate\/amp\/vod\/gayo\/(\d{8,})/,
+    /programs\.sbs\.co\.kr\/enter\/gayo\/vod\/54767\/(\d{8,})/,
+    /\/programTemplate\/amp\/vod\/gayo\/(\d{8,})/,
+    /\/enter\/gayo\/vod\/54767\/(\d{8,})/,
+  ];
+  for (const pattern of patterns) {
+    const m = decoded.match(pattern);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+function parseSbsInkigayoPerformers(html, episodeNo) {
+  const text = textFromHtml(html);
+  const escapedNo = String(episodeNo || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patterns = [
+    new RegExp(`#\\s*${escapedNo}\\s*회\\s*인기가요\\s*출연자\\s*#([\\s\\S]*?)(?:\\*\\s*출연자는|$)`),
+    /#\s*\d+\s*회\s*인기가요\s*출연자\s*#([\s\S]*?)(?:\*\s*출연자는|$)/,
+  ];
+  const m = patterns.map(p => text.match(p)).find(Boolean);
+  if (!m) return [];
+
+  return m[1]
+    .split(',')
+    .map(p => p.replace(/\*.*$/, '').replace(/\\[rn]/g, ' ').replace(/[\r\n]+/g, ' ').trim())
+    .filter(p => p.length > 1 && p.length < 80);
+}
+
+async function fetchSbsInkigayoPerformers(ep) {
+  if (!ep.sbsVodId) return [];
+  const url = `https://programs.sbs.co.kr/programTemplate/amp/vod/gayo/${ep.sbsVodId}`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return [];
+    return parseSbsInkigayoPerformers(await res.text(), ep.no);
+  } catch {
+    return [];
+  }
 }
 
 // Naver 회차정보 탭 HTML 가져오기
@@ -174,6 +258,7 @@ function parseNaverEpisodes(html, descFormat = 'dt_dd') {
     if (seen.has(date)) continue;
 
     let performers = [];
+    const sbsVodId = extractSbsVodId(s);
 
     if (descFormat === 'span_desc') {
       // 인기가요 포맷: <span class="desc _text">aespa, NMIXX, BOYNEXTDOOR 등</span>
@@ -203,11 +288,37 @@ function parseNaverEpisodes(html, descFormat = 'dt_dd') {
 
     if (performers.length > 0) {
       seen.add(date);
-      episodes.push({ no, date, performers });
+      episodes.push({ no, date, performers, sbsVodId });
     }
   }
 
   return episodes;
+}
+
+async function enrichInkigayoEpisodes(episodes) {
+  const enriched = [];
+  for (const ep of episodes) {
+    const detailPerformers = await fetchSbsInkigayoPerformers(ep);
+    if (detailPerformers.length > ep.performers.length) {
+      enriched.push({ ...ep, performers: detailPerformers, detailSource: 'sbs_amp' });
+    } else {
+      enriched.push(ep);
+    }
+  }
+  return enriched;
+}
+
+function officialPerformerNames(rawNames, enNameMap) {
+  const seen = new Set();
+  const names = [];
+  for (const rawName of rawNames) {
+    const official = normalizeArtistName(enNameMap[rawName] || rawName);
+    if (!official || /\\[rn]/.test(official) || /[\r\n]/.test(official)) continue;
+    if (seen.has(official)) continue;
+    seen.add(official);
+    names.push(official);
+  }
+  return names;
 }
 
 // Supabase upsert — manual source는 절대 덮어쓰지 않음
@@ -303,13 +414,15 @@ module.exports = async function handler(req, res) {
   if (!SUPA_SERVICE_KEY) return res.status(500).json({ error: 'SUPA_SERVICE_KEY 없음' });
 
   const since = req.query.since || null;
+  const allowBackfill = req.query.backfill === '1';
+  const cutoffDate = allowBackfill && since ? since : maxDateKey(todayKstKey(), since || '');
   const log = [];
   let totalUpserted = 0;
 
   for (const show of SHOWS_NAVER) {
     try {
       // ① 날짜 뼈대 (skeleton rows)
-      const dates = datesForDay(show.dayOfWeek, since);
+      const dates = datesForDay(show.dayOfWeek, since, cutoffDate);
       const skelRows = dates.map(d => ({
         show_name: show.show_name, broad_date: d,
         groups: [], raw_title: '', episode_number: null, source: 'date_rule',
@@ -327,16 +440,28 @@ module.exports = async function handler(req, res) {
         continue;
       }
 
+      let futureEpisodes = episodes.filter(ep => ep.date >= cutoffDate);
+      const skippedPast = episodes.length - futureEpisodes.length;
+      if (futureEpisodes.length === 0) {
+        log.push(`[${show.show_name}] Naver 업데이트 0/0개 (기준일 ${cutoffDate}, 과거 ${skippedPast}개 스킵)`);
+        totalUpserted += skelOk;
+        continue;
+      }
+
+      if (show.show_name === 'inkigayo') {
+        futureEpisodes = await enrichInkigayoEpisodes(futureEpisodes);
+      }
+
       // 한국어 performer명 → 공식 영문명 변환
-      const allPerformers = [...new Set(episodes.flatMap(ep => ep.performers))];
+      const allPerformers = [...new Set(futureEpisodes.flatMap(ep => ep.performers))];
       const enNameMap = await resolveEnNames(allPerformers);
 
-      const dataRows = episodes.map(ep => {
-        const enPerformers = ep.performers.map(p => enNameMap[p] || p);
+      const dataRows = futureEpisodes.map(ep => {
+        const enPerformers = officialPerformerNames(ep.performers, enNameMap);
         return {
           show_name: show.show_name,
           broad_date: ep.date,
-          groups: mapArtists(ep.performers),
+          groups: mapArtists([...ep.performers, ...enPerformers]),
           raw_title: `${show.show_name} - ${enPerformers.join(', ')}`,
           episode_number: ep.no || null,
           source: 'naver',
@@ -344,7 +469,7 @@ module.exports = async function handler(req, res) {
       });
 
       const dataOk = await upsertRows(dataRows);
-      log.push(`[${show.show_name}] Naver 업데이트 ${dataOk}/${dataRows.length}개`);
+      log.push(`[${show.show_name}] Naver 업데이트 ${dataOk}/${dataRows.length}개 (기준일 ${cutoffDate}, 과거 ${skippedPast}개 스킵)`);
       totalUpserted += skelOk + dataOk;
 
     } catch (err) {

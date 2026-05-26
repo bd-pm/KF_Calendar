@@ -2,13 +2,75 @@
 // 한국어 아티스트명 → 공식 영문명 변환
 // 우선순위: 수동 맵 → Supabase 캐시 → Melon 검색 → 원본 유지
 
+const { OFFICIAL_ARTIST_NAMES } = require('./artist-official-names');
+
 const SUPA_URL         = process.env.SUPA_URL || 'https://kzffotlfdtubkbxsjqiv.supabase.co';
 const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
 
 // ── 수동 맵: 멜론에 영문명 없는 경우 직접 지정 ──
 const MANUAL_EN_MAP = {
+  ...OFFICIAL_ARTIST_NAMES,
   '가비엔제이': 'Gavy NJ',
   '이예준': 'Lee Ye-jun',
+  '박재범': 'Jay Park',
+  '박현규': 'Park Hyun-kyu',
+  '비비': 'BIBI',
+  '에스파': 'aespa',
+  '아일릿': 'ILLIT',
+  '셔누X형원': 'SHOWNU X HYUNGWON',
+  '셔누x형원': 'SHOWNU X HYUNGWON',
+  '셔누': 'SHOWNU',
+  '형원': 'HYUNGWON',
+  '아이오아이': 'I.O.I',
+  '유어즈': 'YUHZ',
+  '윤산하': 'Yoon San-ha',
+  '조혜련': 'Cho Hye-ryun',
+  '차동협': 'Cha Dong-hyup',
+  '태용': 'TAEYONG',
+  '하입프린세스': 'H//PE Princess',
+  '자두': 'Jadu',
+  '이채연': 'Lee Chae-yeon',
+  '휘인': 'WHEEIN',
+  '박지훈': 'Park Ji-hoon',
+  '캣츠아이': 'KATSEYE',
+  '오르빗': 'ORβIT',
+  '박혜경': 'Park Hye-kyung',
+  '유주': 'YUJU',
+  '소유': 'SOYOU',
+  '이지훈': 'Lee Ji-hoon',
+  '동해': 'DONGHAE',
+  '다영': 'DAYOUNG',
+  '김재환': 'Kim Jae-hwan',
+  '연준': 'YEONJUN',
+  '유나': 'YUNA',
+  '한해': 'HANHAE',
+  '문세윤': 'Moon Se-yoon',
+  '올아워즈': 'ALL(H)OURS',
+  '앳하트': 'AtHeart',
+  '레드 오파츠': 'RED OOPARTS',
+  '아이린': 'IRENE',
+  '강민': 'KANGMIN',
+  '서이브': 'SEO EVE',
+  '장한음': 'Jang Han Eum',
+  '에스투잇': 'S2IT',
+  '엠비오': 'MBIO',
+  '키노': 'KINO',
+  '슬레이': 'S.LAY',
+  '민지운': 'Min Ji Woon',
+  '나태주': 'Na Tae Joo',
+  '박재정': 'Parc Jae Jung',
+  '화사': 'HWASA',
+  '엔젤노이즈': 'Angel Noise',
+  '이지민': 'Lee Jimin',
+  '김하온': 'HAON',
+  '투모로우바이투게더': 'TOMORROW X TOGETHER',
+  '천도': 'Cheon Do',
+  '비보이즈': 'B.BOYS',
+  '제이창': 'Jay Chang',
+  '언차일드': 'UNCHILD',
+  '최은빈': 'Choi Eun Bin',
+  '홍승민': 'Hong Seung Min',
+  '포레스텔라': 'Forestella',
   '크레이즈엔젤': 'CrazAngel',
   '오션': 'O3ean',
   '영파씨': 'YOUNG POSSE',
@@ -24,6 +86,8 @@ const MANUAL_EN_MAP = {
   '앤팀': '&TEAM',
   '더보이즈': 'THE BOYZ',
   '크래비티': 'CRAVITY',
+  '싸이커스': 'xikers',
+  '플레어 유': 'FLARE U',
 };
 
 function supaHeaders() {
@@ -36,6 +100,29 @@ function supaHeaders() {
 
 function isKorean(str) {
   return /[가-힣]/.test(str);
+}
+
+function normalizeArtistName(name) {
+  let n = String(name || '')
+    .replace(/\\[rn]/g, ' ')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!n) return n;
+
+  if (MANUAL_EN_MAP[n]) return MANUAL_EN_MAP[n];
+
+  // "비비(BIBI)" / "박재범(Jay Park) & LNGSHOT"처럼 한글명 뒤 영문 병기가 있으면 영문명을 사용.
+  n = n.replace(/[가-힣][가-힣\s]*[（\(]\s*([A-Za-z0-9 &!./'\-+]+?)\s*[）\)]/g, '$1');
+  n = n.replace(/\s+/g, ' ').trim();
+  if (MANUAL_EN_MAP[n]) return MANUAL_EN_MAP[n];
+
+  // "Billlie (빌리)" / "FLARE U (플레어 유)"처럼 영문명 뒤 한글 병기는 제거.
+  n = n.replace(/\s*[（\(]\s*[가-힣][가-힣\s]*\s*[）\)]/g, '').replace(/\s+/g, ' ').trim();
+  if (MANUAL_EN_MAP[n]) return MANUAL_EN_MAP[n];
+
+  return n;
 }
 
 // Supabase 캐시 일괄 조회
@@ -103,9 +190,16 @@ async function searchMelon(krName) {
 
 // 메인: 이름 목록 → { 원본: 영문명 } 맵 반환
 async function resolveEnNames(names) {
-  const koreanNames = [...new Set(names.filter(isKorean))];
+  const direct = {};
+  const normalizedNames = names.map(n => {
+    const normalized = normalizeArtistName(n);
+    direct[n] = normalized;
+    return normalized;
+  });
+
+  const koreanNames = [...new Set(normalizedNames.filter(isKorean))];
   if (!koreanNames.length) {
-    return Object.fromEntries(names.map(n => [n, n]));
+    return Object.fromEntries(names.map(n => [n, direct[n] || n]));
   }
 
   // 1. 수동 맵 먼저 확인
@@ -136,7 +230,10 @@ async function resolveEnNames(names) {
   if (toSave.length) await saveCache(toSave);
 
   // 5. 전체 이름 맵 반환 (영문은 그대로)
-  return Object.fromEntries(names.map(n => [n, isKorean(n) ? (resolved[n] || n) : n]));
+  return Object.fromEntries(names.map(n => {
+    const normalized = direct[n] || n;
+    return [n, isKorean(normalized) ? normalizeArtistName(resolved[normalized] || normalized) : normalized];
+  }));
 }
 
-module.exports = { resolveEnNames, isKorean };
+module.exports = { resolveEnNames, isKorean, normalizeArtistName };
