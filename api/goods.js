@@ -5,6 +5,51 @@
 const BUNJANG_API = 'https://api.bunjang.co.kr/api/1/find_v2.json';
 const KEYWORDS = ['공방포', '역조공', '공방', '사녹'];
 
+function decodeHtml(s) {
+  return String(s || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+}
+
+function cleanDisplayName(s) {
+  return decodeHtml(s)
+    .replace(/\s+on Bunjang Global Site\.?$/i, '')
+    .replace(/^#\s*/, '')
+    .replace(/\s*Translate to English\s*/i, '')
+    .trim();
+}
+
+async function resolveGlobalBunjangDisplayName(id, fallbackName) {
+  if (!/[가-힣]/.test(fallbackName)) return fallbackName;
+
+  try {
+    const res = await fetch(`https://globalbunjang.com/product/${id}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html,application/xhtml+xml' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return fallbackName;
+    const html = await res.text();
+    const patterns = [
+      /<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i,
+      /<h1[^>]*>([^<]+)<\/h1>/i,
+      /<title>([^<]+)<\/title>/i,
+    ];
+    for (const pattern of patterns) {
+      const m = html.match(pattern);
+      if (m && m[1]) {
+        const cleaned = cleanDisplayName(m[1]);
+        if (cleaned) return cleaned;
+      }
+    }
+  } catch {}
+
+  return fallbackName;
+}
+
 // 상품명에 artist가 실제로 포함되는지 확인 (단어 경계 기준)
 // EXO → 엑소(XO) 안에 있는 EXO를 오매칭하는 경우 방지
 function nameMatchesArtist(productName, artist) {
@@ -64,8 +109,17 @@ module.exports = async function handler(req, res) {
       .filter(i => i.status === '0' && nameMatchesArtist(i.name, artist))
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
+    const visibleCount = Math.min(live.length, Math.max(1, n));
+    const enriched = await Promise.all(
+      live.slice(0, visibleCount).map(async item => ({
+        ...item,
+        displayName: await resolveGlobalBunjangDisplayName(item.id, item.name),
+      }))
+    );
+    const itemsOut = [...enriched, ...live.slice(visibleCount)];
+
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
-    return res.status(200).json({ artist, items: live });
+    return res.status(200).json({ artist, items: itemsOut });
   } catch (err) {
     return res.status(502).json({ error: err.message });
   }
