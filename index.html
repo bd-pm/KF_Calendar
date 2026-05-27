@@ -1353,10 +1353,13 @@ function renderBottom(){
 
     chipBar.appendChild(strip);
 
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       const activeChip = strip.querySelector('[data-active="true"]');
-      if(activeChip) strip.scrollLeft = activeChip.offsetLeft - (strip.offsetWidth - activeChip.offsetWidth) / 2;
-    });
+      if(activeChip) {
+        const center = activeChip.offsetLeft - (strip.offsetWidth - activeChip.offsetWidth) / 2;
+        strip.scrollLeft = center;
+      }
+    }, 0);
   }
 
   // ── Divider ──
