@@ -343,10 +343,10 @@ function officialPerformerNames(rawNames, enNameMap) {
   return names;
 }
 
-// Supabase upsert — manual source는 절대 덮어쓰지 않음
+// Supabase upsert — manual/과거 데이터는 절대 덮어쓰지 않음
 async function upsertRows(rows) {
   if (!rows.length) return 0;
-  const CHUNK = 50;
+  const todayKey = todayKstKey();
   let ok = 0;
   const hdrs = {
     apikey: SUPA_SERVICE_KEY,
@@ -356,6 +356,9 @@ async function upsertRows(rows) {
   };
 
   for (const row of rows) {
+    // 오늘 이전 날짜는 source 불문 절대 건드리지 않음 (date_rule 뼈대만 신규 INSERT 허용)
+    if (row.broad_date < todayKey && row.source !== 'date_rule') { ok++; continue; }
+
     // 기존 row 확인
     const ex = await fetch(
       `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${row.show_name}&broad_date=eq.${row.broad_date}&select=id,source`,

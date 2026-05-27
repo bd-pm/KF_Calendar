@@ -168,8 +168,10 @@ async function getNaverProtectedDates(showName) {
 }
 
 // 우선순위: manual > naver > imbc/date_rule
-// 항상 개별 체크 후 write — bulk merge-duplicates 절대 사용 안 함
+// 오늘 이전 날짜는 절대 건드리지 않음
 async function upsertRows(rows) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   const hdrs = {
     'apikey': SUPA_SERVICE_KEY,
     'Authorization': `Bearer ${SUPA_SERVICE_KEY}`,
@@ -178,6 +180,8 @@ async function upsertRows(rows) {
   };
   let ok = 0;
   for (const row of rows) {
+    // 오늘 이전 날짜는 date_rule 신규 INSERT만 허용, 나머지 절대 건드리지 않음
+    if (row.broad_date < todayKey && row.source !== 'date_rule') { ok++; continue; }
     const existing = await fetch(
       `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${row.show_name}&broad_date=eq.${row.broad_date}&select=id,groups,source`,
       { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` },

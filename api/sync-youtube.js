@@ -248,6 +248,8 @@ async function fetchDescriptions(videoIds) {
 
 async function upsertRows(rows) {
   if (rows.length === 0) return 0;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   const hdrs = {
     apikey: SUPA_SERVICE_KEY,
     Authorization: `Bearer ${SUPA_SERVICE_KEY}`,
@@ -256,6 +258,8 @@ async function upsertRows(rows) {
   };
   let ok = 0;
   for (const row of rows) {
+    // 오늘 이전 날짜는 절대 건드리지 않음
+    if (row.broad_date < todayKey) { ok++; continue; }
     const ex = await fetch(
       `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${row.show_name}&broad_date=eq.${row.broad_date}&select=id,source`,
       { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` },
