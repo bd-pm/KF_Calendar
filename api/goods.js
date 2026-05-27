@@ -97,15 +97,17 @@ async function resolveGlobalBunjangDisplayName(id, fallbackName) {
   return fallbackName;
 }
 
-// 상품명에 artist가 실제로 포함되는지 확인 (단어 경계 기준)
-// 영문명과 한국어 별칭 둘 다 체크
+// 상품명에 artist(영문) 또는 krAlias(한국어)가 포함되는지 확인
+// 한국어는 앞뒤 한글 경계 체크 (이즈나 ≠ 네이즈 오매칭 방지)
 function nameMatchesArtist(productName, artist, krAlias) {
-  const checkMatch = (term) => {
-    const re = new RegExp(`(?<![\\w가-힣])${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w가-힣])`, 'i');
-    return re.test(productName);
-  };
-  if (checkMatch(artist)) return true;
-  if (krAlias && productName.includes(krAlias)) return true;
+  // 영문: 단어 경계 기준
+  const enRe = new RegExp(`(?<![\\w가-힣])${artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w가-힣])`, 'i');
+  if (enRe.test(productName)) return true;
+  // 한국어 별칭: 앞뒤가 한글이 아닌 경계에서 매칭
+  if (krAlias) {
+    const krRe = new RegExp(`(?<![가-힣])${krAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![가-힣])`);
+    if (krRe.test(productName)) return true;
+  }
   return false;
 }
 
@@ -161,7 +163,7 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 판매중인 것만, artist명(영문 또는 한국어 별칭) 실제 포함 확인, 최신순
+    // 판매중인 것만, 그룹명(영문 or 한국어 별칭) 포함 확인, 최신순
     const live = items
       .filter(i => i.status === '0' && nameMatchesArtist(i.name, artist, krAlias))
       .sort((a, b) => b.updatedAt - a.updatedAt);
