@@ -1329,9 +1329,20 @@ function renderBottom(){
       return chip;
     }
 
+    function scrollActiveChipToCenter() {
+      const activeChip = strip.querySelector('[data-active="true"]');
+      if (activeChip) {
+        const center = activeChip.offsetLeft - (strip.offsetWidth - activeChip.offsetWidth) / 2;
+        strip.scrollLeft = Math.max(0, center);
+      }
+    }
+
     // 1. CSV 순위 기준 즉시 정렬 후 칩 렌더
     sortedArtists(rawList).then(({ initial, unranked }) => {
       initial.forEach(name => strip.appendChild(makeChip(name)));
+
+      // 칩이 DOM에 붙은 직후 active 칩을 가운데로
+      setTimeout(scrollActiveChipToCenter, 0);
 
       // 2. 순위 없는 그룹만 백그라운드에서 매물 수 조회 후 재정렬
       if (unranked.length > 1) {
@@ -1342,24 +1353,17 @@ function renderBottom(){
             .catch(() => ({ name: a, count: 0 }))
         )).then(results => {
           results.sort((a, b) => b.count - a.count);
-          // strip에서 unranked 칩들만 꺼내서 순서 재배치
           results.forEach(({ name }) => {
             const chip = strip.querySelector(`[data-artist="${CSS.escape(name)}"]`);
-            if (chip) strip.appendChild(chip); // 맨 뒤로 이동 후 순서대로
+            if (chip) strip.appendChild(chip);
           });
+          // 재정렬 후 다시 가운데로
+          setTimeout(scrollActiveChipToCenter, 0);
         });
       }
     });
 
     chipBar.appendChild(strip);
-
-    setTimeout(() => {
-      const activeChip = strip.querySelector('[data-active="true"]');
-      if(activeChip) {
-        const center = activeChip.offsetLeft - (strip.offsetWidth - activeChip.offsetWidth) / 2;
-        strip.scrollLeft = center;
-      }
-    }, 0);
   }
 
   // ── Divider ──
