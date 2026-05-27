@@ -343,8 +343,8 @@ function officialPerformerNames(rawNames, enNameMap) {
   return names;
 }
 
-// Supabase upsert — manual/과거 데이터는 절대 덮어쓰지 않음
-async function upsertRows(rows) {
+// Supabase upsert — manual/cancelled는 항상 보호, backfill 모드에서는 과거 날짜도 허용
+async function upsertRows(rows, { backfill = false } = {}) {
   if (!rows.length) return 0;
   const todayKey = todayKstKey();
   let ok = 0;
@@ -356,8 +356,8 @@ async function upsertRows(rows) {
   };
 
   for (const row of rows) {
-    // 오늘 이전 날짜는 source 불문 절대 건드리지 않음 (date_rule 뼈대만 신규 INSERT 허용)
-    if (row.broad_date < todayKey && row.source !== 'date_rule') { ok++; continue; }
+    // 일반 크론 모드: 오늘 이전 날짜는 건드리지 않음
+    if (!backfill && row.broad_date < todayKey) { ok++; continue; }
 
     // 기존 row 확인
     const ex = await fetch(
@@ -368,7 +368,7 @@ async function upsertRows(rows) {
 
     if (ex.length > 0) {
       const existingSource = ex[0].source;
-      // manual은 절대 덮어쓰지 않음; date_rule은 더 나은 소스가 있을 때만 덮어씀
+      // manual/cancelled는 항상 보호 (backfill 포함)
       if (existingSource === 'manual') { ok++; continue; }
       if (existingSource === 'cancelled' && row.source !== 'manual') { ok++; continue; }
       if (row.source === 'date_rule' && existingSource !== 'date_rule') { ok++; continue; }
@@ -388,6 +388,17 @@ async function upsertRows(rows) {
     }
   }
   return ok;
+}
+
+// date_rule source rows 삭제 (백필 후 빈 뼈대 정리)
+async function deleteDateRuleRows(showName, since) {
+  const url = `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${showName}&source=eq.date_rule&broad_date=gte.${since}`;
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` },
+    signal: AbortSignal.timeout(15000),
+  });
+  return res.ok;
 }
 
 // ── 텔레그램 노티 ──
@@ -440,31 +451,45 @@ module.exports = async function handler(req, res) {
   if (!SUPA_SERVICE_KEY) return res.status(500).json({ error: 'SUPA_SERVICE_KEY 없음' });
 
   const since = req.query.since || null;
-  const allowBackfill = req.query.backfill === '1';
-  const cutoffDate = allowBackfill && since ? since : maxDateKey(todayKstKey(), since || '');
+  const backfill = req.query.backfill === '1';
+  // backfill 모드: since부터 과거 포함 전체 처리
+  // 일반 모드: 오늘 이후만 처리
+  const cutoffDate = backfill && since ? since : todayKstKey();
   const log = [];
   let totalUpserted = 0;
 
   for (const show of SHOWS_NAVER) {
     try {
-      // ① 날짜 뼈대 (skeleton rows)
-      const dates = datesForDay(show.dayOfWeek, since, cutoffDate);
-      const cancelledDates = dates.filter(d => isSpecialCancelled(show.show_name, d));
-      if (cancelledDates.length > 0) {
-        await deleteRowsByDates(show.show_name, cancelledDates);
+      // backfill 모드에서만: 기존 date_rule 빈 뼈대 먼저 삭제 (나중에 데이터 없는 날짜는 row 자체를 만들지 않음)
+      if (backfill && since) {
+        await deleteDateRuleRows(show.show_name, since);
+        log.push(`[${show.show_name}] date_rule rows 삭제 완료 (${since} 이후)`);
       }
-      const skelRows = dates.map(d => ({
-        show_name: show.show_name,
-        broad_date: d,
-        groups: [],
-        raw_title: '',
-        episode_number: null,
-        source: 'date_rule',
-      }));
-      const skelOk = await upsertRows(skelRows.filter(row => !cancelledDates.includes(row.broad_date)));
-      log.push(`[${show.show_name}] 뼈대 ${skelOk}/${dates.length - cancelledDates.length}개`);
 
-      // ② Naver 회차정보 크롤링
+      // 일반 모드: 앞으로 2주 뼈대만 생성 (데이터 없는 날짜 표시용)
+      // backfill 모드: 뼈대 생성 안 함 — 크롤링 데이터 있는 날짜만 저장
+      let skelOk = 0;
+      if (!backfill) {
+        const dates = datesForDay(show.dayOfWeek, since, cutoffDate);
+        const cancelledDates = dates.filter(d => isSpecialCancelled(show.show_name, d));
+        if (cancelledDates.length > 0) {
+          await deleteRowsByDates(show.show_name, cancelledDates);
+        }
+        const skelRows = dates
+          .filter(d => !cancelledDates.includes(d))
+          .map(d => ({
+            show_name: show.show_name,
+            broad_date: d,
+            groups: [],
+            raw_title: '',
+            episode_number: null,
+            source: 'date_rule',
+          }));
+        skelOk = await upsertRows(skelRows);
+        log.push(`[${show.show_name}] 뼈대 ${skelOk}/${skelRows.length}개`);
+      }
+
+      // Naver 회차정보 크롤링
       const html = await fetchNaverEpisodeTab(show);
       const episodes = parseNaverEpisodes(html, show.descFormat || 'dt_dd');
 
@@ -474,24 +499,27 @@ module.exports = async function handler(req, res) {
         continue;
       }
 
-      const cancelledSet = new Set(cancelledDates);
-      let futureEpisodes = episodes.filter(ep => ep.date >= cutoffDate && !cancelledSet.has(ep.date));
-      const skippedPast = episodes.length - futureEpisodes.length;
-      if (futureEpisodes.length === 0) {
-        log.push(`[${show.show_name}] Naver 업데이트 0/0개 (기준일 ${cutoffDate}, 과거 ${skippedPast}개 스킵)`);
+      // 처리 대상 에피소드 필터링
+      const cancelledSet = new Set();
+      let targetEpisodes = episodes.filter(ep => ep.date >= cutoffDate && !cancelledSet.has(ep.date));
+      const skippedCount = episodes.length - targetEpisodes.length;
+
+      if (targetEpisodes.length === 0) {
+        log.push(`[${show.show_name}] Naver 업데이트 0개 (기준일 ${cutoffDate}, ${skippedCount}개 스킵)`);
         totalUpserted += skelOk;
         continue;
       }
 
+      // 인기가요: SBS 공홈 상세페이지에서 전체 출연진 보강
       if (show.show_name === 'inkigayo') {
-        futureEpisodes = await enrichInkigayoEpisodes(futureEpisodes);
+        targetEpisodes = await enrichInkigayoEpisodes(targetEpisodes);
       }
 
       // 한국어 performer명 → 공식 영문명 변환
-      const allPerformers = [...new Set(futureEpisodes.flatMap(ep => ep.performers))];
+      const allPerformers = [...new Set(targetEpisodes.flatMap(ep => ep.performers))];
       const enNameMap = await resolveEnNames(allPerformers);
 
-      const dataRows = futureEpisodes.map(ep => {
+      const dataRows = targetEpisodes.map(ep => {
         const enPerformers = officialPerformerNames(ep.performers, enNameMap);
         return {
           show_name: show.show_name,
@@ -503,8 +531,8 @@ module.exports = async function handler(req, res) {
         };
       });
 
-      const dataOk = await upsertRows(dataRows);
-      log.push(`[${show.show_name}] Naver 업데이트 ${dataOk}/${dataRows.length}개 (기준일 ${cutoffDate}, 과거 ${skippedPast}개 스킵)`);
+      const dataOk = await upsertRows(dataRows, { backfill });
+      log.push(`[${show.show_name}] Naver 업데이트 ${dataOk}/${dataRows.length}개 (기준일 ${cutoffDate}, ${skippedCount}개 스킵)`);
       totalUpserted += skelOk + dataOk;
 
     } catch (err) {
