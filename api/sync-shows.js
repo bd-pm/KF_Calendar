@@ -91,11 +91,10 @@ function dKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-// since 날짜부터 다음달 말일까지 특정 요일의 날짜 목록 (기본: 30일 전부터)
+// 오늘부터 다음달 말일까지 특정 요일의 날짜 목록 (since 지정 시 max(오늘, since)부터)
 function datesForDay(dayOfWeek, sinceDate) {
-  const start = sinceDate ? new Date(sinceDate) : new Date(Date.now() - 30 * 86400000);
-  start.setHours(0,0,0,0);
   const today = new Date(); today.setHours(0,0,0,0);
+  const start = sinceDate ? new Date(Math.max(today, new Date(sinceDate))) : new Date(today);
   const end = new Date(today.getFullYear(), today.getMonth()+2, 0);
 
   const dates = [];
@@ -180,8 +179,8 @@ async function upsertRows(rows) {
   };
   let ok = 0;
   for (const row of rows) {
-    // 오늘 이전 날짜는 date_rule 신규 INSERT만 허용, 나머지 절대 건드리지 않음
-    if (row.broad_date < todayKey && row.source !== 'date_rule') { ok++; continue; }
+    // 오늘 이전 날짜는 source 불문 절대 건드리지 않음
+    if (row.broad_date < todayKey) { ok++; continue; }
     const existing = await fetch(
       `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${row.show_name}&broad_date=eq.${row.broad_date}&select=id,groups,source`,
       { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` },
