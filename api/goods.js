@@ -7,6 +7,7 @@ const KEYWORDS = ['공방포', '역조공', '공방', '사녹'];
 
 // 영문 공식명 → 한국어 표기 (번장에서 한국어로 등록된 상품명 매칭용)
 const EN_TO_KR = {
+  'NOWZ': '나우즈',
   'NAZE': '네이즈',
   'aespa': '에스파',
   'IVE': '아이브',
@@ -123,10 +124,12 @@ module.exports = async function handler(req, res) {
   const krAlias = EN_TO_KR[artist] || null;
 
   try {
-    // 영문명 + 한국어 별칭 각각 키워드 조합으로 검색
+    // 영문명 + 소문자 + 한국어 별칭 각각 키워드 조합으로 검색
+    const artistLower = artist.toLowerCase();
     const queries = [];
     for (const kw of KEYWORDS) {
       queries.push(`${artist} ${kw}`);
+      if (artistLower !== artist) queries.push(`${artistLower} ${kw}`);
       if (krAlias) queries.push(`${krAlias} ${kw}`);
     }
     // 중복 쿼리 제거
@@ -163,9 +166,9 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 판매중인 것만, 그룹명(영문 or 한국어 별칭) 포함 확인, 최신순
+    // 판매중인 것만, 그룹명(영문/소문자/한국어 별칭) 포함 확인, 최신순
     const live = items
-      .filter(i => i.status === '0' && nameMatchesArtist(i.name, artist, krAlias))
+      .filter(i => i.status === '0' && (nameMatchesArtist(i.name, artist, krAlias) || nameMatchesArtist(i.name, artistLower, null)))
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
     const visibleCount = Math.min(live.length, Math.max(1, n));
