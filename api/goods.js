@@ -5,6 +5,53 @@
 const BUNJANG_API = 'https://api.bunjang.co.kr/api/1/find_v2.json';
 const KEYWORDS = ['공방포', '역조공', '공방', '사녹'];
 
+// 영문 공식명 → 한국어 표기 (번장에서 한국어로 등록된 상품명 매칭용)
+const EN_TO_KR = {
+  'NAZE': '네이즈',
+  'aespa': '에스파',
+  'IVE': '아이브',
+  'LE SSERAFIM': '르세라핌',
+  'NewJeans': '뉴진스',
+  'TWICE': '트와이스',
+  'BLACKPINK': '블랙핑크',
+  'ENHYPEN': '엔하이픈',
+  'SEVENTEEN': '세븐틴',
+  'ATEEZ': '에이티즈',
+  'Stray Kids': '스트레이키즈',
+  'TXT': '투모로우바이투게더',
+  'PLAVE': '플레이브',
+  'ZEROBASEONE': '제로베이스원',
+  'BOYNEXTDOOR': '보이넥스트도어',
+  'TWS': '투어스',
+  'ILLIT': '아일릿',
+  'BABYMONSTER': '베이비몬스터',
+  '&TEAM': '앤팀',
+  'CRAVITY': '크래비티',
+  'XIKERS': '자이커스',
+  'THE BOYZ': '더보이즈',
+  'ONEUS': '원어스',
+  'MAMAMOO': '마마무',
+  'Red Velvet': '레드벨벳',
+  'ITZY': '있지',
+  'NMIXX': 'NMIXX',
+  'EVNNE': '이븐',
+  'NEXZ': '넥스지',
+  'Kep1er': '케플러',
+  'AMPERS&ONE': '앰퍼샌드원',
+  'SHINee': '샤이니',
+  'SUPER JUNIOR': '슈퍼주니어',
+  '(G)I-DLE': '여자아이들',
+  'BTOB': '비투비',
+  'INFINITE': '인피니트',
+  'MONSTA X': '몬스타엑스',
+  'Xdinary Heroes': '엑스디너리히어로즈',
+  'P1Harmony': '피원하모니',
+  'H1-KEY': '하이키',
+  'Billlie': '빌리',
+  'YOUNG POSSE': '영파씨',
+  'KATSEYE': '케이씨아이',
+};
+
 function decodeHtml(s) {
   return String(s || '')
     .replace(/&amp;/g, '&')
@@ -51,13 +98,15 @@ async function resolveGlobalBunjangDisplayName(id, fallbackName) {
 }
 
 // 상품명에 artist가 실제로 포함되는지 확인 (단어 경계 기준)
-// EXO → 엑소(XO) 안에 있는 EXO를 오매칭하는 경우 방지
-function nameMatchesArtist(productName, artist) {
-  const name = productName.toLowerCase();
-  const a = artist.toLowerCase();
-  // 앞뒤가 영숫자/한글이 아닌 경계에서 매칭되어야 함
-  const re = new RegExp(`(?<![\\w가-힣])${a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w가-힣])`, 'i');
-  return re.test(productName);
+// 영문명과 한국어 별칭 둘 다 체크
+function nameMatchesArtist(productName, artist, krAlias) {
+  const checkMatch = (term) => {
+    const re = new RegExp(`(?<![\\w가-힣])${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w가-힣])`, 'i');
+    return re.test(productName);
+  };
+  if (checkMatch(artist)) return true;
+  if (krAlias && productName.includes(krAlias)) return true;
+  return false;
 }
 
 module.exports = async function handler(req, res) {
@@ -69,13 +118,21 @@ module.exports = async function handler(req, res) {
   if (!artist) return res.status(400).json({ error: 'artist 파라미터 필요' });
 
   const n = Math.min(parseInt(req.query.n || '50', 10), 100);
+  const krAlias = EN_TO_KR[artist] || null;
 
   try {
-    // 각 키워드로 검색 → 합치기
+    // 영문명 + 한국어 별칭 각각 키워드 조합으로 검색
+    const queries = [];
+    for (const kw of KEYWORDS) {
+      queries.push(`${artist} ${kw}`);
+      if (krAlias) queries.push(`${krAlias} ${kw}`);
+    }
+    // 중복 쿼리 제거
+    const uniqueQueries = [...new Set(queries)];
+
     const results = await Promise.allSettled(
-      KEYWORDS.map(kw => {
-        const q = encodeURIComponent(`${artist} ${kw}`);
-        const url = `${BUNJANG_API}?q=${q}&order=date&n=${n}&page=0`;
+      uniqueQueries.map(q => {
+        const url = `${BUNJANG_API}?q=${encodeURIComponent(q)}&order=date&n=${n}&page=0`;
         return fetch(url, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
           signal: AbortSignal.timeout(10000),
@@ -104,9 +161,9 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 판매중인 것만, artist명 실제 포함 확인, 최신순
+    // 판매중인 것만, artist명(영문 또는 한국어 별칭) 실제 포함 확인, 최신순
     const live = items
-      .filter(i => i.status === '0' && nameMatchesArtist(i.name, artist))
+      .filter(i => i.status === '0' && nameMatchesArtist(i.name, artist, krAlias))
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
     const visibleCount = Math.min(live.length, Math.max(1, n));
