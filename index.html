@@ -905,6 +905,32 @@ function escHtml(s){
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+const KRW_PER_USD = 1300;
+function krwToUsd(price){
+  const n = Number(price) || 0;
+  return n / KRW_PER_USD;
+}
+function formatUsdPrice(price){
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(krwToUsd(price));
+}
+function formatGoodsPrice(item){
+  if (item && item.displayPrice) return item.displayPrice;
+  if (item && Number.isFinite(Number(item.priceGlobal))) {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number(item.priceGlobal));
+  }
+  return formatUsdPrice(item?.price);
+}
+
 // ─────────────────────────────────────────
 //  VIEW TOGGLE
 // ─────────────────────────────────────────
@@ -1495,7 +1521,7 @@ async function fetchAllGroupGoods(artists, showName) {
           ${imgHtml}
         </div>
         <div class="gcard-body">
-          <div class="gcard-price">₩${item.price.toLocaleString()}</div>
+          <div class="gcard-price">${formatGoodsPrice(item)}</div>
           <div class="gcard-name">${escHtml(itemName)}</div>
         </div>
       `;
@@ -1567,7 +1593,7 @@ async function fetchAndShowLiveGoods(artistName) {
           ${imgHtml}
         </div>
         <div class="gcard-body">
-          <div class="gcard-price">₩${item.price.toLocaleString()}</div>
+          <div class="gcard-price">${formatGoodsPrice(item)}</div>
           <div class="gcard-name">${escHtml(itemName)}</div>
         </div>
       `;

@@ -2,8 +2,17 @@
 // 그룹명 + 공방/역조공/공방포/사녹 키워드로 번장 검색 → 최신순 반환
 // GET /api/goods?artist=방탄소년단&n=30
 
+const fs = require('fs');
+const path = require('path');
+
 const BUNJANG_API = 'https://api.bunjang.co.kr/api/1/find_v2.json';
 const KEYWORDS = ['공방포', '역조공', '공방', '사녹'];
+const KRW_PER_USD = 1300;
+const STATIC_GOODS = {
+  bts: 'goods-bts.json',
+  seventeen: 'goods-seventeen.json',
+  enhypen: 'goods-enhypen.json',
+};
 
 // 영문 공식명 → 한국어 표기 (번장에서 한국어로 등록된 상품명 매칭용)
 const EN_TO_KR = {
@@ -66,36 +75,96 @@ function decodeHtml(s) {
 function cleanDisplayName(s) {
   return decodeHtml(s)
     .replace(/\s+on Bunjang Global Site\.?$/i, '')
+    .replace(/\s+\|\s*Bunjang Global.*$/i, '')
     .replace(/^#\s*/, '')
     .replace(/\s*Translate to English\s*/i, '')
     .trim();
 }
 
-async function resolveGlobalBunjangDisplayName(id, fallbackName) {
-  if (!/[가-힣]/.test(fallbackName)) return fallbackName;
+function formatUsdPrice(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return `$${n.toFixed(2)}`;
+}
 
+function krwToGlobalUsd(price) {
+  const n = Number(price) || 0;
+  return Math.round((n / KRW_PER_USD) * 100) / 100;
+}
+
+function withUsdPrice(item) {
+  const priceGlobal = Number.isFinite(Number(item.priceGlobal))
+    ? Number(item.priceGlobal)
+    : krwToGlobalUsd(item.price);
+  return {
+    ...item,
+    priceGlobal,
+    displayPrice: formatUsdPrice(priceGlobal),
+    currency: 'USD',
+  };
+}
+
+function loadStaticGoods() {
+  return Object.fromEntries(
+    Object.entries(STATIC_GOODS).map(([group, file]) => {
+      const filePath = path.join(process.cwd(), 'goods', file);
+      const items = JSON.parse(fs.readFileSync(filePath, 'utf8')).map(withUsdPrice);
+      return [group, items];
+    })
+  );
+}
+
+function parseGlobalProduct(html, id) {
+  const escapedId = String(id).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = html.match(new RegExp(`pid\\\\?":${escapedId}[\\s\\S]{0,2500}?totalPriceGlobal\\\\?":([0-9.]+)`));
+  if (!m) return {};
+
+  const chunk = m[0];
+  const nameEng = chunk.match(/nameEng\\?":"((?:\\.|[^"\\])*)"/);
+  const priceGlobal = chunk.match(/priceGlobal\\?":([0-9.]+)/);
+  const totalPriceGlobal = chunk.match(/totalPriceGlobal\\?":([0-9.]+)/);
+
+  return {
+    displayName: nameEng?.[1] ? cleanDisplayName(nameEng[1].replace(/\\"/g, '"')) : null,
+    priceGlobal: priceGlobal ? Number(priceGlobal[1]) : null,
+    totalPriceGlobal: totalPriceGlobal ? Number(totalPriceGlobal[1]) : null,
+  };
+}
+
+async function resolveGlobalBunjangProduct(id, fallbackName) {
   try {
     const res = await fetch(`https://globalbunjang.com/product/${id}`, {
       headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html,application/xhtml+xml' },
       signal: AbortSignal.timeout(10000),
     });
-    if (!res.ok) return fallbackName;
+    if (!res.ok) return {};
     const html = await res.text();
+
+    const globalProduct = parseGlobalProduct(html, id);
+
     const patterns = [
       /<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i,
       /<h1[^>]*>([^<]+)<\/h1>/i,
       /<title>([^<]+)<\/title>/i,
     ];
+    let displayName = globalProduct.displayName || null;
     for (const pattern of patterns) {
       const m = html.match(pattern);
       if (m && m[1]) {
         const cleaned = cleanDisplayName(m[1]);
-        if (cleaned) return cleaned;
+        if (cleaned && !displayName) displayName = cleaned;
       }
     }
+
+    return {
+      ...globalProduct,
+      displayName: displayName || null,
+      displayPrice: formatUsdPrice(globalProduct.priceGlobal),
+      currency: globalProduct.priceGlobal != null ? 'USD' : null,
+    };
   } catch {}
 
-  return fallbackName;
+  return {};
 }
 
 // 상품명에 artist(영문) 또는 krAlias(한국어)가 포함되는지 확인
@@ -118,7 +187,10 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   const artist = (req.query.artist || '').trim();
-  if (!artist) return res.status(400).json({ error: 'artist 파라미터 필요' });
+  if (!artist) {
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+    return res.status(200).json(loadStaticGoods());
+  }
 
   const n = Math.min(parseInt(req.query.n || '50', 10), 100);
   const krAlias = EN_TO_KR[artist] || null;
@@ -173,12 +245,18 @@ module.exports = async function handler(req, res) {
 
     const visibleCount = Math.min(live.length, Math.max(1, n));
     const enriched = await Promise.all(
-      live.slice(0, visibleCount).map(async item => ({
-        ...item,
-        displayName: await resolveGlobalBunjangDisplayName(item.id, item.name),
-      }))
+      live.slice(0, visibleCount).map(async item => {
+        const globalProduct = await resolveGlobalBunjangProduct(item.id, item.name);
+        return {
+          ...withUsdPrice(item),
+          ...globalProduct,
+          displayName: globalProduct.displayName || item.name,
+          displayPrice: globalProduct.displayPrice || formatUsdPrice(krwToGlobalUsd(item.price)),
+          currency: 'USD',
+        };
+      })
     );
-    const itemsOut = [...enriched, ...live.slice(visibleCount)];
+    const itemsOut = [...enriched, ...live.slice(visibleCount).map(withUsdPrice)];
 
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
     return res.status(200).json({ artist, items: itemsOut });

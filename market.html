@@ -1011,7 +1011,7 @@ function cardHTML(item) {
           ${tagBadges ? `<div class="gcard-tags">${tagBadges}</div>` : ''}
           <div class="gcard-name">${escHtml(item.name)}</div>
           <div class="gcard-footer">
-            <div class="gcard-price">₩${item.price?.toLocaleString()}</div>
+            <div class="gcard-price" data-price-usd="${getUsdPrice(item).toFixed(2)}">${formatGoodsPrice(item)}</div>
             <div class="gcard-group" style="align-self:flex-start;${groupTagStyle(item.group)}">${groupLabel}</div>
           </div>
         </div>
@@ -1060,7 +1060,7 @@ function renderRelated(show) {
       <a class="rcard" href="${bunjangUrl}" target="_blank" rel="noopener">
         ${img}
         <div class="rcard-name">${escHtml(item.name)}</div>
-        <div class="rcard-price">₩${item.price?.toLocaleString()}</div>
+        <div class="rcard-price">${formatGoodsPrice(item)}</div>
       </a>`;
   }).join('');
 
@@ -1069,6 +1069,36 @@ function renderRelated(show) {
 
 function escHtml(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+const KRW_PER_USD = 1300;
+function krwToUsd(price) {
+  const n = Number(price) || 0;
+  return n / KRW_PER_USD;
+}
+function formatUsdPrice(price) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(krwToUsd(price));
+}
+function getUsdPrice(item) {
+  if (item && Number.isFinite(Number(item.priceGlobal))) return Number(item.priceGlobal);
+  return krwToUsd(item?.price);
+}
+function formatGoodsPrice(item) {
+  if (item && item.displayPrice) return item.displayPrice;
+  if (item && Number.isFinite(Number(item.priceGlobal))) {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number(item.priceGlobal));
+  }
+  return formatUsdPrice(item?.price);
 }
 
 /* ══════════════════════════════════════
@@ -1133,8 +1163,8 @@ document.getElementById('goodsGrid').addEventListener('click', e => {
     item_name: nameEl?.textContent?.trim(),
     item_category: activeTag,
     item_brand: groupEl?.textContent?.trim(),
-    price: parseInt((priceEl?.textContent || '').replace(/[^0-9]/g, '')) || 0,
-    currency: 'KRW',
+    price: Number(priceEl?.dataset.priceUsd || 0),
+    currency: 'USD',
   });
 });
 
@@ -1260,7 +1290,7 @@ function renderCompareGrid() {
           <div class="cmp-card-body">
             ${tagLabel ? `<div style="font-size:9px;color:var(--accent);font-weight:700;margin-bottom:3px">${tagLabel}</div>` : ''}
             <div class="cmp-card-name">${escHtml(item.name)}</div>
-            <div class="cmp-card-price">₩${item.price?.toLocaleString()}</div>
+            <div class="cmp-card-price">${formatGoodsPrice(item)}</div>
             <div class="cmp-card-group" style="${groupTagStyle(item.group)}">${groupLabel}</div>
           </div>
         </div>`);
