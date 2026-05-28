@@ -194,14 +194,14 @@ module.exports = async function handler(req, res) {
 
     const rows = episodes.map(ep => {
       const artists = parseArtists(ep.ContentTitle);
-      const groupIds = mapToGroupIds(artists);
       const enArtists = artists.map(a => enNameMap[a] || a);
+      const groupIds = mapToGroupIds([...artists, ...enArtists]);
       return {
         show_name:      'music_core',
         episode_number: ep.ContentNumber || null,
         broad_date:     ep.BroadDate,
         groups:         groupIds,
-        raw_title:      `music_core - ${enArtists.join(', ')}`,
+        raw_title:      `music_core - ${artists.join(', ')}`,
         source:         'imbc_api',
       };
     }).filter(r => r.broad_date);

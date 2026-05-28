@@ -525,7 +525,7 @@ module.exports = async function handler(req, res) {
           show_name: show.show_name,
           broad_date: ep.date,
           groups: mapArtists([...ep.performers, ...enPerformers]),
-          raw_title: `${show.show_name} - ${enPerformers.join(', ')}`,
+          raw_title: `${show.show_name} - ${ep.performers.join(', ')}`,
           episode_number: ep.no || null,
           source: 'naver',
         };

@@ -236,4 +236,34 @@ async function resolveEnNames(names) {
   }));
 }
 
-module.exports = { resolveEnNames, isKorean, normalizeArtistName };
+async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (!['GET', 'POST'].includes(req.method)) return res.status(405).json({ error: 'GET/POST only' });
+
+  try {
+    const rawNames = req.method === 'POST' ? req.body?.names : req.query.names;
+    const names = Array.isArray(rawNames)
+      ? rawNames
+      : String(rawNames || '')
+        .trim()
+        .replace(/^\[/, '')
+        .replace(/\]$/, '')
+        .split(',')
+        .map(s => s.replace(/^["']|["']$/g, '').trim())
+        .filter(Boolean);
+
+    const uniqueNames = [...new Set(names)].slice(0, 100);
+    const map = await resolveEnNames(uniqueNames);
+    return res.status(200).json({ names: map });
+  } catch (err) {
+    return res.status(502).json({ error: err.message });
+  }
+}
+
+module.exports = handler;
+module.exports.resolveEnNames = resolveEnNames;
+module.exports.isKorean = isKorean;
+module.exports.normalizeArtistName = normalizeArtistName;

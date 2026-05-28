@@ -1210,8 +1210,31 @@ const ARTIST_DISPLAY_NAME = {
   '레드벨벳':'Red Velvet','자이커스':'XIKERS',
   '아이오아이':'I.O.I','IOI':'I.O.I','I.O.I':'I.O.I',
 };
+const ARTIST_DISPLAY_CACHE = {};
 function artistDisplayName(name) {
-  return ARTIST_DISPLAY_NAME[name] || name;
+  return ARTIST_DISPLAY_CACHE[name] || ARTIST_DISPLAY_NAME[name] || name;
+}
+
+async function resolveArtistDisplayNames(names) {
+  const need = [...new Set((names || []).filter(name => name && !ARTIST_DISPLAY_CACHE[name]))];
+  if (need.length === 0) return;
+
+  need.forEach(name => {
+    if (ARTIST_DISPLAY_NAME[name]) ARTIST_DISPLAY_CACHE[name] = ARTIST_DISPLAY_NAME[name];
+  });
+  const unresolved = need.filter(name => !ARTIST_DISPLAY_CACHE[name]);
+  if (unresolved.length === 0) return;
+
+  try {
+    const res = await fetch('/api/artist-en-name', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ names: unresolved }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    Object.assign(ARTIST_DISPLAY_CACHE, data.names || {});
+  } catch {}
 }
 
 // ─────────────────────────────────────────
@@ -1350,6 +1373,11 @@ function renderBottom(){
     const rawList = (myGroups && myGroups.length > 0)
       ? allRawList.filter(a => myGroups.includes(a))
       : allRawList;
+    resolveArtistDisplayNames(rawList).then(() => {
+      strip.querySelectorAll('[data-artist]').forEach(chip => {
+        chip.textContent = artistDisplayName(chip.dataset.artist);
+      });
+    });
 
     function makeChip(artistName) {
       const chip = document.createElement('button');
@@ -1555,6 +1583,7 @@ async function fetchAndShowLiveGoods(artistName) {
   if(!area) return;
 
   try {
+    await resolveArtistDisplayNames([artistName]);
     const res = await fetch(`/api/goods?artist=${encodeURIComponent(artistName)}&n=60`);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
