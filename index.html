@@ -1177,7 +1177,7 @@ function parseRawTitleStatic(raw) {
       .split(',')
       .map(s => s.replace(/\s*\([^)]*\)/g, '').trim());
   } else {
-    segments = decoded.split(/\s*[·.]\s*/).map(s => s.trim()).filter(s => s);
+    segments = decoded.split(/[\n,·]+/).map(s => s.trim()).filter(s => s);
   }
   // 중복 제거하면서 순서 유지
   const seen = new Set();
