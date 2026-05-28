@@ -125,10 +125,22 @@ async function fetchImbcEpisodes(programId) {
   return episodes;
 }
 
+function protectDottedArtistNames(raw) {
+  return String(raw || '')
+    .replace(/\bI\s*\.\s*O\s*\.\s*I\b/gi, 'I{{DOT}}O{{DOT}}I')
+    .replace(/\bIOI\b/gi, 'I{{DOT}}O{{DOT}}I')
+    .replace(/아이오아이/g, 'I{{DOT}}O{{DOT}}I');
+}
+
+function normalizeParsedArtistName(name) {
+  const restored = String(name || '').replace(/\{\{DOT\}\}/g, '.').trim();
+  return /^(?:I\.O\.I|IOI|아이오아이)$/i.test(restored) ? 'I.O.I' : restored;
+}
+
 // 음악중심 파싱: "휘인 . 박지훈 . LE SSERAFIM ..."
 function parseMusicCore(ep) {
   const raw = ep.ContentTitle || ep.contentTitle || '';
-  const artists = raw.split(/\s*[·.]\s*/).map(s=>s.trim()).filter(s=>s && s !== 'EVNNE(이븐)'.replace(/\([^)]*\)/g,'').trim());
+  const artists = protectDottedArtistNames(raw).split(/\s*[·.]\s*/).map(normalizeParsedArtistName).filter(s=>s && s !== 'EVNNE(이븐)'.replace(/\([^)]*\)/g,'').trim());
   // 괄호 안 한국어 제거
   const cleaned = artists.map(s => s.replace(/\s*\([^)]*\)/g,'').trim()).filter(Boolean);
   return { raw, artists: cleaned };

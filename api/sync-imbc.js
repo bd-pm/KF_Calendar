@@ -10,12 +10,24 @@ const SUPA_URL        = process.env.SUPA_URL  || 'https://zbnronyslswwbwdiuzjg.s
 const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY; // service_role key (환경변수 필수)
 const SYNC_SECRET     = process.env.SYNC_SECRET || '';
 
+function protectDottedArtistNames(raw) {
+  return String(raw || '')
+    .replace(/\bI\s*\.\s*O\s*\.\s*I\b/gi, 'I{{DOT}}O{{DOT}}I')
+    .replace(/\bIOI\b/gi, 'I{{DOT}}O{{DOT}}I')
+    .replace(/아이오아이/g, 'I{{DOT}}O{{DOT}}I');
+}
+
+function normalizeParsedArtistName(name) {
+  const restored = String(name || '').replace(/\{\{DOT\}\}/g, '.').trim();
+  return /^(?:I\.O\.I|IOI|아이오아이)$/i.test(restored) ? 'I.O.I' : restored;
+}
+
 // ── ContentTitle 파싱: "휘인 . 박지훈 . LE SSERAFIM ..." → 배열
 function parseArtists(contentTitle) {
   if (!contentTitle) return [];
-  return contentTitle
+  return protectDottedArtistNames(contentTitle)
     .split(/\s*[·.]\s*/)
-    .map(s => s.trim())
+    .map(normalizeParsedArtistName)
     .filter(s => s.length > 0);
 }
 

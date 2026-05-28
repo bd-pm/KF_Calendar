@@ -74,7 +74,16 @@ const ARTIST_TO_GROUP = {
 
 function parseArtists(contentTitle) {
   if (!contentTitle) return [];
-  return contentTitle.split(/\s*[·.]\s*/).map(s => s.trim()).filter(s => s.length > 0);
+  return contentTitle
+    .replace(/\bI\s*\.\s*O\s*\.\s*I\b/gi, 'I{{DOT}}O{{DOT}}I')
+    .replace(/\bIOI\b/gi, 'I{{DOT}}O{{DOT}}I')
+    .replace(/아이오아이/g, 'I{{DOT}}O{{DOT}}I')
+    .split(/\s*[·.]\s*/)
+    .map(s => {
+      const restored = s.replace(/\{\{DOT\}\}/g, '.').trim();
+      return /^(?:I\.O\.I|IOI|아이오아이)$/i.test(restored) ? 'I.O.I' : restored;
+    })
+    .filter(s => s.length > 0);
 }
 
 function mapToGroupIds(artists) {

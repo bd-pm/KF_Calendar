@@ -1141,6 +1141,7 @@ const SEGMENT_BLACKLIST = new Set([
 // 세그먼트에서 실제 그룹명만 추출: "CRAVITY COMEBACK" → "CRAVITY"
 // ARTIST_TO_GROUP_FRONT 키 중 longest-prefix match 사용
 function cleanArtistSegment(seg) {
+  if (/^(?:I\.O\.I|IOI|아이오아이)$/i.test(String(seg || '').trim())) return 'I.O.I';
   if (SEGMENT_BLACKLIST.has(seg)) return '';
   const keys = Object.keys(ARTIST_TO_GROUP_FRONT).sort((a,b) => b.length - a.length);
   for (const k of keys) {
@@ -1151,11 +1152,23 @@ function cleanArtistSegment(seg) {
   return seg; // 매핑 없는 경우 원본 (개인 아티스트 등)
 }
 
+function protectDottedArtistNames(raw) {
+  return String(raw || '')
+    .replace(/\bI\s*\.\s*O\s*\.\s*I\b/gi, 'I{{DOT}}O{{DOT}}I')
+    .replace(/\bIOI\b/gi, 'I{{DOT}}O{{DOT}}I')
+    .replace(/아이오아이/g, 'I{{DOT}}O{{DOT}}I');
+}
+
+function restoreProtectedArtistName(seg) {
+  const restored = String(seg || '').replace(/\{\{DOT\}\}/g, '.').trim();
+  return /^(?:I\.O\.I|IOI|아이오아이)$/i.test(restored) ? 'I.O.I' : restored;
+}
+
 // parseRawTitle 전역 버전 (renderBottom 스코프 밖에서도 사용)
 function parseRawTitleStatic(raw) {
   if (!raw) return [];
   // HTML entity decode: &#39; → '
-  const decoded = raw.replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  const decoded = protectDottedArtistNames(raw.replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'));
   const dashIdx = decoded.indexOf(' - ');
   let segments;
   if (dashIdx !== -1) {
@@ -1170,7 +1183,7 @@ function parseRawTitleStatic(raw) {
   const seen = new Set();
   const result = [];
   for (const seg of segments) {
-    const cleaned = cleanArtistSegment(seg);
+    const cleaned = cleanArtistSegment(restoreProtectedArtistName(seg));
     if (!cleaned || seen.has(cleaned)) continue;
     seen.add(cleaned);
     result.push(cleaned);
@@ -1195,6 +1208,7 @@ const ARTIST_DISPLAY_NAME = {
   '이채연':'LEE CHAEYEON','휘인':'WHEEIN','박지훈':'PARK JIHOON',
   '키노':'KINO','펜타곤':'PENTAGON','여자아이들':'(G)I-DLE','마마무':'MAMAMOO',
   '레드벨벳':'Red Velvet','자이커스':'XIKERS',
+  '아이오아이':'I.O.I','IOI':'I.O.I','I.O.I':'I.O.I',
 };
 function artistDisplayName(name) {
   return ARTIST_DISPLAY_NAME[name] || name;

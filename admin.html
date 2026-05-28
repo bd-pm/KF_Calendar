@@ -440,8 +440,19 @@ async function submitLineup() {
 
   if (!show || !date) { msg.style.color='#f08080'; msg.textContent='Show and date are required.'; return; }
 
+  function protectDottedArtistNames(value) {
+    return String(value || '')
+      .replace(/\bI\s*\.\s*O\s*\.\s*I\b/gi, 'I{{DOT}}O{{DOT}}I')
+      .replace(/\bIOI\b/gi, 'I{{DOT}}O{{DOT}}I')
+      .replace(/아이오아이/g, 'I{{DOT}}O{{DOT}}I');
+  }
+  function normalizeParsedArtistName(value) {
+    const restored = String(value || '').replace(/\{\{DOT\}\}/g, '.').trim();
+    return /^(?:I\.O\.I|IOI|아이오아이)$/i.test(restored) ? 'I.O.I' : restored;
+  }
+
   // Parse artists (line breaks or dots)
-  const artists = raw.split(/[\n·.]+/).map(s=>s.trim()).filter(s=>s.length>0);
+  const artists = protectDottedArtistNames(raw).split(/[\n·.]+/).map(normalizeParsedArtistName).filter(s=>s.length>0);
   if (!artists.length) { msg.style.color='#f08080'; msg.textContent='Enter at least one artist.'; return; }
 
   // Group ID mapping (same as index.html ARTIST_TO_GROUP_FRONT)
