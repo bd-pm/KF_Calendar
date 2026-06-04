@@ -807,6 +807,58 @@ const SHOW_LABELS = {
   mcountdown:    { name:'M Countdown',      short:'M Countdown',   day:'THU', color:'#FF4757' },
   show_champion: { name:'Show Champion',    short:'Show Champion', day:'WED', color:'#00C4B4' },
 };
+const SHOW_DAY_INDEX = { SUN:0, MON:1, TUE:2, WED:3, THU:4, FRI:5, SAT:6 };
+
+function scheduledShowForDate(ds) {
+  const [y, mo, d] = ds.split('-').map(Number);
+  const dow = new Date(y, mo - 1, d).getDay();
+  const entry = Object.entries(SHOW_LABELS).find(([, show]) => SHOW_DAY_INDEX[show.day] === dow);
+  if (!entry) return null;
+  const [showName, show] = entry;
+  return { showName, ...show };
+}
+
+function lineupArtistCount(lineup) {
+  if (!lineup || lineup.source === 'cancelled') return 0;
+  const rawArtists = parseRawTitleStatic(lineup.rawTitle);
+  return rawArtists.length > 0 ? rawArtists.length : (lineup.groups || []).length;
+}
+
+function previousWeekLineupFor(showName, ds) {
+  if (!showName) return null;
+  const [y, mo, d] = ds.split('-').map(Number);
+  const base = new Date(y, mo - 1, d);
+  for (let daysBack = 7; daysBack <= 35; daysBack += 7) {
+    const prevDate = dKey(addDays(base, -daysBack));
+    const prevLineup = LINEUP_BY_DATE[prevDate];
+    if (!prevLineup || prevLineup.showName !== showName) continue;
+    const count = lineupArtistCount(prevLineup);
+    if (prevLineup.source !== 'date_rule' && count > 0) {
+      return { date: prevDate, lineup: prevLineup, count };
+    }
+  }
+  return null;
+}
+
+function ensureFixedShowSkeletons() {
+  const end = addDays(getWeekStart(addDays(TODAY, 7)), 6);
+  const cur = new Date(TODAY);
+  cur.setHours(0, 0, 0, 0);
+  while (cur <= end) {
+    const ds = dKey(cur);
+    const expectedShow = scheduledShowForDate(ds);
+    if (expectedShow && !LINEUP_BY_DATE[ds]) {
+      LINEUP_BY_DATE[ds] = {
+        showName: expectedShow.showName,
+        episode: null,
+        groups: [],
+        rawTitle: '',
+        source: 'date_rule',
+      };
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+}
 
 // 프론트용 아티스트→그룹ID 매핑
 const ARTIST_TO_GROUP_FRONT = {
@@ -1113,6 +1165,12 @@ function buildMonth(area){
 function selectDate(ds, opts = {}){
   selectedDate = ds;
   selectedArtistName = null;
+  if (opts.syncCalendar) {
+    const [y, mo, d] = ds.split('-').map(Number);
+    const selected = new Date(y, mo - 1, d);
+    weekStart = getWeekStart(selected);
+    monthPivot = new Date(y, mo - 1, 1);
+  }
   const lineup = LINEUP_BY_DATE[ds];
   allGroupsSelected = !!(lineup && (lineup.rawTitle || lineup.groups.length > 0));
   buildCal();
@@ -1308,24 +1366,26 @@ function renderBottom(){
 
   const lineup = LINEUP_BY_DATE[selectedDate];
   const show   = lineup ? (SHOW_LABELS[lineup.showName] || { name: lineup.showName, color:'#9B6FD8', short: lineup.showName }) : null;
+  const expectedShow = show ? { showName: lineup.showName, ...show } : scheduledShowForDate(selectedDate);
   const isCancelled = lineup?.source === 'cancelled';
 
   const rawArtists = lineup ? parseRawTitleStatic(lineup.rawTitle) : [];
   const chipCount = rawArtists.length > 0 ? rawArtists.length : (lineup ? lineup.groups.length : 0);
+  const lineupUnavailable = !isCancelled && expectedShow && (!lineup || lineup.source === 'date_rule' || chipCount === 0);
 
   // ── Date header → #dateHeader (.app 직속, 스크롤과 함께 올라감) ──
   const hdr = document.createElement('div');
   hdr.className = 'sel-hdr';
-  if(lineup && show){
+  if((lineup && show) || expectedShow){
     hdr.innerHTML=`
       <div>
         <div class="sel-date">${dayNames[dateObj.getDay()]}, ${MONTH_NAMES[mo-1]} ${d}</div>
         <div class="sel-sub" style="display:flex;align-items:center;gap:6px;margin-top:3px">
-          <span class="show-badge" style="background:${isCancelled ? '#7A7A7A' : show.color}">${show.short}</span>
-          <span class="show-badge" style="background:${isCancelled ? '#5A5A5A' : show.color}">${isCancelled ? 'Canceled' : (chipCount > 0 ? (lineup.episode ? 'EP '+lineup.episode+' · ' : '')+chipCount+' Artists' : 'Lineup TBA')}</span>
+          <span class="show-badge" style="background:${isCancelled ? '#7A7A7A' : expectedShow.color}">${expectedShow.short}</span>
+          <span class="show-badge" style="background:${isCancelled ? '#5A5A5A' : expectedShow.color}">${isCancelled ? 'Canceled' : (chipCount > 0 ? (lineup.episode ? 'EP '+lineup.episode+' · ' : '')+chipCount+' Artists' : 'Lineup TBA')}</span>
         </div>
       </div>
-      ${isCancelled ? `<div class="evt-badge" style="background:#5A5A5A">Canceled</div>` : (chipCount > 0 ? `<div class="evt-badge" style="background:${show.color}">${chipCount}</div>` : '')}
+      ${isCancelled ? `<div class="evt-badge" style="background:#5A5A5A">Canceled</div>` : (chipCount > 0 ? `<div class="evt-badge" style="background:${expectedShow.color}">${chipCount}</div>` : '')}
     `;
   } else {
     hdr.innerHTML=`
@@ -1337,11 +1397,61 @@ function renderBottom(){
   }
   dateHeader.appendChild(hdr);
 
+  function appendEmptyNotice(title, body, action) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:48px 20px 56px;text-align:center;';
+    empty.innerHTML = `
+      <div style="
+        width:56px;height:56px;border-radius:16px;
+        background:#F2F2F2;
+        display:flex;align-items:center;justify-content:center;
+        font-size:26px;line-height:1;
+        margin:0 auto 16px;
+      ">🎤</div>
+      <div style="color:var(--txt1);font-size:14px;font-weight:600;letter-spacing:0;line-height:1.5;margin-bottom:6px">
+        ${escHtml(title)}
+      </div>
+      <div style="color:var(--txt2);font-size:13px;letter-spacing:0;line-height:1.6">
+        ${body}
+      </div>
+    `;
+    if (action) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.style.cssText = `
+        margin-top:18px;height:38px;padding:0 16px;border:1px solid #E2E2E2;border-radius:9999px;
+        background:#FFFFFF;color:var(--txt1);font-size:13px;font-weight:700;letter-spacing:0;
+        display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;
+        box-shadow:0 1px 2px rgba(0,0,0,.04);-webkit-tap-highlight-color:transparent;
+      `;
+      btn.innerHTML = `${escHtml(action.label)} <span style="color:var(--txt2);font-weight:700">›</span>`;
+      btn.onclick = action.onClick;
+      empty.appendChild(btn);
+    }
+    bot.appendChild(empty);
+  }
+
+  const prevWeek = expectedShow ? previousWeekLineupFor(expectedShow.showName, selectedDate) : null;
+  const prevWeekAction = prevWeek ? {
+    label: `View last week's ${expectedShow.short} · ${prevWeek.count} Artists`,
+    onClick: () => selectDate(prevWeek.date, { scrollToDetails: true, syncCalendar: true }),
+  } : null;
+
   if (isCancelled) {
-    const notice = document.createElement('div');
-    notice.style.cssText = 'margin:14px 0 18px;padding:14px 16px;border:1px solid #3f3f4f;border-radius:8px;background:#191919;color:#cfcfcf;font-size:13px;line-height:1.6';
-    notice.innerHTML = '<strong style="color:#e6e6e6">Canceled</strong><br>This episode did not air.';
-    bot.appendChild(notice);
+    appendEmptyNotice(
+      `${expectedShow?.name || 'This music show'} did not air`,
+      'This episode appears to be off-air or canceled.<br>Fan goods will show when a lineup is available.',
+      prevWeekAction
+    );
+    return;
+  }
+
+  if (lineupUnavailable) {
+    appendEmptyNotice(
+      `${expectedShow.name} lineup is not available yet`,
+      'The broadcaster has not published this lineup yet,<br>or the episode may be off-air.',
+      prevWeekAction
+    );
     return;
   }
 
@@ -1415,7 +1525,7 @@ function renderBottom(){
       // 2. 순위 없는 그룹만 백그라운드에서 매물 수 조회 후 재정렬
       if (unranked.length > 1) {
         Promise.all(unranked.map(a =>
-          fetch(`/api/goods?artist=${encodeURIComponent(a)}&n=1`)
+          fetch(goodsApiUrl(a, 1), { cache: 'no-store' })
             .then(r => r.ok ? r.json() : { items: [] })
             .then(d => ({ name: a, count: (d.items || []).length }))
             .catch(() => ({ name: a, count: 0 }))
@@ -1471,30 +1581,20 @@ function renderBottom(){
     prompt.textContent = 'Select a group above to browse Bunjang listings';
     bot.appendChild(prompt);
   } else {
-    const empty = document.createElement('div');
-    empty.style.cssText = 'padding:48px 20px 56px;text-align:center;';
-    empty.innerHTML = `
-      <div style="
-        width:56px;height:56px;border-radius:16px;
-        background:#F2F2F2;
-        display:flex;align-items:center;justify-content:center;
-        font-size:26px;line-height:1;
-        margin:0 auto 16px;
-      ">🎤</div>
-      <div style="color:var(--txt1);font-size:14px;font-weight:600;letter-spacing:0;line-height:1.5;margin-bottom:6px">
-        Select a date with a music show
-      </div>
-      <div style="color:var(--txt2);font-size:13px;letter-spacing:0;line-height:1.6">
-        Fan postcards &amp; exclusive goods<br>will show up here
-      </div>
-    `;
-    bot.appendChild(empty);
+    appendEmptyNotice(
+      'Select a date with a music show',
+      'Fan postcards &amp; exclusive goods<br>will show up here'
+    );
   }
 }
 
 // ─────────────────────────────────────────
 //  LIVE GOODS: 번장 실시간 검색
 // ─────────────────────────────────────────
+function goodsApiUrl(artistName, n) {
+  return `/api/goods?artist=${encodeURIComponent(artistName)}&n=${n}&_t=${Date.now()}`;
+}
+
 // 전체 탭: 여러 그룹을 각각 검색해서 합치기
 async function fetchAllGroupGoods(artists, showName) {
   const area = document.getElementById('live-goods-area');
@@ -1503,7 +1603,7 @@ async function fetchAllGroupGoods(artists, showName) {
   try {
     const results = await Promise.all(
       artists.map(a =>
-        fetch(`/api/goods?artist=${encodeURIComponent(a)}&n=40`)
+        fetch(goodsApiUrl(a, 40), { cache: 'no-store' })
           .then(r => r.ok ? r.json() : { items: [] })
           .then(d => d.items || [])
           .catch(() => [])
@@ -1584,7 +1684,7 @@ async function fetchAndShowLiveGoods(artistName) {
 
   try {
     await resolveArtistDisplayNames([artistName]);
-    const res = await fetch(`/api/goods?artist=${encodeURIComponent(artistName)}&n=60`);
+    const res = await fetch(goodsApiUrl(artistName, 60), { cache: 'no-store' });
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const items = data.items || [];
@@ -1679,10 +1779,9 @@ async function fetchMusicShowLineups() {
     );
     if (!res.ok) { console.warn('[KF_Calendar] fetchLineups HTTP', res.status); return; }
     const rows = await res.json();
-    if (!Array.isArray(rows) || rows.length === 0) return;
 
     LINEUP_BY_DATE = {};
-    rows.forEach(r => {
+    (Array.isArray(rows) ? rows : []).forEach(r => {
       if (r.source === 'cancelled') return;
       const dateKey = (r.broad_date || '').slice(0, 10);
       if (!dateKey) return;
@@ -1699,6 +1798,7 @@ async function fetchMusicShowLineups() {
         };
       }
     });
+    ensureFixedShowSkeletons();
 
     EVENTS = Object.entries(LINEUP_BY_DATE).map(([date, lineup]) => {
       const show = SHOW_LABELS[lineup.showName] || { name: lineup.showName, color: '#9B6FD8' };
@@ -1824,24 +1924,8 @@ function getAllArtistsFromLineups() {
   });
 }
 
-// ─── Group brand page URL (slug 기반, 없으면 search fallback) ───
-const GROUP_BRAND_SLUG = {
-  '엔시티':'nct','엔시티 127':'nct-127','엔시티 드림':'nct-dream','엔시티 위시':'nct-wish',
-  '세븐틴':'seventeen','방탄소년단':'bts','IVE':'ive','투모로우바이투게더':'txt',
-  '스트레이키즈':'straykids','플레이브':'plave','보이넥스트도어':'boynextdoor',
-  '제로베이스원':'zerobaseone','데이식스':'day6','더보이즈':'theboyz',
-  '에스파':'aespa','엔하이픈':'enhypen','몬스타엑스':'monstax','뉴진스':'newjeans',
-  '엑소':'exo','에이티즈':'ateez','비투비':'btob','샤이니':'shinee',
-  '르세라핌':'lesserafim','트와이스':'twice','엔믹스':'nmixx','블랙핑크':'blackpink',
-  '레드벨벳':'redvelvet','트레저':'treasure','여자아이들':'gidle','아스트로':'astro',
-  '슈퍼주니어':'superjunior','아일릿':'illit','있지':'itzy','마마무':'mamamoo',
-  '케플러':'kep1er','베이비몬스터':'babymonster','원어스':'oneus','갓세븐':'got7',
-  '빌리':'billlie','펜타곤':'pentagon','자이커스':'xikers','퀘이커':'qwer',
-};
+// ─── Group search URL (Global Bunjang search results) ───
 function groupBrandUrl(rawName) {
-  const utm = '?utm_source=kf-calendar&utm_medium=social&utm_campaign=kpop-groups';
-  const slug = GROUP_BRAND_SLUG[rawName];
-  if (slug) return `https://globalbunjang.com/brand/${slug}${utm}`;
   const display = artistDisplayName(rawName);
   return `https://globalbunjang.com/search?q=${encodeURIComponent(display)}&utm_source=kf-calendar&utm_medium=social&utm_campaign=kpop-groups`;
 }

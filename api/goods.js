@@ -14,7 +14,7 @@ const STATIC_GOODS = {
   enhypen: 'goods-enhypen.json',
 };
 
-// 영문 공식명 → 한국어 표기 (번장에서 한국어로 등록된 상품명 매칭용)
+// 영문 공식명 → 한국어/현지 표기. 검색 쿼리 확장용이며, 결과 후처리 필터에는 쓰지 않는다.
 const EN_TO_KR = {
   'NOWZ': '나우즈',
   'NAZE': '네이즈',
@@ -58,8 +58,15 @@ const EN_TO_KR = {
   'P1Harmony': '피원하모니',
   'H1-KEY': '하이키',
   'Billlie': '빌리',
+  'BIBI': '비비',
+  'VIVIZ': '비비지',
   'YOUNG POSSE': '영파씨',
   'KATSEYE': '케이씨아이',
+  'Queenz Eye': ['퀸즈아이', 'Queenzeye'],
+};
+
+const RESULT_EXCLUDES = {
+  BIBI: [/비비지/i, /\bVIVIZ\b/i, /비비업/i, /\bVVUP\b/i],
 };
 
 function decodeHtml(s) {
@@ -76,6 +83,7 @@ function cleanDisplayName(s) {
   return decodeHtml(s)
     .replace(/\s+on Bunjang Global Site\.?$/i, '')
     .replace(/\s+\|\s*Bunjang Global.*$/i, '')
+    .replace(/\s*\|\s*Bunjang Global\s*$/i, '')
     .replace(/^#\s*/, '')
     .replace(/\s*Translate to English\s*/i, '')
     .trim();
@@ -117,15 +125,32 @@ function loadStaticGoods() {
 function parseGlobalProduct(html, id) {
   const escapedId = String(id).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const m = html.match(new RegExp(`pid\\\\?":${escapedId}[\\s\\S]{0,2500}?totalPriceGlobal\\\\?":([0-9.]+)`));
-  if (!m) return {};
+  const titlePatterns = [
+    /<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i,
+    /<meta[^>]+name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i,
+    /<title>([^<]+)<\/title>/i,
+  ];
+  let displayName = null;
+  for (const pattern of titlePatterns) {
+    const titleMatch = html.match(pattern);
+    if (titleMatch?.[1]) {
+      const cleaned = cleanDisplayName(titleMatch[1]);
+      if (cleaned) {
+        displayName = cleaned;
+        break;
+      }
+    }
+  }
+  if (!m) return { displayName };
 
   const chunk = m[0];
   const nameEng = chunk.match(/nameEng\\?":"((?:\\.|[^"\\])*)"/);
   const priceGlobal = chunk.match(/priceGlobal\\?":([0-9.]+)/);
   const totalPriceGlobal = chunk.match(/totalPriceGlobal\\?":([0-9.]+)/);
+  const chunkName = nameEng?.[1] ? cleanDisplayName(nameEng[1].replace(/\\"/g, '"')) : null;
 
   return {
-    displayName: nameEng?.[1] ? cleanDisplayName(nameEng[1].replace(/\\"/g, '"')) : null,
+    displayName: displayName || chunkName || null,
     priceGlobal: priceGlobal ? Number(priceGlobal[1]) : null,
     totalPriceGlobal: totalPriceGlobal ? Number(totalPriceGlobal[1]) : null,
   };
@@ -142,23 +167,9 @@ async function resolveGlobalBunjangProduct(id, fallbackName) {
 
     const globalProduct = parseGlobalProduct(html, id);
 
-    const patterns = [
-      /<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i,
-      /<h1[^>]*>([^<]+)<\/h1>/i,
-      /<title>([^<]+)<\/title>/i,
-    ];
-    let displayName = globalProduct.displayName || null;
-    for (const pattern of patterns) {
-      const m = html.match(pattern);
-      if (m && m[1]) {
-        const cleaned = cleanDisplayName(m[1]);
-        if (cleaned && !displayName) displayName = cleaned;
-      }
-    }
-
     return {
       ...globalProduct,
-      displayName: displayName || null,
+      displayName: globalProduct.displayName || null,
       displayPrice: formatUsdPrice(globalProduct.priceGlobal),
       currency: globalProduct.priceGlobal != null ? 'USD' : null,
     };
@@ -167,18 +178,65 @@ async function resolveGlobalBunjangProduct(id, fallbackName) {
   return {};
 }
 
-// 상품명에 artist(영문) 또는 krAlias(한국어)가 포함되는지 확인
-// 한국어는 앞뒤 한글 경계 체크 (이즈나 ≠ 네이즈 오매칭 방지)
-function nameMatchesArtist(productName, artist, krAlias) {
-  // 영문: 단어 경계 기준
-  const enRe = new RegExp(`(?<![\\w가-힣])${artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w가-힣])`, 'i');
-  if (enRe.test(productName)) return true;
-  // 한국어 별칭: 앞뒤가 한글이 아닌 경계에서 매칭
-  if (krAlias) {
-    const krRe = new RegExp(`(?<![가-힣])${krAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![가-힣])`);
-    if (krRe.test(productName)) return true;
+function compactLatinName(name) {
+  const s = String(name || '').trim();
+  if (!/[A-Za-z]/.test(s)) return null;
+  const compact = s.replace(/[\s._-]+/g, '');
+  return compact && compact !== s ? compact : null;
+}
+
+function artistVariants(artist) {
+  const s = String(artist || '').trim();
+  const variants = [s];
+  const paren = s.match(/^(.+?)[（(]\s*([^）)]+?)\s*[）)]$/);
+  if (paren) variants.push(paren[1].trim(), paren[2].trim());
+  return variants.filter(Boolean);
+}
+
+function canonicalArtistKey(artist) {
+  for (const variant of artistVariants(artist)) {
+    if (/^BIBI$/i.test(variant)) return 'BIBI';
+    if (variant === '비비') return 'BIBI';
   }
-  return false;
+  return String(artist || '').trim();
+}
+
+function getSearchAliases(artist) {
+  const variants = artistVariants(artist);
+  const aliases = [
+    ...variants,
+    ...variants.map(v => v.toLowerCase()),
+    ...variants.map(compactLatinName),
+    ...variants.flatMap(v => {
+      const mapped = EN_TO_KR[v] || EN_TO_KR[canonicalArtistKey(v)];
+      return Array.isArray(mapped) ? mapped : mapped ? [mapped] : [];
+    }),
+  ].filter(Boolean);
+
+  return [...new Set(aliases.flatMap(alias => {
+    const compact = compactLatinName(alias);
+    return compact ? [alias, compact] : [alias];
+  }))];
+}
+
+function isExcludedResult(item, artist) {
+  const rules = RESULT_EXCLUDES[canonicalArtistKey(artist)] || [];
+  if (!rules.length) return false;
+  const text = `${item.name || ''} ${item.displayName || ''}`;
+  return rules.some(rule => rule.test(text));
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+  const out = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const idx = next++;
+      out[idx] = await mapper(items[idx], idx);
+    }
+  });
+  await Promise.all(workers);
+  return out;
 }
 
 module.exports = async function handler(req, res) {
@@ -193,16 +251,14 @@ module.exports = async function handler(req, res) {
   }
 
   const n = Math.min(parseInt(req.query.n || '50', 10), 100);
-  const krAlias = EN_TO_KR[artist] || null;
 
   try {
-    // 영문명 + 소문자 + 한국어 별칭 각각 키워드 조합으로 검색
-    const artistLower = artist.toLowerCase();
+    // 검색 쿼리 자체를 신뢰한다. 상품명/태그 번역과 띄어쓰기 차이 때문에
+    // 결과 후처리에서 아티스트명을 재검사하면 정상 상품이 누락될 수 있다.
+    const aliases = getSearchAliases(artist);
     const queries = [];
     for (const kw of KEYWORDS) {
-      queries.push(`${artist} ${kw}`);
-      if (artistLower !== artist) queries.push(`${artistLower} ${kw}`);
-      if (krAlias) queries.push(`${krAlias} ${kw}`);
+      for (const alias of aliases) queries.push(`${alias} ${kw}`);
     }
     // 중복 쿼리 제거
     const uniqueQueries = [...new Set(queries)];
@@ -238,25 +294,29 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 판매중인 것만, 그룹명(영문/소문자/한국어 별칭) 포함 확인, 최신순
+    // 판매중인 것만 최신순. 번장 검색 결과에는 태그 매칭 상품도 포함되므로
+    // 상품명에 아티스트명이 없다는 이유로 다시 제거하지 않는다.
     const live = items
-      .filter(i => i.status === '0' && (nameMatchesArtist(i.name, artist, krAlias) || nameMatchesArtist(i.name, artistLower, null)))
+      .filter(i => i.status === '0' && !isExcludedResult(i, artist))
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
     const visibleCount = Math.min(live.length, Math.max(1, n));
-    const enriched = await Promise.all(
-      live.slice(0, visibleCount).map(async item => {
+    const enriched = await mapWithConcurrency(
+      live.slice(0, visibleCount),
+      6,
+      async item => {
         const globalProduct = await resolveGlobalBunjangProduct(item.id, item.name);
+        const displayName = globalProduct.displayName || 'View item on Bunjang Global';
         return {
           ...withUsdPrice(item),
           ...globalProduct,
-          displayName: globalProduct.displayName || item.name,
+          displayName,
           displayPrice: globalProduct.displayPrice || formatUsdPrice(krwToGlobalUsd(item.price)),
           currency: 'USD',
         };
-      })
+      }
     );
-    const itemsOut = [...enriched, ...live.slice(visibleCount).map(withUsdPrice)];
+    const itemsOut = enriched;
 
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
     return res.status(200).json({ artist, items: itemsOut });

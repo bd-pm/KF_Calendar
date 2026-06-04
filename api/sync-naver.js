@@ -1,5 +1,5 @@
 // api/sync-naver.js
-// 전체 5개 음악방송 — Naver 회차정보 탭 크롤링 → Supabase upsert (최우선 소스)
+// 전체 5개 음악방송 — 공식 페이지/Naver 회차정보 탭 크롤링 → Supabase upsert
 // Vercel Cron: 0 0 * * * (매일 09:00 KST)
 
 const { resolveEnNames, normalizeArtistName } = require('./artist-en-name');
@@ -60,7 +60,7 @@ const ARTIST_TO_GROUP = {
   'INI':'ini',
   'EVNNE':'evnne','이븐':'evnne','EVNNE(이븐)':'evnne',
   'CRAVITY':'cravity','크래비티':'cravity',
-  'XIKERS':'xikers','자이커스':'xikers',
+  'XIKERS':'xikers','xikers':'xikers','자이커스':'xikers',
   'DRIPPIN':'drippin','VERIVERY':'verivery',
   'THE BOYZ':'theboyz','더보이즈':'theboyz',
   'ONEUS':'oneus','원어스':'oneus',
@@ -78,6 +78,12 @@ const ARTIST_TO_GROUP = {
   'Red Velvet':'redvelvet','레드벨벳':'redvelvet',
   'TREASURE':'treasure',
   'YOUNG POSSE':'youngposse','영파씨':'youngposse',
+  'DAYOUNG':'dayoung','다영':'dayoung',
+  'RESCENE':'rescene','리센느':'rescene',
+  'ICHILLIN':'ichillin','ICHILLIN\'':'ichillin','아이칠린':'ichillin',
+  'cosmosy':'cosmosy','COSMOSY':'cosmosy','코스모시':'cosmosy',
+  'KEYVITUP':'keyvitup',
+  'ANGEL NOISE':'angelnoise','엔젤노이즈':'angelnoise',
   'HWASA':'hwasa','화사':'hwasa',
   'ORBIT':'orbit','오르빗':'orbit',
   'B1A4':'b1a4',
@@ -92,6 +98,23 @@ const ARTIST_TO_GROUP = {
   'NAZE':'naze','네이즈':'naze',
   'UNCHILD':'unchild',
   'CORTIS':'cortis',
+  'Queenz Eye':'queenzeye','QUEENZ EYE':'queenzeye','퀸즈아이':'queenzeye',
+  'XLOV':'xlov',
+  'XODIAC':'xodiac','소디엑':'xodiac',
+  'IDID':'idid','아이딧':'idid',
+  'MODYSSEY':'modyssey','모디세이':'modyssey',
+  'Hearts2Hearts':'hearts2hearts',
+  'MEOVV':'meovv',
+  'KickFlip':'kickflip','킥플립':'kickflip',
+  'LNGSHOT':'lngshot',
+  'ALPHA DRIVE ONE':'alphadriveone','알파드라이브원':'alphadriveone',
+  'AND2BLE':'and2ble','앤더블':'and2ble',
+  'HEART OF WOMAN':'heartofwoman',
+  '따따블':'ddaddable',
+  '박현규':'parkhyunkyu',
+  '윤산하':'yoonsanha',
+  'ONEWE':'onewe','원위':'onewe',
+  'hrtz.wav':'hrtswav','하츠웨이브':'hrtswav',
   'CrazAngel':'crazangel','크레이즈엔젤':'crazangel',
   'KIIRAS':'kiiras',
   'FLARE U':'flareu','플레어 유':'flareu',
@@ -116,6 +139,12 @@ function mapArtists(names) {
 
 function dKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function addDays(d, n) {
+  const c = new Date(d);
+  c.setDate(c.getDate() + n);
+  return c;
 }
 
 function todayKstKey() {
@@ -188,6 +217,176 @@ function textFromHtml(html) {
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s+/g, '\n')
     .trim();
+}
+
+function stripHtmlText(html) {
+  return decodeHtml(String(html || ''))
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h\d|tr)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\r/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s+/g, '\n')
+    .trim();
+}
+
+function cleanShowChampionArtistName(name) {
+  return String(name || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeShowChampionArtistToken(name) {
+  return String(name || '')
+    .replace(/^[\s"'‘’“”]+|[\s"'‘’“”]+$/g, '')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function splitShowChampionArtistNames(name) {
+  const raw = cleanShowChampionArtistName(name);
+  if (!raw) return [];
+  const out = [];
+  const clean = value => {
+    const cleaned = normalizeShowChampionArtistToken(value);
+    return cleaned && cleaned.length > 1 && cleaned.length < 80 ? cleaned : null;
+  };
+  for (const part of raw.split(/\s+X\s+/i)) {
+    const parens = [...part.matchAll(/\(([^)]+)\)/g)].map(m => clean(m[1])).filter(Boolean);
+    const outside = clean(part.replace(/\([^)]*\)/g, '').trim());
+    if (outside && ARTIST_TO_GROUP[outside]) {
+      out.push(outside);
+      continue;
+    }
+    const mappedParen = parens.find(token => ARTIST_TO_GROUP[token]);
+    if (mappedParen) {
+      out.push(mappedParen);
+      continue;
+    }
+    if (outside) out.push(outside);
+    else out.push(...parens);
+  }
+  return out;
+}
+
+function extractShowChampionQuotedSegments(text) {
+  const segments = [];
+  let quote = null;
+  let start = -1;
+  let parenDepth = 0;
+  const quoteChars = new Set(["'", '‘', '’']);
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '(') parenDepth++;
+    else if (ch === ')' && parenDepth > 0) parenDepth--;
+    if (!quote) {
+      if (quoteChars.has(ch)) {
+        quote = ch;
+        start = i + 1;
+      }
+      continue;
+    }
+    if (quoteChars.has(ch) && parenDepth === 0) {
+      const segment = text.slice(start, i).trim();
+      if (segment) segments.push(segment);
+      quote = null;
+      start = -1;
+    }
+  }
+  return segments;
+}
+
+function isShowChampionIntroArtistName(name) {
+  if (!name || name.length < 2 || name.length > 80) return false;
+  if (ARTIST_TO_GROUP[name]) return true;
+  if (/[가-힣]/.test(name)) return true;
+  if (/[A-Z]/.test(name)) return true;
+  return false;
+}
+
+async function fetchShowChampionOfficialRows({ cutoffDate, backfill }) {
+  const [cy, cm, cd] = cutoffDate.split('-').map(Number);
+  const recentCutoff = dKey(addDays(new Date(cy, cm - 1, cd), -7));
+  const listUrl = 'https://www.mbcplus.com/web/program/contentList.do?searchCondition=001005&programMenuSeq=220&programInfoSeq=67';
+  const res = await fetch(listUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+    },
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) throw new Error(`MBC PLUS HTTP ${res.status}`);
+  const html = await res.text();
+  const rows = [];
+  const rowRe = /fnGetForm\('220','001005',\s*'(\d+)'\)[\s\S]*?>(쇼챔피언[^<]+)<[\s\S]*?<td>(\d{4}-\d{2}-\d{2})<\/td>/g;
+  let match;
+  while ((match = rowRe.exec(html))) {
+    const seq = match[1];
+    const title = stripHtmlText(match[2]);
+    const postedAt = match[3];
+    const md = title.match(/\((\d{2})(\d{2})\)/);
+    const year = Number(postedAt.slice(0, 4));
+    const broadDate = md ? `${year}-${md[1]}-${md[2]}` : postedAt;
+    if (!backfill && broadDate < recentCutoff) continue;
+
+    if (/결방|휴방/i.test(title)) {
+      rows.push({
+        show_name: 'show_champion',
+        broad_date: broadDate,
+        groups: [],
+        raw_title: title,
+        episode_number: Number((title.match(/(\d+)회/) || [])[1]) || null,
+        source: 'cancelled',
+      });
+      continue;
+    }
+
+    if (!/생방송\s*출연진/.test(title)) continue;
+
+    const iframeUrl = `https://www.mbcplus.com/web/program/iframeContent.do?seq=${seq}&programMenuSeq=220`;
+    const detailRes = await fetch(iframeUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!detailRes.ok) continue;
+    const text = stripHtmlText(await detailRes.text())
+      .replace(/[<>]+/g, '\n')
+      .replace(/\s*\n\s*/g, '\n');
+    const lineupMatch = text.match(/&\s*출연진\s*&\s*([\s\S]*?)(?:\n\s*\n|$)/);
+    if (!lineupMatch) continue;
+
+    const introText = text.slice(0, lineupMatch.index);
+    const introPerformers = extractShowChampionQuotedSegments(introText)
+      .flatMap(splitShowChampionArtistNames)
+      .filter(isShowChampionIntroArtistName);
+    const listedPerformers = lineupMatch[1]
+      .split('/')
+      .flatMap(splitShowChampionArtistNames)
+      .filter(name => name.length > 1 && name.length < 80);
+    const seenPerformers = new Set();
+    const performers = [...introPerformers, ...listedPerformers].filter(name => {
+      const key = name.toLowerCase();
+      if (seenPerformers.has(key)) return false;
+      seenPerformers.add(key);
+      return true;
+    });
+    if (performers.length === 0) continue;
+    rows.push({
+      show_name: 'show_champion',
+      broad_date: broadDate,
+      groups: mapArtists(performers),
+      raw_title: `show_champion - ${performers.join(', ')}`,
+      episode_number: Number((title.match(/(\d+)회/) || [])[1]) || null,
+      source: 'mbcplus',
+    });
+  }
+  return rows;
 }
 
 function extractSbsVodId(section) {
@@ -344,7 +543,7 @@ function officialPerformerNames(rawNames, enNameMap) {
 }
 
 // Supabase upsert — manual/cancelled는 항상 보호, backfill 모드에서는 과거 날짜도 허용
-async function upsertRows(rows, { backfill = false } = {}) {
+async function upsertRows(rows, { backfill = false, allowManualOverride = false } = {}) {
   if (!rows.length) return 0;
   const todayKey = todayKstKey();
   let ok = 0;
@@ -369,7 +568,7 @@ async function upsertRows(rows, { backfill = false } = {}) {
     if (ex.length > 0) {
       const existingSource = ex[0].source;
       // manual/cancelled는 항상 보호 (backfill 포함)
-      if (existingSource === 'manual') { ok++; continue; }
+      if (existingSource === 'manual' && !allowManualOverride) { ok++; continue; }
       if (existingSource === 'cancelled' && row.source !== 'manual') { ok++; continue; }
       if (row.source === 'date_rule' && existingSource !== 'date_rule') { ok++; continue; }
       await fetch(`${SUPA_URL}/rest/v1/music_show_lineups?id=eq.${ex[0].id}`, {
@@ -442,6 +641,28 @@ async function fetchWeekCounts(from, to) {
   return res.json();
 }
 
+function scheduledShowNameForDateKey(dateKey) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const dow = new Date(y, m - 1, d).getDay();
+  return SHOWS_NAVER.find(show => show.dayOfWeek === dow)?.show_name || null;
+}
+
+function todayLineupSummary(rows, todayKey) {
+  const todayRows = rows.filter(r => r.broad_date === todayKey);
+  const expectedShowName = scheduledShowNameForDateKey(todayKey);
+  if (expectedShowName && !todayRows.some(r => r.show_name === expectedShowName)) {
+    todayRows.push({ show_name: expectedShowName, broad_date: todayKey, groups: [], source: 'date_rule' });
+  }
+  return todayRows
+    .filter(r => SHOWS_NAVER.some(show => show.show_name === r.show_name))
+    .map(r => {
+      const show = SHOWS_NAVER.find(s => s.show_name === r.show_name);
+      const count = Array.isArray(r.groups) ? r.groups.length : 0;
+      const status = r.source === 'cancelled' ? '휴방' : `${count}개 그룹`;
+      return `${show?.label || r.show_name}: ${status}`;
+    });
+}
+
 module.exports = async function handler(req, res) {
   const authHeader = req.headers.authorization || '';
   const secret = req.query.secret || '';
@@ -487,6 +708,17 @@ module.exports = async function handler(req, res) {
           }));
         skelOk = await upsertRows(skelRows);
         log.push(`[${show.show_name}] 뼈대 ${skelOk}/${skelRows.length}개`);
+      }
+
+      if (show.show_name === 'show_champion') {
+        const officialRows = await fetchShowChampionOfficialRows({ cutoffDate, backfill });
+        if (officialRows.length > 0) {
+          const officialOk = await upsertRows(officialRows, { backfill: true, allowManualOverride: true });
+          log.push(`[${show.show_name}] MBC PLUS 공식 업데이트 ${officialOk}/${officialRows.length}개 (기준일 ${cutoffDate})`);
+          totalUpserted += skelOk + officialOk;
+          continue;
+        }
+        log.push(`[${show.show_name}] MBC PLUS 공식 공지 없음 → Naver fallback`);
       }
 
       // Naver 회차정보 크롤링
@@ -548,6 +780,8 @@ module.exports = async function handler(req, res) {
     try {
       const { from, to } = thisAndNextWeekRange();
       const rows = await fetchWeekCounts(from, to);
+      const todayKey = todayKstKey();
+      const todaySummary = todayLineupSummary(rows, todayKey);
 
       // 방송별 집계
       const counts = {};
@@ -572,6 +806,9 @@ module.exports = async function handler(req, res) {
       const lines = [
         `${icon} <b>sync-naver 실행 완료</b> (${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
         `📊 총 upsert: ${totalUpserted}건 | 대상기간: ${from} ~ ${to}`,
+        '',
+        `📅 <b>오늘(${todayKey}) 등록 현황:</b>`,
+        ...(todaySummary.length ? todaySummary.map(line => `  ${line}`) : ['  오늘 고정 방송 없음']),
         '',
       ];
 
