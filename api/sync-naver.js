@@ -1,6 +1,6 @@
 // api/sync-naver.js
 // 전체 5개 음악방송 — 공식 페이지/Naver 회차정보 탭 크롤링 → Supabase upsert
-// Vercel Cron: 0 0 * * * (매일 09:00 KST)
+// Vercel Cron: 0 6 * * 1-5 (평일 15:00 KST)
 
 const { resolveEnNames, normalizeArtistName } = require('./artist-en-name');
 const { getSpecialLineupRow } = require('./show-status');
@@ -701,13 +701,54 @@ function crawledArtistsForRow(row) {
   return Array.isArray(row.groups) ? row.groups.filter(Boolean) : [];
 }
 
-function summarizeCrawledRows(rows) {
-  if (!rows.length) return ['• 이번 실행에서 새로 크롤링된 라인업 없음'];
+function sourceLabelForRow(row) {
+  if (row.source === 'mbcplus') return 'MBC PLUS 공홈';
+  if (row.source === 'naver' && row.show_name === 'inkigayo') return 'Naver + SBS 공홈 보강';
+  if (row.source === 'naver') return 'Naver 회차정보';
+  if (row.source === 'manual') return '관리자 입력';
+  return row.source || '출처 미상';
+}
 
-  const totalGroups = rows.reduce((sum, row) => {
+function countArtistsForRows(rows) {
+  return rows.reduce((sum, row) => {
     if (row.source === 'cancelled') return sum;
     return sum + crawledArtistsForRow(row).length;
   }, 0);
+}
+
+function sourceSummaryForShow(show, log, rows) {
+  const showRows = rows.filter(row => row.show_name === show.show_name && row.source !== 'cancelled');
+  const showLogs = log.filter(line => line.includes(`[${show.show_name}]`));
+  const lineups = showRows.length;
+  const groups = countArtistsForRows(showRows);
+
+  if (showLogs.some(line => line.includes('MBC PLUS 공식 업데이트'))) {
+    return `• <b>${escapeTelegramHtml(show.label)}</b>: MBC PLUS 공홈 · ${lineups}개 라인업 / ${groups}개 그룹`;
+  }
+  if (showLogs.some(line => line.includes('MBC PLUS 공식 공지 없음'))) {
+    return `• <b>${escapeTelegramHtml(show.label)}</b>: MBC PLUS 공홈 없음 → Naver 확인 · ${lineups}개 라인업 / ${groups}개 그룹`;
+  }
+  if (showLogs.some(line => line.includes('Naver 업데이트'))) {
+    const source = show.show_name === 'inkigayo' ? 'Naver 회차정보 + SBS 공홈 보강' : 'Naver 회차정보';
+    return `• <b>${escapeTelegramHtml(show.label)}</b>: ${source} · ${lineups}개 라인업 / ${groups}개 그룹`;
+  }
+  if (showLogs.some(line => line.includes('Naver 에피소드 없음'))) {
+    return `• <b>${escapeTelegramHtml(show.label)}</b>: Naver 회차정보 없음 · 0개 라인업`;
+  }
+  if (showLogs.some(line => line.includes('오류'))) {
+    return `• <b>${escapeTelegramHtml(show.label)}</b>: 오류 발생`;
+  }
+  return `• <b>${escapeTelegramHtml(show.label)}</b>: 신규 라인업 없음`;
+}
+
+function summarizeCrawlSources(log, rows) {
+  return SHOWS_NAVER.map(show => sourceSummaryForShow(show, log, rows));
+}
+
+function summarizeCrawledRows(rows) {
+  if (!rows.length) return ['• 이번 실행에서 새로 크롤링된 라인업 없음'];
+
+  const totalGroups = countArtistsForRows(rows);
   const activeRows = rows.filter(row => row.source !== 'cancelled').length;
   const lines = [
     `총 ${totalGroups}개 그룹 / ${activeRows}개 라인업`,
@@ -729,7 +770,7 @@ function summarizeCrawledRows(rows) {
         const groupText = artists.length
           ? artists.map(escapeTelegramHtml).join(', ')
           : '그룹명 없음';
-        lines.push(`  - <b>${showLabel}</b>: ${groupCount}개 그룹`);
+        lines.push(`  - <b>${showLabel}</b> · ${escapeTelegramHtml(sourceLabelForRow(row))}: ${groupCount}개 그룹`);
         lines.push(`    ${groupText}`);
       });
   }
@@ -886,6 +927,9 @@ module.exports = async function handler(req, res) {
         '',
         `📅 <b>오늘(${todayKey}) 등록 현황:</b>`,
         ...(todaySummary.length ? todaySummary.map(line => `  ${line}`) : ['  오늘 고정 방송 없음']),
+        '',
+        '🧭 <b>방송사별 수집 결과:</b>',
+        ...summarizeCrawlSources(log, crawledRows),
         '',
         '🎤 <b>이번 실행 크롤링 라인업:</b>',
         ...summarizeCrawledRows(crawledRows),
