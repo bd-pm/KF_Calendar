@@ -953,6 +953,21 @@ function eventsOnDate(ds){
   return EVENTS.filter(e=>e.date===ds);
 }
 
+function isManualCalendarEvent(row) {
+  return row?.source === 'manual_event' || String(row?.showName || row?.show_name || '').startsWith('event_');
+}
+
+function parseManualCalendarEvent(row) {
+  const raw = String(row?.rawTitle || row?.raw_title || '');
+  const text = raw.includes(' - ') ? raw.slice(raw.indexOf(' - ') + 3) : raw;
+  const [nameVenue] = text.split('|').map(s => s.trim());
+  const atIdx = nameVenue.indexOf(' @ ');
+  return {
+    name: atIdx >= 0 ? nameVenue.slice(0, atIdx).trim() : nameVenue.trim(),
+    venue: atIdx >= 0 ? nameVenue.slice(atIdx + 3).trim() : '',
+  };
+}
+
 function escHtml(s){
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -1077,6 +1092,21 @@ function buildWeek(area){
       }
       cell.appendChild(dc);
     }
+    const manualEvents = eventsOnDate(ds).filter(e => e.source === 'manual_event');
+    if(manualEvents.length > 0){
+      const dc = cell.querySelector('.dots-col') || document.createElement('div');
+      if(!dc.classList.contains('dots-col')) {
+        dc.className = 'dots-col';
+        cell.appendChild(dc);
+      }
+      manualEvents.slice(0, 2).forEach(event => {
+        const dot = document.createElement('div');
+        dot.className = 'evt-dot';
+        dot.style.background = '#80B0F0';
+        dot.title = event.name;
+        dc.appendChild(dot);
+      });
+    }
 
     cell.onclick=()=>{ selectDate(ds); };
     grid.appendChild(cell);
@@ -1151,6 +1181,23 @@ function buildMonth(area){
       pill.textContent=isCancelled ? `${show?show.short:mLineup.showName} · Canceled` : (show?show.short:mLineup.showName)+(mCount?` · ${mCount}`:'');
       pillsEl.appendChild(pill);
       cell.appendChild(pillsEl);
+    }
+    const manualEvents = eventsOnDate(ds).filter(e => e.source === 'manual_event');
+    if(manualEvents.length > 0){
+      let pillsEl = cell.querySelector('.mday-evts');
+      if(!pillsEl){
+        pillsEl=document.createElement('div');
+        pillsEl.className='mday-evts';
+        cell.appendChild(pillsEl);
+      }
+      manualEvents.slice(0, 2).forEach(event => {
+        const pill=document.createElement('div');
+        pill.className='mevt-pill';
+        pill.style.background='#80B0F033';
+        pill.style.color='#4F7FC8';
+        pill.textContent=event.name;
+        pillsEl.appendChild(pill);
+      });
     }
 
     cell.onclick=()=>{ selectDate(ds, { scrollToDetails: true }); };
@@ -1781,10 +1828,25 @@ async function fetchMusicShowLineups() {
     const rows = await res.json();
 
     LINEUP_BY_DATE = {};
+    const manualEvents = [];
     (Array.isArray(rows) ? rows : []).forEach(r => {
       if (r.source === 'cancelled') return;
       const dateKey = (r.broad_date || '').slice(0, 10);
       if (!dateKey) return;
+      if (isManualCalendarEvent(r)) {
+        const parsed = parseManualCalendarEvent(r);
+        manualEvents.push({
+          id: `manual-event-${r.id || dateKey}`,
+          group: (r.groups || [])[0] || 'manual',
+          date: dateKey,
+          name: parsed.name || 'Manual event',
+          type: 'manual_event',
+          venue: parsed.venue,
+          source: 'manual_event',
+          color: '#80B0F0',
+        });
+        return;
+      }
       // 같은 날짜에 여러 row가 있으면 manual > naver > imbc/youtube > date_rule 순
       const existing = LINEUP_BY_DATE[dateKey];
       const priority = { manual: 5, naver: 3, imbc_api: 1, youtube_api: 1, imbc: 1, date_rule: 0 };
@@ -1800,7 +1862,7 @@ async function fetchMusicShowLineups() {
     });
     ensureFixedShowSkeletons();
 
-    EVENTS = Object.entries(LINEUP_BY_DATE).map(([date, lineup]) => {
+    const lineupEvents = Object.entries(LINEUP_BY_DATE).map(([date, lineup]) => {
       const show = SHOW_LABELS[lineup.showName] || { name: lineup.showName, color: '#9B6FD8' };
       return {
         id:    `lineup-${date}`,
@@ -1812,6 +1874,7 @@ async function fetchMusicShowLineups() {
         color: show.color,
       };
     });
+    EVENTS = [...lineupEvents, ...manualEvents];
 
     // Default to most recent past show with lineup
     const todayKey = dKey(TODAY);

@@ -294,6 +294,27 @@ async function api(path, opts={}) {
   return res;
 }
 
+function parseManualCalendarEvent(row) {
+  const raw = String(row.raw_title || '');
+  const text = raw.includes(' - ') ? raw.slice(raw.indexOf(' - ') + 3) : raw;
+  const [nameVenue] = text.split('|').map(s => s.trim());
+  const atIdx = nameVenue.indexOf(' @ ');
+  return {
+    ...row,
+    event_name: atIdx >= 0 ? nameVenue.slice(0, atIdx).trim() : nameVenue.trim(),
+    venue: atIdx >= 0 ? nameVenue.slice(atIdx + 3).trim() : '',
+  };
+}
+
+function displayNameForEvent(row) {
+  if (row.source === 'manual_event') return parseManualCalendarEvent(row).event_name || 'Manual event';
+  return SHOW_LABELS_ADMIN[row.show_name] || row.show_name;
+}
+
+function isManualSource(row) {
+  return (row.source || 'manual') === 'manual' || row.source === 'manual_event';
+}
+
 // ── STATE ──
 const TABS = ['calendar','lineups','feedback','add'];
 let allEvents = [];
@@ -338,7 +359,7 @@ async function loadLineups(onDone) {
     const res = await supaFetch('music_show_lineups?select=*&order=broad_date.desc&limit=50');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const rows = await res.json();
-    const visibleRows = rows.filter(r => r.source !== 'cancelled');
+    const visibleRows = rows.filter(r => r.source !== 'cancelled' && r.source !== 'manual_event');
     if (!visibleRows.length) { el.innerHTML = '<div style="color:#555;font-size:13px">No data</div>'; return; }
     el.innerHTML = '';
     visibleRows.forEach(r => {
@@ -576,8 +597,8 @@ async function loadAllEvents() {
 }
 
 function updateTopbar() {
-  const crawled = allEvents.filter(e=>(e.source||'manual')!=='manual').length;
-  const manual  = allEvents.filter(e=>e.source==='manual').length;
+  const crawled = allEvents.filter(e=>!isManualSource(e)).length;
+  const manual  = allEvents.filter(e=>isManualSource(e)).length;
   const visible = visibleEvents().length;
   document.getElementById('topbar-stats').textContent =
     `Total ${allEvents.length} (Crawled ${crawled} · Manual ${manual}) · Visible ${visible}`;
@@ -605,7 +626,7 @@ function visibleEvents() {
   const q = filterGroup.toLowerCase();
   return allEvents.filter(e => {
     // 'manual' = admin input, everything else ('naver','date_rule','imbc_api', etc.) = Crawled bucket
-    const isCrawled = (e.source || 'manual') !== 'manual';
+    const isCrawled = !isManualSource(e);
     const srcMatch = isCrawled ? filterSrc.has('naver') : filterSrc.has('manual');
     if (!srcMatch) return false;
     if (!q) return true;
@@ -659,15 +680,15 @@ function renderCal() {
     const MAX_PILLS = 3;
     dayEvts.slice(0, MAX_PILLS).forEach(e => {
       const pill = document.createElement('div');
-      const isCrawled = (e.source||'manual') !== 'manual';
+      const isCrawled = !isManualSource(e);
       pill.className = `cal-pill ${isCrawled ? 'src-crawl' : 'src-manual'}`;
-      const showColor = SHOW_COLORS_ADMIN[e.show_name];
+      const showColor = e.source === 'manual_event' ? '#80b0f0' : SHOW_COLORS_ADMIN[e.show_name];
       if(showColor) pill.style.cssText += `;border-left:3px solid ${showColor}`;
       // Shorten show label: 'MBC Music Core' → 'Music Core'
-      const fullLabel = SHOW_LABELS_ADMIN[e.show_name] || e.show_name;
+      const fullLabel = displayNameForEvent(e);
       const shortName = fullLabel.replace(/🎵 /,'').replace(/^[A-Za-z]+ M? /,'').replace(/^[A-Za-z]+ /,'');
       const artistCount = (e.groups||[]).length;
-      pill.textContent = artistCount ? `${shortName} (${artistCount})` : shortName;
+      pill.textContent = e.source === 'manual_event' ? shortName : (artistCount ? `${shortName} (${artistCount})` : shortName);
       const titleArtists = e.raw_title
         ? e.raw_title.replace(/^[^-]+-\s*/,'').slice(0,80)
         : (e.groups||[]).join(', ').slice(0,80);
@@ -704,10 +725,12 @@ function openDetail(e) {
   panel.classList.add('open');
   document.getElementById('dp-edit').style.display='none';
 
-  const showLabel = SHOW_LABELS_ADMIN[e.show_name] || e.show_name;
-  const showColor = SHOW_COLORS_ADMIN[e.show_name] || '#9B6FD8';
+  const manualCalendarEvent = e.source === 'manual_event';
+  const parsedManualEvent = manualCalendarEvent ? parseManualCalendarEvent(e) : null;
+  const showLabel = manualCalendarEvent ? parsedManualEvent.event_name : (SHOW_LABELS_ADMIN[e.show_name] || e.show_name);
+  const showColor = manualCalendarEvent ? '#80b0f0' : (SHOW_COLORS_ADMIN[e.show_name] || '#9B6FD8');
   const isCancelled = e.source === 'cancelled';
-  const isCrawled = (e.source||'manual') !== 'manual' && !isCancelled;
+  const isCrawled = !isManualSource(e) && !isCancelled;
   const srcText   = isCancelled ? 'Canceled' : (isCrawled ? 'Crawled' : 'Manual');
   const srcClass  = isCancelled ? '' : (isCrawled ? 'badge-crawl' : 'badge-manual');
 
@@ -727,7 +750,7 @@ function openDetail(e) {
     `<span style="color:${showColor}">${showLabel}</span>`;
   document.getElementById('dp-meta').innerHTML = `
     <span class="badge ${srcClass}" style="${isCancelled ? 'background:#5A5A5A;color:#fff' : ''}">${srcText}</span>
-    &nbsp;📅 ${e.broad_date}${e.episode_number ? ` &nbsp;·&nbsp; EP ${e.episode_number}` : ''}<br><br>
+    &nbsp;📅 ${e.broad_date}${e.episode_number ? ` &nbsp;·&nbsp; EP ${e.episode_number}` : ''}${parsedManualEvent?.venue ? ` &nbsp;·&nbsp; ${parsedManualEvent.venue}` : ''}<br><br>
     ${groupBadges || '<span style="color:#555;font-size:12px">No group mapping</span>'}
     ${artistList.length ? `<div style="margin-top:8px;font-size:11px;color:#777;line-height:1.8">${artistList.join(' · ')}</div>` : ''}
   `;
@@ -735,8 +758,22 @@ function openDetail(e) {
   const actions = document.getElementById('dp-actions');
   actions.innerHTML='';
   const btnGoLineups = document.createElement('button');
-  btnGoLineups.className='btn-edit btn-sm'; btnGoLineups.textContent='Edit lineup';
+  btnGoLineups.className='btn-edit btn-sm';
+  btnGoLineups.textContent = manualCalendarEvent ? 'Delete event' : 'Edit lineup';
   btnGoLineups.onclick = () => {
+    if (manualCalendarEvent) {
+      if(!confirm('Delete this event?')) return;
+      fetch(`/api/lineup-upsert?id=${e.id}`, { method:'DELETE' })
+        .then(async res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+          await loadAllEvents();
+          renderCal();
+          updateTopbar();
+          panel.classList.remove('open');
+        })
+        .catch(err => alert('Delete failed: ' + err.message));
+      return;
+    }
     panel.classList.remove('open');
     // Switch tabs (do not call loadLineups directly)
     TABS.forEach(t => {
@@ -825,12 +862,12 @@ async function addEvent() {
   const msg=document.getElementById('a-msg');
   if(!name||!ds){msg.style.color='#d06060';msg.textContent='Name and date required.';return;}
   msg.style.color='#888';msg.textContent='Saving…';
-  const res=await api('events',{method:'POST',prefer:'return=minimal',
-    body:JSON.stringify({group_id:group,type,name,venue,date_start:ds,date_end:de,source:'manual',source_url:url})});
+  const res=await fetch('/api/lineup-upsert',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({kind:'event',group_id:group,type,name,venue,date_start:ds,date_end:de,source_url:url})});
   if(res.ok||res.status===201){
     msg.style.color='#60d090';msg.textContent='✓ Event added!';
     ['a-name','a-venue','a-date-start','a-date-end','a-url'].forEach(id=>document.getElementById(id).value='');
-    await loadAllEvents(); updateTopbar();
+    await loadAllEvents(); renderCal(); updateTopbar();
   } else { msg.style.color='#d06060';msg.textContent='Error: '+(await res.text()); }
 }
 </script>
