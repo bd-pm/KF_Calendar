@@ -685,23 +685,55 @@ function showLabelForName(showName) {
   return SHOWS_NAVER.find(s => s.show_name === showName)?.label || showName;
 }
 
+function groupCrawledRowsByDate(rows) {
+  const byDate = new Map();
+  for (const row of rows) {
+    const dateKey = row.broad_date || '날짜 미상';
+    if (!byDate.has(dateKey)) byDate.set(dateKey, []);
+    byDate.get(dateKey).push(row);
+  }
+  return [...byDate.entries()].sort(([a], [b]) => String(a).localeCompare(String(b)));
+}
+
+function crawledArtistsForRow(row) {
+  const artists = artistsFromRawTitle(row.raw_title);
+  if (artists.length) return artists;
+  return Array.isArray(row.groups) ? row.groups.filter(Boolean) : [];
+}
+
 function summarizeCrawledRows(rows) {
-  if (!rows.length) return ['  이번 실행에서 새로 크롤링된 라인업 없음'];
-  return rows
-    .sort((a, b) => `${a.broad_date}:${a.show_name}`.localeCompare(`${b.broad_date}:${b.show_name}`))
-    .flatMap(row => {
-      if (row.source === 'cancelled') {
-        return [`  ${row.broad_date} · ${escapeTelegramHtml(showLabelForName(row.show_name))}: 휴방/취소`];
-      }
-      const artists = artistsFromRawTitle(row.raw_title);
-      const groupText = artists.length
-        ? artists.map(escapeTelegramHtml).join(', ')
-        : `${Array.isArray(row.groups) ? row.groups.length : 0}개 그룹`;
-      return [
-        `  ${row.broad_date} · ${escapeTelegramHtml(showLabelForName(row.show_name))}`,
-        `    ${groupText}`,
-      ];
-    });
+  if (!rows.length) return ['• 이번 실행에서 새로 크롤링된 라인업 없음'];
+
+  const totalGroups = rows.reduce((sum, row) => {
+    if (row.source === 'cancelled') return sum;
+    return sum + crawledArtistsForRow(row).length;
+  }, 0);
+  const activeRows = rows.filter(row => row.source !== 'cancelled').length;
+  const lines = [
+    `총 ${totalGroups}개 그룹 / ${activeRows}개 라인업`,
+    '',
+  ];
+
+  for (const [dateKey, dateRows] of groupCrawledRowsByDate(rows)) {
+    lines.push(`• <b>${escapeTelegramHtml(dateKey)}</b>`);
+    dateRows
+      .sort((a, b) => String(a.show_name).localeCompare(String(b.show_name)))
+      .forEach(row => {
+        const showLabel = escapeTelegramHtml(showLabelForName(row.show_name));
+        if (row.source === 'cancelled') {
+          lines.push(`  - <b>${showLabel}</b>: 휴방/취소`);
+          return;
+        }
+        const artists = crawledArtistsForRow(row);
+        const groupCount = artists.length;
+        const groupText = artists.length
+          ? artists.map(escapeTelegramHtml).join(', ')
+          : '그룹명 없음';
+        lines.push(`  - <b>${showLabel}</b>: ${groupCount}개 그룹`);
+        lines.push(`    ${groupText}`);
+      });
+  }
+  return lines;
 }
 
 module.exports = async function handler(req, res) {
