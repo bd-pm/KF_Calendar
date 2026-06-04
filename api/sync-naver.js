@@ -705,6 +705,7 @@ function summarizeCrawledRows(rows) {
 }
 
 module.exports = async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   const authHeader = req.headers.authorization || '';
   const secret = req.query.secret || '';
   if (SYNC_SECRET && secret !== SYNC_SECRET && authHeader !== `Bearer ${SYNC_SECRET}`) {
