@@ -663,6 +663,47 @@ function todayLineupSummary(rows, todayKey) {
     });
 }
 
+function escapeTelegramHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function artistsFromRawTitle(rawTitle) {
+  const raw = String(rawTitle || '');
+  const dashIdx = raw.indexOf(' - ');
+  const artistPart = dashIdx >= 0 ? raw.slice(dashIdx + 3) : raw;
+  return artistPart
+    .replace(/\s+등\s*$/, '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function showLabelForName(showName) {
+  return SHOWS_NAVER.find(s => s.show_name === showName)?.label || showName;
+}
+
+function summarizeCrawledRows(rows) {
+  if (!rows.length) return ['  이번 실행에서 새로 크롤링된 라인업 없음'];
+  return rows
+    .sort((a, b) => `${a.broad_date}:${a.show_name}`.localeCompare(`${b.broad_date}:${b.show_name}`))
+    .flatMap(row => {
+      if (row.source === 'cancelled') {
+        return [`  ${row.broad_date} · ${escapeTelegramHtml(showLabelForName(row.show_name))}: 휴방/취소`];
+      }
+      const artists = artistsFromRawTitle(row.raw_title);
+      const groupText = artists.length
+        ? artists.map(escapeTelegramHtml).join(', ')
+        : `${Array.isArray(row.groups) ? row.groups.length : 0}개 그룹`;
+      return [
+        `  ${row.broad_date} · ${escapeTelegramHtml(showLabelForName(row.show_name))}`,
+        `    ${groupText}`,
+      ];
+    });
+}
+
 module.exports = async function handler(req, res) {
   const authHeader = req.headers.authorization || '';
   const secret = req.query.secret || '';
@@ -677,6 +718,7 @@ module.exports = async function handler(req, res) {
   // 일반 모드: 오늘 이후만 처리
   const cutoffDate = backfill && since ? since : todayKstKey();
   const log = [];
+  const crawledRows = [];
   let totalUpserted = 0;
 
   for (const show of SHOWS_NAVER) {
@@ -714,6 +756,7 @@ module.exports = async function handler(req, res) {
         const officialRows = await fetchShowChampionOfficialRows({ cutoffDate, backfill });
         if (officialRows.length > 0) {
           const officialOk = await upsertRows(officialRows, { backfill: true, allowManualOverride: true });
+          crawledRows.push(...officialRows.filter(r => r.source !== 'date_rule'));
           log.push(`[${show.show_name}] MBC PLUS 공식 업데이트 ${officialOk}/${officialRows.length}개 (기준일 ${cutoffDate})`);
           totalUpserted += skelOk + officialOk;
           continue;
@@ -764,6 +807,7 @@ module.exports = async function handler(req, res) {
       });
 
       const dataOk = await upsertRows(dataRows, { backfill });
+      crawledRows.push(...dataRows);
       log.push(`[${show.show_name}] Naver 업데이트 ${dataOk}/${dataRows.length}개 (기준일 ${cutoffDate}, ${skippedCount}개 스킵)`);
       totalUpserted += skelOk + dataOk;
 
@@ -809,6 +853,9 @@ module.exports = async function handler(req, res) {
         '',
         `📅 <b>오늘(${todayKey}) 등록 현황:</b>`,
         ...(todaySummary.length ? todaySummary.map(line => `  ${line}`) : ['  오늘 고정 방송 없음']),
+        '',
+        '🎤 <b>이번 실행 크롤링 라인업:</b>',
+        ...summarizeCrawledRows(crawledRows),
         '',
       ];
 

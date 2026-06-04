@@ -3,11 +3,7 @@
   "crons": [
     {
       "path": "/api/sync-naver",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/sync-naver",
-      "schedule": "0 9 * * *"
+      "schedule": "0 6 * * 1-5"
     }
   ],
   "headers": [
