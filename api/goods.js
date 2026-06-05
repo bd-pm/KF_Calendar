@@ -122,62 +122,6 @@ function loadStaticGoods() {
   );
 }
 
-function parseGlobalProduct(html, id) {
-  const escapedId = String(id).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const m = html.match(new RegExp(`pid\\\\?":${escapedId}[\\s\\S]{0,2500}?totalPriceGlobal\\\\?":([0-9.]+)`));
-  const titlePatterns = [
-    /<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i,
-    /<meta[^>]+name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i,
-    /<title>([^<]+)<\/title>/i,
-  ];
-  let displayName = null;
-  for (const pattern of titlePatterns) {
-    const titleMatch = html.match(pattern);
-    if (titleMatch?.[1]) {
-      const cleaned = cleanDisplayName(titleMatch[1]);
-      if (cleaned) {
-        displayName = cleaned;
-        break;
-      }
-    }
-  }
-  if (!m) return { displayName };
-
-  const chunk = m[0];
-  const nameEng = chunk.match(/nameEng\\?":"((?:\\.|[^"\\])*)"/);
-  const priceGlobal = chunk.match(/priceGlobal\\?":([0-9.]+)/);
-  const totalPriceGlobal = chunk.match(/totalPriceGlobal\\?":([0-9.]+)/);
-  const chunkName = nameEng?.[1] ? cleanDisplayName(nameEng[1].replace(/\\"/g, '"')) : null;
-
-  return {
-    displayName: displayName || chunkName || null,
-    priceGlobal: priceGlobal ? Number(priceGlobal[1]) : null,
-    totalPriceGlobal: totalPriceGlobal ? Number(totalPriceGlobal[1]) : null,
-  };
-}
-
-async function resolveGlobalBunjangProduct(id, fallbackName) {
-  try {
-    const res = await fetch(`https://globalbunjang.com/product/${id}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html,application/xhtml+xml' },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) return {};
-    const html = await res.text();
-
-    const globalProduct = parseGlobalProduct(html, id);
-
-    return {
-      ...globalProduct,
-      displayName: globalProduct.displayName || null,
-      displayPrice: formatUsdPrice(globalProduct.priceGlobal),
-      currency: globalProduct.priceGlobal != null ? 'USD' : null,
-    };
-  } catch {}
-
-  return {};
-}
-
 function compactLatinName(name) {
   const s = String(name || '').trim();
   if (!/[A-Za-z]/.test(s)) return null;
@@ -226,18 +170,6 @@ function isExcludedResult(item, artist) {
   return rules.some(rule => rule.test(text));
 }
 
-async function mapWithConcurrency(items, limit, mapper) {
-  const out = new Array(items.length);
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const idx = next++;
-      out[idx] = await mapper(items[idx], idx);
-    }
-  });
-  await Promise.all(workers);
-  return out;
-}
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -300,25 +232,12 @@ module.exports = async function handler(req, res) {
       .filter(i => i.status === '0' && !isExcludedResult(i, artist))
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
-    const visibleCount = Math.min(live.length, Math.max(1, Math.min(n, 12)));
-    const enriched = await mapWithConcurrency(
-      live.slice(0, visibleCount),
-      6,
-      async item => {
-        const globalProduct = await resolveGlobalBunjangProduct(item.id, item.name);
-        const displayName = globalProduct.displayName || 'View item on Bunjang Global';
-        return {
-          ...withUsdPrice(item),
-          ...globalProduct,
-          displayName,
-          displayPrice: globalProduct.displayPrice || formatUsdPrice(krwToGlobalUsd(item.price)),
-          currency: 'USD',
-        };
-      }
-    );
-    const itemsOut = [...enriched, ...live.slice(visibleCount, n).map(withUsdPrice)];
+    const itemsOut = live.slice(0, n).map(item => ({
+      ...withUsdPrice(item),
+      displayName: item.name || '',
+    }));
 
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=120');
     return res.status(200).json({ artist, items: itemsOut });
   } catch (err) {
     return res.status(502).json({ error: err.message });
