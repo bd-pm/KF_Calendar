@@ -1128,7 +1128,26 @@ function buildWeek(area){
 
     const lineup = LINEUP_BY_DATE[ds];
     const isCancelled = lineup?.source === 'cancelled';
-    if(activeEventTypes.has('gonbang') && lineup && (isCancelled || dateHasMyGroup(ds))){
+    const hasVisibleLineup = activeEventTypes.has('gonbang') && lineup && (isCancelled || dateHasMyGroup(ds));
+    const manualEvents = eventsOnDate(ds).filter(e => e.source === 'manual_event' || e.source === 'auto_event');
+    const scheduleColors = [];
+    if(hasVisibleLineup){
+      const show = SHOW_LABELS[lineup.showName];
+      scheduleColors.push(isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8'));
+    }
+    manualEvents.forEach(event => scheduleColors.push(event.color || eventColor(event.type, event.source)));
+
+    if(scheduleColors.length > 1){
+      const dc=document.createElement('div');
+      dc.className='dots-col';
+      scheduleColors.forEach(color => {
+        const dot=document.createElement('div');
+        dot.className='evt-dot';
+        dot.style.background=color;
+        dc.appendChild(dot);
+      });
+      cell.appendChild(dc);
+    } else if(hasVisibleLineup){
       const dc=document.createElement('div');
       dc.className='dots-col';
       const show = SHOW_LABELS[lineup.showName];
@@ -1146,27 +1165,17 @@ function buildWeek(area){
         dc.appendChild(cnt);
       }
       cell.appendChild(dc);
-    }
-    const manualEvents = eventsOnDate(ds).filter(e => e.source === 'manual_event' || e.source === 'auto_event');
-    if(manualEvents.length > 0){
-      const dc = cell.querySelector('.dots-col') || document.createElement('div');
-      if(!dc.classList.contains('dots-col')) {
-        dc.className = 'dots-col';
-        cell.appendChild(dc);
-      }
-      manualEvents.slice(0, 4).forEach(event => {
+    } else if(manualEvents.length === 1){
+      const dc=document.createElement('div');
+      dc.className='dots-col';
+      manualEvents.forEach(event => {
         const dot = document.createElement('div');
         dot.className = 'evt-dot';
         dot.style.background = event.color || eventColor(event.type, event.source);
         dot.title = event.name;
         dc.appendChild(dot);
       });
-      if (manualEvents.length > 4) {
-        const more = document.createElement('div');
-        more.className = 'evt-more';
-        more.textContent = `+${manualEvents.length - 4}`;
-        dc.appendChild(more);
-      }
+      cell.appendChild(dc);
     }
 
     cell.onclick=()=>{ selectDate(ds); };
@@ -1220,7 +1229,26 @@ function buildMonth(area){
 
     const mLineup = LINEUP_BY_DATE[ds];
     const isCancelled = mLineup?.source === 'cancelled';
-    if(activeEventTypes.has('gonbang') && mLineup && (isCancelled || dateHasMyGroup(ds))){
+    const hasVisibleLineup = activeEventTypes.has('gonbang') && mLineup && (isCancelled || dateHasMyGroup(ds));
+    const manualEvents = eventsOnDate(ds).filter(e => e.source === 'manual_event' || e.source === 'auto_event');
+    const scheduleColors = [];
+    if(hasVisibleLineup){
+      const show = SHOW_LABELS[mLineup.showName];
+      scheduleColors.push(isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8'));
+    }
+    manualEvents.forEach(event => scheduleColors.push(event.color || eventColor(event.type, event.source)));
+
+    if(scheduleColors.length > 1){
+      const dotsEl=document.createElement('div');
+      dotsEl.className='mday-dots';
+      scheduleColors.forEach(color => {
+        const dot=document.createElement('div');
+        dot.className='mdot';
+        dot.style.background=color;
+        dotsEl.appendChild(dot);
+      });
+      cell.appendChild(dotsEl);
+    } else if(hasVisibleLineup){
       const show = SHOW_LABELS[mLineup.showName];
       const showColor = isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8');
       const dotsEl=document.createElement('div');
@@ -1242,16 +1270,19 @@ function buildMonth(area){
       pill.textContent=isCancelled ? `${show?show.short:mLineup.showName} · Canceled` : (show?show.short:mLineup.showName)+(mCount?` · ${mCount}`:'');
       pillsEl.appendChild(pill);
       cell.appendChild(pillsEl);
-    }
-    const manualEvents = eventsOnDate(ds).filter(e => e.source === 'manual_event' || e.source === 'auto_event');
-    if(manualEvents.length > 0){
-      let pillsEl = cell.querySelector('.mday-evts');
-      if(!pillsEl){
-        pillsEl=document.createElement('div');
-        pillsEl.className='mday-evts';
-        cell.appendChild(pillsEl);
-      }
-      manualEvents.slice(0, 3).forEach(event => {
+    } else if(manualEvents.length === 1){
+      const dotsEl=document.createElement('div');
+      dotsEl.className='mday-dots';
+      const event = manualEvents[0];
+      const dot=document.createElement('div');
+      dot.className='mdot';
+      dot.style.background=event.color || eventColor(event.type, event.source);
+      dotsEl.appendChild(dot);
+      cell.appendChild(dotsEl);
+
+      const pillsEl=document.createElement('div');
+      pillsEl.className='mday-evts';
+      manualEvents.forEach(event => {
         const pill=document.createElement('div');
         pill.className='mevt-pill';
         const color = event.color || eventColor(event.type, event.source);
@@ -1260,12 +1291,7 @@ function buildMonth(area){
         pill.textContent=event.name;
         pillsEl.appendChild(pill);
       });
-      if (manualEvents.length > 3) {
-        const more=document.createElement('div');
-        more.className='mevt-more';
-        more.textContent=`+${manualEvents.length - 3} more`;
-        pillsEl.appendChild(more);
-      }
+      cell.appendChild(pillsEl);
     }
 
     cell.onclick=()=>{ selectDate(ds, { scrollToDetails: true }); };
