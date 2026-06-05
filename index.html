@@ -93,6 +93,22 @@ body{
   transition:all .2s;letter-spacing:0;
 }
 .toggle-btn.on{background:#FFFFFF;color:var(--txt1);box-shadow:0 1px 6px rgba(0,0,0,0.1)}
+.type-filter{
+  display:flex;gap:6px;overflow-x:auto;
+  padding:8px 16px;
+  background:#FFFFFF;
+  border-bottom:1px solid var(--border);
+  scrollbar-width:none;
+}
+.type-filter::-webkit-scrollbar{display:none}
+.type-chip{
+  flex-shrink:0;height:30px;padding:0 13px;border-radius:9999px;
+  border:1px solid var(--border);
+  background:#FFFFFF;color:var(--txt2);
+  font-size:12px;font-weight:700;letter-spacing:0;
+  cursor:pointer;transition:all .16s;
+}
+.type-chip.on{background:#191919;color:#FFFFFF;border-color:#191919}
 .nav-btn{
   width:30px;height:30px;border-radius:50%;
   border:none;
@@ -656,6 +672,12 @@ body{
     </div>
   </div>
 </div>
+<div class="type-filter" id="typeFilter">
+  <button class="type-chip on" data-type="gonbang" onclick="toggleEventType('gonbang')">Music Shows</button>
+  <button class="type-chip on" data-type="concert" onclick="toggleEventType('concert')">Concerts</button>
+  <button class="type-chip on" data-type="fanmeeting" onclick="toggleEventType('fanmeeting')">Fan Meetings</button>
+  <button class="type-chip on" data-type="md" onclick="toggleEventType('md')">MD</button>
+</div>
 </div><!-- /hdr-wrap -->
 
 <!-- CALENDAR AREA -->
@@ -796,6 +818,7 @@ let allGroupsSelected = false;
 
 // 공방 EVENTS 목록 (calendar dot 렌더용)
 let EVENTS = [];
+let activeEventTypes = new Set(['gonbang', 'concert', 'fanmeeting', 'md']);
 
 // ─────────────────────────────────────────
 //  SHOW LABELS
@@ -950,11 +973,38 @@ function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===
 function isFuture(ds){ return ds > dKey(TODAY); }
 
 function eventsOnDate(ds){
-  return EVENTS.filter(e=>e.date===ds);
+  return EVENTS.filter(e=>e.date===ds && activeEventTypes.has(e.type));
 }
 
 function isManualCalendarEvent(row) {
-  return row?.source === 'manual_event' || String(row?.showName || row?.show_name || '').startsWith('event_');
+  return row?.source === 'manual_event' || row?.source === 'auto_event' || String(row?.showName || row?.show_name || '').startsWith('event_');
+}
+
+function eventTypeFromRow(row) {
+  const showName = String(row?.showName || row?.show_name || '');
+  const m = showName.match(/^event_([^_]+)/);
+  const type = m ? m[1] : 'event';
+  if (type === 'goods' || type === 'merch' || type === 'popup') return 'md';
+  if (type === 'fanmeet') return 'fanmeeting';
+  return ['concert', 'fanmeeting', 'md'].includes(type) ? type : 'fanmeeting';
+}
+
+function eventColor(type, source) {
+  if (type === 'concert') return '#D80C18';
+  if (type === 'fanmeeting') return '#4F7FC8';
+  if (type === 'md') return '#8C6A22';
+  return source === 'auto_event' ? '#7E8A98' : '#80B0F0';
+}
+
+function toggleEventType(type) {
+  if (activeEventTypes.has(type)) activeEventTypes.delete(type);
+  else activeEventTypes.add(type);
+  if (activeEventTypes.size === 0) activeEventTypes.add(type);
+  document.querySelectorAll('.type-chip').forEach(btn => {
+    btn.classList.toggle('on', activeEventTypes.has(btn.dataset.type));
+  });
+  buildCal();
+  renderBottom();
 }
 
 function parseManualCalendarEvent(row) {
@@ -1073,7 +1123,7 @@ function buildWeek(area){
 
     const lineup = LINEUP_BY_DATE[ds];
     const isCancelled = lineup?.source === 'cancelled';
-    if(lineup && (isCancelled || dateHasMyGroup(ds))){
+    if(activeEventTypes.has('gonbang') && lineup && (isCancelled || dateHasMyGroup(ds))){
       const dc=document.createElement('div');
       dc.className='dots-col';
       const show = SHOW_LABELS[lineup.showName];
@@ -1092,7 +1142,7 @@ function buildWeek(area){
       }
       cell.appendChild(dc);
     }
-    const manualEvents = eventsOnDate(ds).filter(e => e.source === 'manual_event');
+    const manualEvents = eventsOnDate(ds).filter(e => e.source === 'manual_event' || e.source === 'auto_event');
     if(manualEvents.length > 0){
       const dc = cell.querySelector('.dots-col') || document.createElement('div');
       if(!dc.classList.contains('dots-col')) {
@@ -1102,7 +1152,7 @@ function buildWeek(area){
       manualEvents.slice(0, 2).forEach(event => {
         const dot = document.createElement('div');
         dot.className = 'evt-dot';
-        dot.style.background = '#80B0F0';
+        dot.style.background = event.color || eventColor(event.type, event.source);
         dot.title = event.name;
         dc.appendChild(dot);
       });
@@ -1159,7 +1209,7 @@ function buildMonth(area){
 
     const mLineup = LINEUP_BY_DATE[ds];
     const isCancelled = mLineup?.source === 'cancelled';
-    if(mLineup && (isCancelled || dateHasMyGroup(ds))){
+    if(activeEventTypes.has('gonbang') && mLineup && (isCancelled || dateHasMyGroup(ds))){
       const show = SHOW_LABELS[mLineup.showName];
       const showColor = isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8');
       const dotsEl=document.createElement('div');
@@ -1182,7 +1232,7 @@ function buildMonth(area){
       pillsEl.appendChild(pill);
       cell.appendChild(pillsEl);
     }
-    const manualEvents = eventsOnDate(ds).filter(e => e.source === 'manual_event');
+    const manualEvents = eventsOnDate(ds).filter(e => e.source === 'manual_event' || e.source === 'auto_event');
     if(manualEvents.length > 0){
       let pillsEl = cell.querySelector('.mday-evts');
       if(!pillsEl){
@@ -1193,8 +1243,9 @@ function buildMonth(area){
       manualEvents.slice(0, 2).forEach(event => {
         const pill=document.createElement('div');
         pill.className='mevt-pill';
-        pill.style.background='#80B0F033';
-        pill.style.color='#4F7FC8';
+        const color = event.color || eventColor(event.type, event.source);
+        pill.style.background=color+'33';
+        pill.style.color=color;
         pill.textContent=event.name;
         pillsEl.appendChild(pill);
       });
@@ -1412,6 +1463,7 @@ function renderBottom(){
   const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
   const lineup = LINEUP_BY_DATE[selectedDate];
+  const selectedEvents = eventsOnDate(selectedDate).filter(e => e.type !== 'gonbang');
   const show   = lineup ? (SHOW_LABELS[lineup.showName] || { name: lineup.showName, color:'#9B6FD8', short: lineup.showName }) : null;
   const expectedShow = show ? { showName: lineup.showName, ...show } : scheduledShowForDate(selectedDate);
   const isCancelled = lineup?.source === 'cancelled';
@@ -1438,11 +1490,35 @@ function renderBottom(){
     hdr.innerHTML=`
       <div>
         <div class="sel-date">${dayNames[dateObj.getDay()]}, ${MONTH_NAMES[mo-1]} ${d}</div>
-        <div class="sel-sub">No show scheduled</div>
+        <div class="sel-sub">${selectedEvents.length ? `${selectedEvents.length} event${selectedEvents.length > 1 ? 's' : ''}` : 'No show scheduled'}</div>
       </div>
     `;
   }
   dateHeader.appendChild(hdr);
+
+  function appendEventList(events) {
+    if (!events.length) return;
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'padding:16px 16px 0;background:#FFFFFF';
+    wrap.innerHTML = events.map(event => {
+      const color = event.color || eventColor(event.type, event.source);
+      const label = event.type === 'concert' ? 'Concert' : event.type === 'fanmeeting' ? 'Fan Meeting' : event.type === 'md' ? 'MD' : 'Event';
+      return `
+        <div style="display:flex;gap:10px;padding:12px 0;border-bottom:1px solid #F0F0F0">
+          <div style="width:8px;height:8px;border-radius:50%;background:${color};margin-top:7px;flex-shrink:0"></div>
+          <div style="min-width:0;flex:1">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <span class="show-badge" style="background:${color}">${escHtml(label)}</span>
+              ${event.source === 'auto_event' ? '<span style="font-size:11px;color:var(--txt2);font-weight:700">Auto</span>' : ''}
+            </div>
+            <div style="font-size:14px;font-weight:700;color:var(--txt1);line-height:1.35">${escHtml(event.name)}</div>
+            ${event.venue ? `<div style="font-size:12px;color:var(--txt2);margin-top:3px">${escHtml(event.venue)}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+    bot.appendChild(wrap);
+  }
 
   function appendEmptyNotice(title, body, action) {
     const empty = document.createElement('div');
@@ -1483,6 +1559,8 @@ function renderBottom(){
     label: `View last week's ${expectedShow.short} · ${prevWeek.count} Artists`,
     onClick: () => selectDate(prevWeek.date, { scrollToDetails: true, syncCalendar: true }),
   } : null;
+
+  appendEventList(selectedEvents);
 
   if (isCancelled) {
     appendEmptyNotice(
@@ -1627,7 +1705,7 @@ function renderBottom(){
     prompt.style.cssText = 'padding:16px 16px 20px;text-align:center;color:var(--txt2);font-size:12.5px';
     prompt.textContent = 'Select a group above to browse Bunjang listings';
     bot.appendChild(prompt);
-  } else {
+  } else if(selectedEvents.length === 0) {
     appendEmptyNotice(
       'Select a date with a music show',
       'Fan postcards &amp; exclusive goods<br>will show up here'
@@ -1992,15 +2070,17 @@ async function fetchMusicShowLineups() {
       if (!dateKey) return;
       if (isManualCalendarEvent(r)) {
         const parsed = parseManualCalendarEvent(r);
+        const eventType = eventTypeFromRow(r);
+        const source = r.source === 'auto_event' ? 'auto_event' : 'manual_event';
         manualEvents.push({
-          id: `manual-event-${r.id || dateKey}`,
+          id: `${source}-${r.id || dateKey}`,
           group: (r.groups || [])[0] || 'manual',
           date: dateKey,
           name: parsed.name || 'Manual event',
-          type: 'manual_event',
+          type: eventType,
           venue: parsed.venue,
-          source: 'manual_event',
-          color: '#80B0F0',
+          source,
+          color: eventColor(eventType, source),
         });
         return;
       }
@@ -2027,6 +2107,7 @@ async function fetchMusicShowLineups() {
         date,
         name:  show.name,
         type:  'gonbang',
+        source:'lineup',
         venue: lineup.episode ? `EP ${lineup.episode}` : '',
         color: show.color,
       };

@@ -4,6 +4,10 @@
     {
       "path": "/api/sync-naver",
       "schedule": "0 6 * * 1-5"
+    },
+    {
+      "path": "/api/sync-events",
+      "schedule": "10 6 * * 1-5"
     }
   ],
   "headers": [
