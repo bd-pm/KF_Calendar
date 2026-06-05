@@ -1572,7 +1572,7 @@ function renderBottom(){
       // 2. 순위 없는 그룹만 백그라운드에서 매물 수 조회 후 재정렬
       if (unranked.length > 1) {
         Promise.all(unranked.map(a =>
-          fetch(goodsApiUrl(a, 1), { cache: 'no-store' })
+          fetchGoodsCached(a, 1)
             .then(r => r.ok ? r.json() : { items: [] })
             .then(d => ({ name: a, count: (d.items || []).length }))
             .catch(() => ({ name: a, count: 0 }))
@@ -1639,18 +1639,110 @@ function renderBottom(){
 //  LIVE GOODS: 번장 실시간 검색
 // ─────────────────────────────────────────
 function goodsApiUrl(artistName, n) {
-  return `/api/goods?artist=${encodeURIComponent(artistName)}&n=${n}&_t=${Date.now()}`;
+  return `/api/goods?artist=${encodeURIComponent(artistName)}&n=${n}`;
+}
+
+const GOODS_CACHE_TTL_MS = 1000 * 60 * 30;
+const GOODS_CACHE_PREFIX = 'kf_goods_cache_v2:';
+const goodsMemoryCache = new Map();
+const goodsInflight = new Map();
+let goodsRequestSeq = 0;
+
+function goodsCacheKey(artistName, n) {
+  return `${String(artistName || '').trim()}::${n}`;
+}
+
+function readGoodsCache(key) {
+  const now = Date.now();
+  const cached = goodsMemoryCache.get(key);
+  if (cached && now - cached.ts < GOODS_CACHE_TTL_MS) return cached.data;
+  try {
+    const raw = sessionStorage.getItem(GOODS_CACHE_PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (now - parsed.ts >= GOODS_CACHE_TTL_MS) {
+      sessionStorage.removeItem(GOODS_CACHE_PREFIX + key);
+      return null;
+    }
+    goodsMemoryCache.set(key, parsed);
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+function writeGoodsCache(key, data) {
+  const entry = { ts: Date.now(), data };
+  goodsMemoryCache.set(key, entry);
+  try { sessionStorage.setItem(GOODS_CACHE_PREFIX + key, JSON.stringify(entry)); } catch {}
+}
+
+function cachedJsonResponse(data) {
+  return {
+    ok: true,
+    json: async () => data,
+  };
+}
+
+function fetchGoodsCached(artistName, n) {
+  const key = goodsCacheKey(artistName, n);
+  const cached = readGoodsCache(key);
+  if (cached) return Promise.resolve(cachedJsonResponse(cached));
+  if (goodsInflight.has(key)) return goodsInflight.get(key);
+
+  const request = fetch(goodsApiUrl(artistName, n))
+    .then(async res => {
+      if (!res.ok) return res;
+      const data = await res.json();
+      writeGoodsCache(key, data);
+      return cachedJsonResponse(data);
+    })
+    .finally(() => goodsInflight.delete(key));
+  goodsInflight.set(key, request);
+  return request;
+}
+
+function renderGoodsCards(grid, items, limit, delayStep) {
+  items.slice(0, limit).forEach((item, i) => {
+    const productUrl = `https://globalbunjang.com/product/${item.id}?utm_source=kf-calendar&utm_medium=social&utm_campaign=pdp-direct`;
+    const imgSrc = item.imageUrl ? `/api/image?url=${encodeURIComponent(item.imageUrl)}` : '';
+    const itemName = item.displayName || item.name;
+    const imgHtml = imgSrc
+      ? `<img src="${imgSrc}" alt="${escHtml(itemName)}" loading="lazy" onerror="this.closest('.gcard-img').classList.add('img-err')">`
+      : '';
+    const card = document.createElement('div');
+    card.className = 'gcard';
+    card.style.cssText = `animation:fadeUp .22s ease both;animation-delay:${i*delayStep}ms`;
+    card.innerHTML = `
+      <div class="gcard-img">
+        <div class="gcard-img-fallback">🎤</div>
+        ${imgHtml}
+      </div>
+      <div class="gcard-body">
+        <div class="gcard-price">${formatGoodsPrice(item)}</div>
+        <div class="gcard-name">${escHtml(itemName)}</div>
+      </div>
+    `;
+    card.onclick = () => window.open(productUrl, '_blank');
+    grid.appendChild(card);
+  });
 }
 
 // 전체 탭: 여러 그룹을 각각 검색해서 합치기
 async function fetchAllGroupGoods(artists, showName) {
   const area = document.getElementById('live-goods-area');
   if(!area) return;
+  const requestId = ++goodsRequestSeq;
+  const comboKey = goodsCacheKey(`__all__:${artists.join('|')}`, 60);
+  const cachedCombo = readGoodsCache(comboKey);
+  if (cachedCombo) {
+    renderAllGoods(document.getElementById('live-goods-area'), cachedCombo.items || [], showName);
+  }
 
   try {
     const results = await Promise.all(
       artists.map(a =>
-        fetch(goodsApiUrl(a, 40), { cache: 'no-store' })
+        fetchGoodsCached(a, 12)
           .then(r => r.ok ? r.json() : { items: [] })
           .then(d => d.items || [])
           .catch(() => [])
@@ -1658,7 +1750,7 @@ async function fetchAllGroupGoods(artists, showName) {
     );
 
     const freshArea = document.getElementById('live-goods-area');
-    if(!freshArea || !allGroupsSelected) return;
+    if(!freshArea || !allGroupsSelected || requestId !== goodsRequestSeq) return;
 
     // 중복 제거 후 최신순 정렬
     const seen = new Set();
@@ -1671,131 +1763,103 @@ async function fetchAllGroupGoods(artists, showName) {
       }
     }
     items.sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0));
-
-    freshArea.innerHTML = '';
-
-    const hdr = document.createElement('div');
-    hdr.className = 'goods-intro';
-    hdr.innerHTML = `
-      <div class="goods-intro-title-row">
-        <div class="goods-intro-title">K-pop photocards & goods,<br>fresh from ${showName ? escHtml(showName) : 'today\'s show'}</div>
-      </div>
-      <div class="goods-intro-footer">
-        <div class="goods-intro-sub">${items.length > 0 ? `${items.length} listings · Latest` : 'No listings found'}</div>
-      </div>
-    `;
-    freshArea.appendChild(hdr);
-
-    if(items.length === 0){
-      const empty = document.createElement('div');
-      empty.className = 'goods-empty';
-      empty.textContent = 'No fan goods listings found for today\'s artists.';
-      freshArea.appendChild(empty);
-      return;
-    }
-
-    const grid = document.createElement('div');
-    grid.className = 'goods-grid';
-    items.slice(0, 60).forEach((item, i) => {
-      const productUrl = `https://globalbunjang.com/product/${item.id}?utm_source=kf-calendar&utm_medium=social&utm_campaign=pdp-direct`;
-      const imgSrc = item.imageUrl ? `/api/image?url=${encodeURIComponent(item.imageUrl)}` : '';
-      const itemName = item.displayName || item.name;
-      const imgHtml = imgSrc ? `<img src="${imgSrc}" alt="${escHtml(itemName)}" loading="lazy" onerror="this.closest('.gcard-img').classList.add('img-err')">` : '';
-      const card = document.createElement('div');
-      card.className = 'gcard';
-      card.style.cssText = `animation:fadeUp .22s ease both;animation-delay:${i*15}ms`;
-      card.innerHTML = `
-        <div class="gcard-img">
-          <div class="gcard-img-fallback">🎤</div>
-          ${imgHtml}
-        </div>
-        <div class="gcard-body">
-          <div class="gcard-price">${formatGoodsPrice(item)}</div>
-          <div class="gcard-name">${escHtml(itemName)}</div>
-        </div>
-      `;
-      card.onclick = () => window.open(productUrl, '_blank');
-      grid.appendChild(card);
-    });
-    freshArea.appendChild(grid);
+    writeGoodsCache(comboKey, { items });
+    renderAllGoods(freshArea, items, showName);
 
   } catch(err) {
     const a = document.getElementById('live-goods-area');
-    if(a) a.innerHTML = `<div style="padding:16px 14px;color:var(--txt2);font-size:12px">Failed to load listings: ${escHtml(err.message)}</div>`;
+    if(a && requestId === goodsRequestSeq) a.innerHTML = `<div style="padding:16px 14px;color:var(--txt2);font-size:12px">Failed to load listings: ${escHtml(err.message)}</div>`;
   }
+}
+
+function renderAllGoods(area, items, showName) {
+  if (!area) return;
+  area.innerHTML = '';
+
+  const hdr = document.createElement('div');
+  hdr.className = 'goods-intro';
+  hdr.innerHTML = `
+    <div class="goods-intro-title-row">
+      <div class="goods-intro-title">K-pop photocards & goods,<br>fresh from ${showName ? escHtml(showName) : 'today\'s show'}</div>
+    </div>
+    <div class="goods-intro-footer">
+      <div class="goods-intro-sub">${items.length > 0 ? `${items.length} listings · Latest` : 'No listings found'}</div>
+    </div>
+  `;
+  area.appendChild(hdr);
+
+  if(items.length === 0){
+    const empty = document.createElement('div');
+    empty.className = 'goods-empty';
+    empty.textContent = 'No fan goods listings found for today\'s artists.';
+    area.appendChild(empty);
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'goods-grid';
+  renderGoodsCards(grid, items, 60, 15);
+  area.appendChild(grid);
 }
 
 async function fetchAndShowLiveGoods(artistName) {
   const area = document.getElementById('live-goods-area');
   if(!area) return;
+  const requestId = ++goodsRequestSeq;
 
   try {
     await resolveArtistDisplayNames([artistName]);
-    const res = await fetch(goodsApiUrl(artistName, 60), { cache: 'no-store' });
+    const cached = readGoodsCache(goodsCacheKey(artistName, 60));
+    if (cached) renderSingleGoods(document.getElementById('live-goods-area'), artistName, cached.items || []);
+
+    const res = await fetchGoodsCached(artistName, 60);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const items = data.items || [];
 
     const freshArea = document.getElementById('live-goods-area');
-    if(!freshArea) return;
+    if(!freshArea || requestId !== goodsRequestSeq) return;
 
-    freshArea.innerHTML = '';
-
-    const displayName = allGroupsSelected ? "Today's Artists" : artistDisplayName(artistName);
-    const hdr = document.createElement('div');
-    hdr.className = 'goods-intro';
-    hdr.innerHTML = `
-      <div class="goods-intro-title-row">
-        <div class="goods-intro-title">${escHtml(displayName)} Fan Goods &amp; Postcards</div>
-        <a href="https://globalbunjang.com/search?q=${encodeURIComponent(artistName+' 공방')}&order=date&utm_source=kf-calendar&utm_medium=social&utm_campaign=fan-goods-postcards" target="_blank" rel="noopener" class="goods-intro-chevron">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        </a>
-      </div>
-      <div class="goods-intro-footer">
-        <div class="goods-intro-sub">${items.length > 0 ? `${items.length} listings · Latest` : 'No listings found'}</div>
-      </div>
-    `;
-    freshArea.appendChild(hdr);
-
-    if(items.length === 0){
-      const empty = document.createElement('div');
-      empty.className = 'goods-empty';
-      empty.textContent = `No fan goods listings found for ${displayName}.`;
-      freshArea.appendChild(empty);
-      return;
-    }
-
-    const grid = document.createElement('div');
-    grid.className = 'goods-grid';
-    items.slice(0, 40).forEach((item, i) => {
-      const productUrl = `https://globalbunjang.com/product/${item.id}?utm_source=kf-calendar&utm_medium=social&utm_campaign=pdp-direct`;
-      const imgSrc = item.imageUrl ? `/api/image?url=${encodeURIComponent(item.imageUrl)}` : '';
-      const itemName = item.displayName || item.name;
-      const imgHtml = imgSrc
-        ? `<img src="${imgSrc}" alt="${escHtml(itemName)}" loading="lazy" onerror="this.closest('.gcard-img').classList.add('img-err')">`
-        : '';
-      const card = document.createElement('div');
-      card.className = 'gcard';
-      card.style.cssText = `animation:fadeUp .22s ease both;animation-delay:${i*20}ms`;
-      card.innerHTML = `
-        <div class="gcard-img">
-          <div class="gcard-img-fallback">🎤</div>
-          ${imgHtml}
-        </div>
-        <div class="gcard-body">
-          <div class="gcard-price">${formatGoodsPrice(item)}</div>
-          <div class="gcard-name">${escHtml(itemName)}</div>
-        </div>
-      `;
-      card.onclick = () => window.open(productUrl, '_blank');
-      grid.appendChild(card);
-    });
-    freshArea.appendChild(grid);
+    renderSingleGoods(freshArea, artistName, items);
 
   } catch(err) {
     const area2 = document.getElementById('live-goods-area');
-    if(area2) area2.innerHTML = `<div style="padding:16px 14px;color:var(--txt2);font-size:12px">Failed to load listings: ${escHtml(err.message)}</div>`;
+    if(area2 && requestId === goodsRequestSeq) area2.innerHTML = `<div style="padding:16px 14px;color:var(--txt2);font-size:12px">Failed to load listings: ${escHtml(err.message)}</div>`;
   }
+}
+
+function renderSingleGoods(area, artistName, items) {
+  if (!area) return;
+  area.innerHTML = '';
+
+  const displayName = allGroupsSelected ? "Today's Artists" : artistDisplayName(artistName);
+  const hdr = document.createElement('div');
+  hdr.className = 'goods-intro';
+  hdr.innerHTML = `
+    <div class="goods-intro-title-row">
+      <div class="goods-intro-title">${escHtml(displayName)} Fan Goods &amp; Postcards</div>
+      <a href="https://globalbunjang.com/search?q=${encodeURIComponent(artistName+' 공방')}&order=date&utm_source=kf-calendar&utm_medium=social&utm_campaign=fan-goods-postcards" target="_blank" rel="noopener" class="goods-intro-chevron">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </a>
+    </div>
+    <div class="goods-intro-footer">
+      <div class="goods-intro-sub">${items.length > 0 ? `${items.length} listings · Latest` : 'No listings found'}</div>
+    </div>
+  `;
+  area.appendChild(hdr);
+
+  if(items.length === 0){
+    const empty = document.createElement('div');
+    empty.className = 'goods-empty';
+    empty.textContent = `No fan goods listings found for ${displayName}.`;
+    area.appendChild(empty);
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'goods-grid';
+  renderGoodsCards(grid, items, 40, 20);
+  area.appendChild(grid);
 }
 
 // ─────────────────────────────────────────

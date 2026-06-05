@@ -300,7 +300,7 @@ module.exports = async function handler(req, res) {
       .filter(i => i.status === '0' && !isExcludedResult(i, artist))
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
-    const visibleCount = Math.min(live.length, Math.max(1, n));
+    const visibleCount = Math.min(live.length, Math.max(1, Math.min(n, 12)));
     const enriched = await mapWithConcurrency(
       live.slice(0, visibleCount),
       6,
@@ -316,7 +316,7 @@ module.exports = async function handler(req, res) {
         };
       }
     );
-    const itemsOut = enriched;
+    const itemsOut = [...enriched, ...live.slice(visibleCount, n).map(withUsdPrice)];
 
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
     return res.status(200).json({ artist, items: itemsOut });
