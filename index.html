@@ -1642,8 +1642,8 @@ function goodsApiUrl(artistName, n) {
   return `/api/goods?artist=${encodeURIComponent(artistName)}&n=${n}`;
 }
 
-const GOODS_CACHE_TTL_MS = 1000 * 60 * 30;
-const GOODS_CACHE_PREFIX = 'kf_goods_cache_v2:';
+const GOODS_CACHE_TTL_MS = 1000 * 60 * 120; // 2시간
+const GOODS_CACHE_PREFIX = 'kf_goods_cache_v3:';
 const goodsMemoryCache = new Map();
 const goodsInflight = new Map();
 let goodsRequestSeq = 0;
@@ -1654,17 +1654,17 @@ function goodsCacheKey(artistName, n) {
 
 function readGoodsCache(key) {
   const now = Date.now();
-  const cached = goodsMemoryCache.get(key);
-  if (cached && now - cached.ts < GOODS_CACHE_TTL_MS) return cached.data;
+  const mem = goodsMemoryCache.get(key);
+  if (mem && now - mem.ts < GOODS_CACHE_TTL_MS) return mem.data;
   try {
-    const raw = sessionStorage.getItem(GOODS_CACHE_PREFIX + key);
+    const raw = localStorage.getItem(GOODS_CACHE_PREFIX + key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (now - parsed.ts >= GOODS_CACHE_TTL_MS) {
-      sessionStorage.removeItem(GOODS_CACHE_PREFIX + key);
+      localStorage.removeItem(GOODS_CACHE_PREFIX + key);
       return null;
     }
-    goodsMemoryCache.set(key, parsed);
+    goodsMemoryCache.set(key, { ts: parsed.ts, data: parsed.data });
     return parsed.data;
   } catch {
     return null;
@@ -1674,7 +1674,7 @@ function readGoodsCache(key) {
 function writeGoodsCache(key, data) {
   const entry = { ts: Date.now(), data };
   goodsMemoryCache.set(key, entry);
-  try { sessionStorage.setItem(GOODS_CACHE_PREFIX + key, JSON.stringify(entry)); } catch {}
+  try { localStorage.setItem(GOODS_CACHE_PREFIX + key, JSON.stringify(entry)); } catch {}
 }
 
 function cachedJsonResponse(data) {
@@ -1728,15 +1728,50 @@ function renderGoodsCards(grid, items, limit, delayStep) {
   });
 }
 
+function mergeGoodsResults(results) {
+  const seen = new Set();
+  const items = [];
+  for (const group of results) {
+    for (const item of group) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      items.push(item);
+    }
+  }
+  items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return items;
+}
+
 // 전체 탭: 여러 그룹을 각각 검색해서 합치기
 async function fetchAllGroupGoods(artists, showName) {
   const area = document.getElementById('live-goods-area');
-  if(!area) return;
+  if (!area) return;
   const requestId = ++goodsRequestSeq;
   const comboKey = goodsCacheKey(`__all__:${artists.join('|')}`, 60);
+
+  // 1) combo 캐시 히트 → 즉시 렌더 후 return
   const cachedCombo = readGoodsCache(comboKey);
   if (cachedCombo) {
     renderAllGoods(document.getElementById('live-goods-area'), cachedCombo.items || [], showName);
+    return;
+  }
+
+  // 2) 개별 아티스트 캐시 확인 → 있는 것만 즉시 렌더 (부분 캐시)
+  const individualCaches = artists.map(a => readGoodsCache(goodsCacheKey(a, 12)));
+  const allIndividualCached = individualCaches.every(c => c !== null);
+  if (allIndividualCached) {
+    // 모두 캐시됨 → 즉시 렌더 + combo 캐시 저장
+    const items = mergeGoodsResults(individualCaches.map(c => c.items || []));
+    writeGoodsCache(comboKey, { items });
+    renderAllGoods(document.getElementById('live-goods-area'), items, showName);
+    return;
+  }
+  const partialItems = individualCaches.some(c => c !== null)
+    ? mergeGoodsResults(individualCaches.map((c, i) => c ? c.items || [] : []))
+    : null;
+  if (partialItems && partialItems.length > 0) {
+    // 일부 캐시 → 즉시 부분 렌더 (나머지 로딩 중 표시)
+    renderAllGoods(document.getElementById('live-goods-area'), partialItems, showName);
   }
 
   try {
@@ -1750,25 +1785,15 @@ async function fetchAllGroupGoods(artists, showName) {
     );
 
     const freshArea = document.getElementById('live-goods-area');
-    if(!freshArea || !allGroupsSelected || requestId !== goodsRequestSeq) return;
+    if (!freshArea || !allGroupsSelected || requestId !== goodsRequestSeq) return;
 
-    // 중복 제거 후 최신순 정렬
-    const seen = new Set();
-    const items = [];
-    for(const group of results){
-      for(const item of group){
-        if(seen.has(item.id)) continue;
-        seen.add(item.id);
-        items.push(item);
-      }
-    }
-    items.sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0));
+    const items = mergeGoodsResults(results);
     writeGoodsCache(comboKey, { items });
     renderAllGoods(freshArea, items, showName);
 
-  } catch(err) {
+  } catch (err) {
     const a = document.getElementById('live-goods-area');
-    if(a && requestId === goodsRequestSeq) a.innerHTML = `<div style="padding:16px 14px;color:var(--txt2);font-size:12px">Failed to load listings: ${escHtml(err.message)}</div>`;
+    if (a && requestId === goodsRequestSeq) a.innerHTML = `<div style="padding:16px 14px;color:var(--txt2);font-size:12px">Failed to load listings: ${escHtml(err.message)}</div>`;
   }
 }
 
@@ -1873,6 +1898,22 @@ function toast(msg){
   setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(()=>t.remove(),350)},2200);
 }
 
+// 오늘 ±1~3일 아티스트 상품 백그라운드 프리패치 (lineup 로드 후 호출)
+function prefetchNearbyGoods() {
+  const seen = new Set();
+  for (let i = -1; i <= 3; i++) {
+    const d = new Date(TODAY); d.setDate(d.getDate() + i);
+    const lineup = LINEUP_BY_DATE[dKey(d)];
+    if (!lineup || !lineup.groups.length) continue;
+    lineup.groups.forEach(a => seen.add(a));
+  }
+  let delay = 300;
+  seen.forEach(artist => {
+    setTimeout(() => fetchGoodsCached(artist, 12).catch(() => {}), delay);
+    delay += 200;
+  });
+}
+
 // ─────────────────────────────────────────
 //  공방 일정 로드 (Supabase music_show_lineups)
 // ─────────────────────────────────────────
@@ -1939,6 +1980,9 @@ async function fetchMusicShowLineups() {
       };
     });
     EVENTS = [...lineupEvents, ...manualEvents];
+
+    // 근처 날짜 아티스트 상품 프리패치 (500ms 지연 — UI 렌더 우선)
+    setTimeout(prefetchNearbyGoods, 500);
 
     // Default to most recent past show with lineup
     const todayKey = dKey(TODAY);
