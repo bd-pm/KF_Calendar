@@ -38,6 +38,15 @@ const GROUP_SLUGS = {
 };
 
 const SOURCE_URL = 'https://kpopping.com/calendar';
+const TIMESPREAD_SOURCES = [
+  { group_id: 'illit', url: 'https://www.timespread.co.kr/subscription-calendar/%EC%95%84%EC%9D%BC%EB%A6%BF' },
+  { group_id: 'seventeen', url: 'https://www.timespread.co.kr/subscription-calendar/%EC%84%B8%EB%B8%90%ED%8B%B4' },
+  { group_id: 'ive', url: 'https://www.timespread.co.kr/subscription-calendar/%EC%95%84%EC%9D%B4%EB%B8%8C' },
+  { group_id: 'bts', url: 'https://www.timespread.co.kr/subscription-calendar/%EB%B0%A9%ED%83%84%EC%86%8C%EB%85%84%EB%8B%A8' },
+  { group_id: 'twice', url: 'https://www.timespread.co.kr/subscription-calendar/%ED%8A%B8%EC%99%80%EC%9D%B4%EC%8A%A4' },
+  { group_id: 'riize', url: 'https://www.timespread.co.kr/subscription-calendar/%EB%9D%BC%EC%9D%B4%EC%A6%88' },
+  { group_id: 'babymonster', url: 'https://www.timespread.co.kr/subscription-calendar/%EB%B2%A0%EC%9D%B4%EB%B9%84%EB%AA%AC%EC%8A%A4%ED%84%B0' },
+];
 
 function dKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -95,8 +104,13 @@ function inferType(text, fallback) {
   const s = String(text || '').toLowerCase();
   if (/\b(md|merch|merchandise|official goods|popup|pop-up)\b|굿즈|공식\s*md/i.test(text)) return 'md';
   if (/fan\s*meeting|fanmeet|fan\s*sign|fansign|meet\s*&\s*greet|팬미팅|팬싸|사인회/i.test(text)) return 'fanmeeting';
-  if (/concert|tour|live|festival|showcase|fan\s*con|콘서트|투어|페스티벌|쇼케이스/i.test(text)) return 'concert';
+  if (/concert|tour|live|festival|showcase|on\s*stage|fan\s*con|콘서트|투어|페스티벌|쇼케이스|공연|행사/i.test(text)) return 'concert';
   return fallback || 'event';
+}
+
+function shouldKeepTimespreadEvent(name) {
+  if (/방송|생일|기념일|컴백|티저|뮤비|발매|음원|챌린지|당첨자\s*발표/i.test(name)) return false;
+  return /concert|tour|live|festival|showcase|on\s*stage|fan\s*meeting|fanmeet|fansign|fan\s*sign|md|merch|popup|pop-up|콘서트|투어|페스티벌|쇼케이스|팬미팅|팬싸|팬사인|사인회|공연|행사|팝업|굿즈|공식\s*md/i.test(name);
 }
 
 function normalizeGroupId(name) {
@@ -195,6 +209,64 @@ async function crawlKpopping({ from, to }) {
   return parseKpoppingEvents(html, { from, to, sourceUrl: url });
 }
 
+function parseTimespreadEvents(html, { from, to, group_id }) {
+  const events = [];
+  const seen = new Set();
+  const itemRe = /"name":"([^"]+)","url":"([^"]+)"/g;
+  let m;
+  while ((m = itemRe.exec(html))) {
+    const name = decodeEntities(m[1].replace(/\\u([0-9a-f]{4})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16))));
+    if (!shouldKeepTimespreadEvent(name)) continue;
+    const sourceUrl = decodeEntities(m[2].replace(/\\\//g, '/'));
+    const dateMatch = sourceUrl.match(/(20\d{2})-(\d{2})-(\d{2})/) || name.match(/(20\d{2})[.-](\d{2})[.-](\d{2})/);
+    if (!dateMatch) continue;
+    const date = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
+    if (!dateInRange(date, from, to)) continue;
+    const type = inferType(name, 'fanmeeting');
+    const key = `${date}:${name}:${sourceUrl}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    events.push({
+      type,
+      group_id,
+      name,
+      venue: '',
+      date_start: date,
+      date_end: date,
+      source_url: sourceUrl,
+    });
+  }
+  return events;
+}
+
+async function crawlTimespread(range) {
+  const all = [];
+  for (const source of TIMESPREAD_SOURCES) {
+    const res = await fetch(source.url, {
+      headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'text/html' },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) continue;
+    const html = await res.text();
+    all.push(...parseTimespreadEvents(html, { ...range, group_id: source.group_id }));
+  }
+  return all;
+}
+
+async function crawlExternalEvents(range) {
+  if (range.source === 'timespread') {
+    const events = await crawlTimespread(range);
+    return { source: 'timespread', events };
+  }
+  try {
+    const events = await crawlKpopping(range);
+    return { source: 'kpopping', events };
+  } catch (err) {
+    const events = await crawlTimespread(range);
+    return { source: `timespread fallback (${err.message})`, events };
+  }
+}
+
 async function upsertEvents(events) {
   const hdrs = {
     apikey: SUPA_SERVICE_KEY,
@@ -264,10 +336,11 @@ module.exports = async function handler(req, res) {
     const range = req.query.from && req.query.to
       ? { from: String(req.query.from), to: String(req.query.to) }
       : thisWeekRange();
-    const events = await crawlKpopping(range);
+    if (req.query.source) range.source = String(req.query.source);
+    const { source, events } = await crawlExternalEvents(range);
     await deleteAutoEvents(range.from, range.to);
     const upserted = await upsertEvents(events);
-    return res.status(200).json({ ok: true, source: 'kpopping', ...range, found: events.length, upserted, events });
+    return res.status(200).json({ ok: true, source, ...range, found: events.length, upserted, events });
   } catch (err) {
     return res.status(500).json({ ok: false, error: err.message });
   }
