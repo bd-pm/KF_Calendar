@@ -1648,6 +1648,28 @@ const goodsMemoryCache = new Map();
 const goodsInflight = new Map();
 let goodsRequestSeq = 0;
 
+// 영어 상품명 캐시 — goods 캐시(2hr)보다 오래 유지(7일)
+const ENG_NAMES_LS_KEY = 'kf_eng_v1';
+const ENG_NAMES_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+let engNamesCache = (() => {
+  try {
+    const raw = localStorage.getItem(ENG_NAMES_LS_KEY);
+    if (!raw) return {};
+    const p = JSON.parse(raw);
+    if (Date.now() - (p.ts || 0) > ENG_NAMES_TTL_MS) { localStorage.removeItem(ENG_NAMES_LS_KEY); return {}; }
+    return p.names || {};
+  } catch { return {}; }
+})();
+function saveEngNames() {
+  try { localStorage.setItem(ENG_NAMES_LS_KEY, JSON.stringify({ ts: Date.now(), names: engNamesCache })); } catch {}
+}
+function applyEngNames(items) {
+  return items.map(item => {
+    const eng = engNamesCache[String(item.id)];
+    return (eng && !item._eng) ? { ...item, displayName: eng, _eng: true } : item;
+  });
+}
+
 function goodsCacheKey(artistName, n) {
   return `${String(artistName || '').trim()}::${n}`;
 }
@@ -1706,12 +1728,15 @@ function renderGoodsCards(grid, items, limit, delayStep) {
   items.slice(0, limit).forEach((item, i) => {
     const productUrl = `https://globalbunjang.com/product/${item.id}?utm_source=kf-calendar&utm_medium=social&utm_campaign=pdp-direct`;
     const imgSrc = item.imageUrl ? `/api/image?url=${encodeURIComponent(item.imageUrl)}` : '';
-    const itemName = item.displayName || item.name;
+    // Apply cached English name; fall back to Korean name from Bunjang API
+    const eng = engNamesCache[String(item.id)];
+    const itemName = eng || item.displayName || item.name;
     const imgHtml = imgSrc
       ? `<img src="${imgSrc}" alt="${escHtml(itemName)}" loading="lazy" onerror="this.closest('.gcard-img').classList.add('img-err')">`
       : '';
     const card = document.createElement('div');
     card.className = 'gcard';
+    card.dataset.pid = item.id;
     card.style.cssText = `animation:fadeUp .22s ease both;animation-delay:${i*delayStep}ms`;
     card.innerHTML = `
       <div class="gcard-img">
@@ -1726,6 +1751,31 @@ function renderGoodsCards(grid, items, limit, delayStep) {
     card.onclick = () => window.open(productUrl, '_blank');
     grid.appendChild(card);
   });
+}
+
+// 백그라운드 영어명 enrichment — 렌더 직후 호출
+function enrichGoodsInBackground(area, items) {
+  const missing = items.filter(item => !engNamesCache[String(item.id)]);
+  if (!missing.length) return;
+  const pids = missing.map(i => i.id).join(',');
+  fetch(`/api/goods-enrich?pids=${pids}`)
+    .then(r => r.ok ? r.json() : {})
+    .then(nameMap => {
+      if (!Object.keys(nameMap).length) return;
+      Object.assign(engNamesCache, nameMap);
+      saveEngNames();
+      // DOM 패치 — 현재 보이는 카드 이름만 교체
+      if (area) {
+        area.querySelectorAll('.gcard[data-pid]').forEach(card => {
+          const eng = nameMap[card.dataset.pid];
+          if (eng) {
+            const el = card.querySelector('.gcard-name');
+            if (el) el.textContent = eng;
+          }
+        });
+      }
+    })
+    .catch(() => {});
 }
 
 function mergeGoodsResults(results) {
@@ -1825,6 +1875,7 @@ function renderAllGoods(area, items, showName) {
   grid.className = 'goods-grid';
   renderGoodsCards(grid, items, 60, 15);
   area.appendChild(grid);
+  enrichGoodsInBackground(area, items.slice(0, 60));
 }
 
 async function fetchAndShowLiveGoods(artistName) {
@@ -1885,6 +1936,7 @@ function renderSingleGoods(area, artistName, items) {
   grid.className = 'goods-grid';
   renderGoodsCards(grid, items, 40, 20);
   area.appendChild(grid);
+  enrichGoodsInBackground(area, items.slice(0, 40));
 }
 
 // ─────────────────────────────────────────
