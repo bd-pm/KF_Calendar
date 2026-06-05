@@ -37,10 +37,7 @@ const GROUP_SLUGS = {
   treasure: 'TREASURE',
 };
 
-const EVENT_TYPES = [
-  { type: 'concert', url: 'https://kpopcalendar.com/?type=concert' },
-  { type: 'fanmeeting', url: 'https://kpopcalendar.com/?type=fanmeeting' },
-];
+const SOURCE_URL = 'https://kpopping.com/calendar';
 
 function dKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -52,8 +49,25 @@ function addDays(d, n) {
   return c;
 }
 
-function escRegExp(s) {
-  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function todayKstDate() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date()).reduce((acc, part) => {
+    acc[part.type] = part.value;
+    return acc;
+  }, {});
+  return new Date(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
+}
+
+function thisWeekRange(base = todayKstDate()) {
+  const from = new Date(base);
+  from.setHours(0, 0, 0, 0);
+  from.setDate(from.getDate() - ((from.getDay() + 6) % 7));
+  const to = addDays(from, 6);
+  return { from: dKey(from), to: dKey(to) };
 }
 
 function stripHtml(html) {
@@ -66,6 +80,15 @@ function stripHtml(html) {
     .replace(/&quot;/g, '"')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function decodeEntities(value) {
+  return String(value || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&#x27;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
 }
 
 function inferType(text, fallback) {
@@ -82,9 +105,19 @@ function normalizeGroupId(name) {
     const variants = [label, label.replace(/\s+/g, ''), id.replace(/_/g, ' '), id.replace(/_/g, '')]
       .filter(Boolean)
       .map(v => String(v).toLowerCase());
-    if (variants.some(v => lower.includes(v))) return id;
+    if (variants.some(v => {
+      const i = lower.indexOf(v);
+      if (i < 0) return false;
+      const before = i === 0 ? '' : lower[i - 1];
+      const after = lower[i + v.length] || '';
+      return !/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after);
+    })) return id;
   }
   return '';
+}
+
+function dateInRange(date, from, to) {
+  return (!from || date >= from) && (!to || date <= to);
 }
 
 function eventShowName(evt) {
@@ -105,38 +138,41 @@ function eventRawTitle(evt) {
   return `event - ${parts.join(' ')}`;
 }
 
-function parseKpopCalendarEvents(html, fallbackType, sourceUrl) {
-  const text = stripHtml(html);
+function parseKpoppingEvents(html, { from, to, sourceUrl }) {
   const events = [];
-  const now = new Date();
-  const maxDate = addDays(now, 120);
-  const dateRe = /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},\s+2026\b|\b2026[-.]\d{1,2}[-.]\d{1,2}\b/gi;
-  let m;
-  while ((m = dateRe.exec(text))) {
-    const rawDate = m[0];
-    const d = new Date(rawDate.replace(/\./g, '-'));
-    if (!Number.isFinite(d.getTime()) || d < addDays(now, -7) || d > maxDate) continue;
-    const start = Math.max(0, m.index - 220);
-    const end = Math.min(text.length, m.index + 260);
-    const windowText = text.slice(start, end);
-    const groupId = normalizeGroupId(windowText);
-    if (!groupId) continue;
-    const groupLabel = GROUP_SLUGS[groupId] || groupId;
-    const type = inferType(windowText, fallbackType);
-    const titleMatch = windowText.match(new RegExp(`${escRegExp(groupLabel)}[^.]{0,120}`, 'i'));
-    const name = (titleMatch ? titleMatch[0] : `${groupLabel} ${type}`)
-      .replace(/\s+/g, ' ')
-      .replace(/\bView details\b.*$/i, '')
-      .trim();
-    events.push({
-      type,
-      group_id: groupId,
-      name,
-      venue: '',
-      date_start: dKey(d),
-      date_end: dKey(d),
-      source_url: sourceUrl,
-    });
+  const dayRe = /<div id="cal-day-(\d{4}-\d{2}-\d{2})">([\s\S]*?)(?=<div id="cal-day-\d{4}-\d{2}-\d{2}">|<\/main>|$)/g;
+  let dayMatch;
+  while ((dayMatch = dayRe.exec(html))) {
+    const date = dayMatch[1];
+    if (!dateInRange(date, from, to)) continue;
+    const dayHtml = dayMatch[2];
+    const anchorRe = /<a\b[^>]*href="(\/events\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+    let anchorMatch;
+    while ((anchorMatch = anchorRe.exec(dayHtml))) {
+      const href = anchorMatch[1];
+      const card = anchorMatch[2];
+      const title = decodeEntities((card.match(/<p[^>]*font-weight:700[^>]*>([\s\S]*?)<\/p>/) || [])[1] || '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!title) continue;
+      const venue = decodeEntities((card.match(/<p class="text-sm text-gray-400 truncate">([\s\S]*?)<\/p>/) || [])[1] || '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const badge = stripHtml((card.match(/<span class="text-xs font-bold">([\s\S]*?)<\/span>/) || [])[1] || '');
+      const type = inferType(`${title} ${badge}`, badge && /fan/i.test(badge) ? 'fanmeeting' : 'concert');
+      const groupId = normalizeGroupId(title) || 'general';
+      events.push({
+        type,
+        group_id: groupId,
+        name: title,
+        venue,
+        date_start: date,
+        date_end: date,
+        source_url: `https://kpopping.com${href}`,
+      });
+    }
   }
   const seen = new Set();
   return events.filter(evt => {
@@ -147,18 +183,16 @@ function parseKpopCalendarEvents(html, fallbackType, sourceUrl) {
   });
 }
 
-async function crawlKpopCalendar() {
-  const all = [];
-  for (const source of EVENT_TYPES) {
-    const res = await fetch(source.url, {
-      headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'text/html' },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) throw new Error(`Kpopcalendar ${source.type} HTTP ${res.status}`);
-    const html = await res.text();
-    all.push(...parseKpopCalendarEvents(html, source.type, source.url));
-  }
-  return all;
+async function crawlKpopping({ from, to }) {
+  const date = from || dKey(new Date());
+  const url = `${SOURCE_URL}?date=${encodeURIComponent(date)}`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'text/html' },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`Kpopping calendar HTTP ${res.status}`);
+  const html = await res.text();
+  return parseKpoppingEvents(html, { from, to, sourceUrl: url });
 }
 
 async function upsertEvents(events) {
@@ -204,6 +238,20 @@ async function upsertEvents(events) {
   return ok;
 }
 
+async function deleteAutoEvents(from, to) {
+  const url = `${SUPA_URL}/rest/v1/music_show_lineups?source=eq.auto_event&broad_date=gte.${from}&broad_date=lte.${to}`;
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      apikey: SUPA_SERVICE_KEY,
+      Authorization: `Bearer ${SUPA_SERVICE_KEY}`,
+      Prefer: 'return=minimal',
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`auto_event cleanup HTTP ${res.status}`);
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   const auth = (req.headers.authorization || '').replace('Bearer ', '');
@@ -213,9 +261,13 @@ module.exports = async function handler(req, res) {
   }
   if (!SUPA_SERVICE_KEY) return res.status(500).json({ error: 'SUPA_SERVICE_KEY 없음' });
   try {
-    const events = await crawlKpopCalendar();
+    const range = req.query.from && req.query.to
+      ? { from: String(req.query.from), to: String(req.query.to) }
+      : thisWeekRange();
+    const events = await crawlKpopping(range);
+    await deleteAutoEvents(range.from, range.to);
     const upserted = await upsertEvents(events);
-    return res.status(200).json({ ok: true, source: 'kpopcalendar', found: events.length, upserted, events });
+    return res.status(200).json({ ok: true, source: 'kpopping', ...range, found: events.length, upserted, events });
   } catch (err) {
     return res.status(500).json({ ok: false, error: err.message });
   }
