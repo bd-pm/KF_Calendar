@@ -2572,12 +2572,22 @@ function openGroupModal(artistName) {
   };
   const alias = artistName.toLowerCase();
 
+  // 아티스트 매칭: 정확한 단어 경계 매칭 (짧은 alias가 다른 이름 안에 포함되는 오매칭 방지)
+  function artistMatches(candidate) {
+    const c = candidate.toLowerCase().trim();
+    const a = alias.trim();
+    if (c === a) return true;
+    // alias가 candidate의 완전한 단어로 존재하는지 (예: "bts" in "방탄소년단 bts 슈가")
+    const wordRe = new RegExp('(?<![a-z0-9])' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![a-z0-9])', 'i');
+    return wordRe.test(c);
+  }
+
   // gonbang 날짜 중 이 아티스트 포함된 것
   const gonbangItems = [];
   for (const [date, lineup] of Object.entries(LINEUP_BY_DATE)) {
     const artists = parseRawTitleStatic(lineup.rawTitle);
-    const list = (artists.length > 0 ? artists : lineup.groups).map(a => a.toLowerCase());
-    if (list.some(l => l.includes(alias) || alias.includes(l))) {
+    const list = artists.length > 0 ? artists : lineup.groups;
+    if (list.some(a => artistMatches(a))) {
       const show = SHOW_LABELS[lineup.showName] || { name: lineup.showName, color: '#9B6FD8' };
       gonbangItems.push({ date, name: show.name, type: 'gonbang', color: '#8FB8E0', venue: lineup.episode ? `EP ${lineup.episode}` : '', artistName });
     }
@@ -2586,9 +2596,9 @@ function openGroupModal(artistName) {
   const otherItems = [];
   for (const evt of EVENTS) {
     if (evt.type === 'gonbang') continue;
-    const mapped = (GROUP_SLUGS_MAP_G[evt.group] || evt.group || '').toLowerCase();
-    const evtArtist = (artistFromEventName(evt.name) || mapped).toLowerCase();
-    if (evtArtist.includes(alias) || alias.includes(evtArtist)) {
+    const mapped = GROUP_SLUGS_MAP_G[evt.group] || evt.group || '';
+    const evtArtist = artistFromEventName(evt.name) || mapped;
+    if (artistMatches(evtArtist)) {
       otherItems.push({ date: evt.date, name: evt.name, type: evt.type, color: eventColor(evt.type), venue: evt.venue || '', artistName: artistFromEventName(evt.name) || artistName });
     }
   }
@@ -2692,7 +2702,10 @@ function openGroupModal(artistName) {
           <path d="M19 12H5M12 5l-7 7 7 7"/>
         </svg>
       </button>
-      <span style="font-size:17px;font-weight:700;color:var(--txt1);">${escHtml(displayName)}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:17px;font-weight:700;color:var(--txt1);line-height:1.2;">${escHtml(displayName)}</div>
+        <div style="font-size:11px;color:var(--txt2);margin-top:1px;">${allItems.length ? allItems.length + ' schedule' + (allItems.length > 1 ? 's' : '') : 'No schedules found'}</div>
+      </div>
     </div>
     <div class="gmodal-body"></div>
   `;
