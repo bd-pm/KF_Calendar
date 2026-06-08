@@ -986,6 +986,22 @@ function isManualCalendarEvent(row) {
   return row?.source === 'manual_event' || row?.source === 'auto_event' || String(row?.showName || row?.show_name || '').startsWith('event_');
 }
 
+// 이벤트 이름에 명시된 유닛/아티스트 우선 추출 (그룹 슬러그 매핑보다 정확)
+const UNIT_NAME_MAP = [
+  { re: /\bDxS\b/i, name: 'DxS' },
+  { re: /도겸[x×X]\s*승관/i, name: 'DxS' },
+  { re: /\bBSS\b/, name: 'BSS' },
+  { re: /부석순/, name: 'BSS' },
+  { re: /Jeonghan\s*[&＆]\s*Joshua/i, name: 'Jeonghan & Joshua' },
+  { re: /정한\s*[&＆]\s*조슈아/i, name: 'Jeonghan & Joshua' },
+];
+function artistFromEventName(name) {
+  for (const { re, name: n } of UNIT_NAME_MAP) {
+    if (re.test(name)) return n;
+  }
+  return null;
+}
+
 function eventTypeFromRow(row) {
   const showName = String(row?.showName || row?.show_name || '');
   const m = showName.match(/^event_([^_]+)/);
@@ -1349,9 +1365,9 @@ function selectDate(ds, opts = {}){
       tws:'TWS',day6:'DAY6',zerobaseone:'ZEROBASEONE',boynextdoor:'BOYNEXTDOOR',
       babymonster:'BABYMONSTER',txt:'TOMORROW X TOGETHER',straykids:'Stray Kids',
       ateez:'ATEEZ',itzy:'ITZY',nmixx:'NMIXX',plave:'PLAVE',kiss_of_life:'KISS OF LIFE',
-      kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',
+      kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',dxs:'DxS',bss:'BSS',
     };
-    selectedArtistName = first.group_id ? (GROUP_SLUGS_MAP[first.group_id] || first.group_id) : first.name;
+    const _fg = first.group_id || first.group; selectedArtistName = artistFromEventName(first.name) || (_fg ? (GROUP_SLUGS_MAP[_fg] || _fg) : first.name);
     allGroupsSelected = false;
   }
   buildCal();
@@ -1567,7 +1583,7 @@ function renderBottom(){
     tws:'TWS',day6:'DAY6',zerobaseone:'ZEROBASEONE',boynextdoor:'BOYNEXTDOOR',
     babymonster:'BABYMONSTER',txt:'TOMORROW X TOGETHER',straykids:'Stray Kids',
     ateez:'ATEEZ',itzy:'ITZY',nmixx:'NMIXX',plave:'PLAVE',kiss_of_life:'KISS OF LIFE',
-    kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',
+    kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',dxs:'DxS',bss:'BSS',
   };
 
   function eventTypeLabel(type) {
@@ -1686,7 +1702,7 @@ function renderBottom(){
     row.onclick = () => {
       const toggling = selectedEventId === eid;
       selectedEventId = toggling ? null : eid;
-      const artistQuery = event.group_id ? (GROUP_SLUGS_MAP[event.group_id] || event.group_id) : event.name;
+      const _gid = event.group_id || event.group; const artistQuery = artistFromEventName(event.name) || (_gid ? (GROUP_SLUGS_MAP[_gid] || _gid) : event.name);
       selectedArtistName = toggling ? null : artistQuery;
       selectedEventType = toggling ? 'gonbang' : (event.type || 'gonbang');
       allGroupsSelected = false;

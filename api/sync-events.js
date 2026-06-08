@@ -8,6 +8,8 @@ const SYNC_SECRET = process.env.SYNC_SECRET || '';
 const GROUP_SLUGS = {
   bts: 'BTS',
   seventeen: 'SEVENTEEN',
+  dxs: 'DxS',
+  bss: 'BSS',
   enhypen: 'ENHYPEN',
   aespa: 'aespa',
   ive: 'IVE',
