@@ -1845,7 +1845,7 @@ function goodsApiUrl(artistName, n, eventType) {
 }
 
 const GOODS_CACHE_TTL_MS = 1000 * 60 * 120; // 2시간
-const GOODS_CACHE_PREFIX = 'kf_goods_cache_v3:';
+const GOODS_CACHE_PREFIX = 'kf_goods_cache_v4:';
 const goodsMemoryCache = new Map();
 const goodsInflight = new Map();
 let goodsRequestSeq = 0;
