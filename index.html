@@ -2344,13 +2344,65 @@ function getAllArtistsFromLineups() {
     const list = artists.length > 0 ? artists : lineup.groups;
     list.forEach(a => set.add(a));
   }
+  // 공방 외 이벤트(콘서트/팬미팅/MD 등)의 그룹도 포함
+  for (const evt of EVENTS) {
+    if (evt.type !== 'gonbang' && evt.group && evt.group !== 'manual') {
+      const mapped = {
+        bts:'BTS',seventeen:'SEVENTEEN',enhypen:'ENHYPEN',aespa:'aespa',ive:'IVE',
+        lesserafim:'LE SSERAFIM',newjeans:'NewJeans',twice:'TWICE',blackpink:'BLACKPINK',
+        nct:'NCT',nctwish:'NCT WISH',nctdream:'NCT DREAM',nct127:'NCT 127',riize:'RIIZE',
+        tws:'TWS',day6:'DAY6',zerobaseone:'ZEROBASEONE',boynextdoor:'BOYNEXTDOOR',
+        babymonster:'BABYMONSTER',txt:'TOMORROW X TOGETHER',straykids:'Stray Kids',
+        ateez:'ATEEZ',itzy:'ITZY',nmixx:'NMIXX',plave:'PLAVE',kiss_of_life:'KISS OF LIFE',
+        kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',dxs:'DxS',bss:'BSS',
+      }[evt.group] || evt.group;
+      set.add(mapped);
+    }
+  }
   return [...set].sort((a, b) => {
-    // GROUP_RANK 기준 정렬, 없으면 뒤
     const ga = ARTIST_TO_GROUP_FRONT[a], gb = ARTIST_TO_GROUP_FRONT[b];
     const ra = ga ? (GROUP_RANK[ga] ?? 999) : 999;
     const rb = gb ? (GROUP_RANK[gb] ?? 999) : 999;
     return ra - rb;
   });
+}
+
+// 아티스트명 → 가장 최근(오늘 이후 우선, 없으면 과거 최신) 일정 날짜
+function findLatestDateForArtist(artistName) {
+  const today = dKey(new Date());
+  const aliases = [artistName.toLowerCase()];
+
+  // LINEUP_BY_DATE에서 해당 아티스트 포함 날짜 수집
+  const dates = [];
+  for (const [date, lineup] of Object.entries(LINEUP_BY_DATE)) {
+    const artists = parseRawTitleStatic(lineup.rawTitle);
+    const list = (artists.length > 0 ? artists : lineup.groups).map(a => a.toLowerCase());
+    if (aliases.some(a => list.some(l => l.includes(a) || a.includes(l)))) {
+      dates.push(date);
+    }
+  }
+  // EVENTS(콘서트 등)에서도 수집
+  const GROUP_SLUGS_MAP_LOCAL = {
+    bts:'BTS',seventeen:'SEVENTEEN',enhypen:'ENHYPEN',aespa:'aespa',ive:'IVE',
+    lesserafim:'LE SSERAFIM',newjeans:'NewJeans',twice:'TWICE',blackpink:'BLACKPINK',
+    nct:'NCT',nctwish:'NCT WISH',nctdream:'NCT DREAM',nct127:'NCT 127',riize:'RIIZE',
+    tws:'TWS',day6:'DAY6',zerobaseone:'ZEROBASEONE',boynextdoor:'BOYNEXTDOOR',
+    babymonster:'BABYMONSTER',txt:'TOMORROW X TOGETHER',straykids:'Stray Kids',
+    ateez:'ATEEZ',itzy:'ITZY',nmixx:'NMIXX',plave:'PLAVE',kiss_of_life:'KISS OF LIFE',
+    kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',dxs:'DxS',bss:'BSS',
+  };
+  for (const evt of EVENTS) {
+    if (evt.type === 'gonbang') continue;
+    const mapped = (GROUP_SLUGS_MAP_LOCAL[evt.group] || evt.group || '').toLowerCase();
+    const evtArtist = (artistFromEventName(evt.name) || mapped).toLowerCase();
+    if (aliases.some(a => evtArtist.includes(a) || a.includes(evtArtist))) {
+      dates.push(evt.date);
+    }
+  }
+  if (!dates.length) return today;
+  const future = dates.filter(d => d >= today).sort();
+  if (future.length) return future[0];
+  return dates.sort().reverse()[0];
 }
 
 // ─── Group search URL (Global Bunjang search results) ───
@@ -2383,12 +2435,10 @@ function openSearchModal() {
       return;
     }
     filtered.forEach(artistName => {
-      const a = document.createElement('a');
-      a.className = 'smodal-row';
-      a.href = groupBrandUrl(artistName);
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.innerHTML = `
+      const row = document.createElement('div');
+      row.className = 'smodal-row';
+      row.style.cursor = 'pointer';
+      row.innerHTML = `
         <span class="smodal-row-name">${escHtml(artistDisplayName(artistName))}</span>
         <span class="smodal-row-chev">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -2396,7 +2446,12 @@ function openSearchModal() {
           </svg>
         </span>
       `;
-      list.appendChild(a);
+      row.onclick = () => {
+        const targetDate = findLatestDateForArtist(artistName);
+        closeSearchModal();
+        selectDate(targetDate, { syncCalendar: true, scrollToDetails: true });
+      };
+      list.appendChild(row);
     });
   }
 
@@ -2416,7 +2471,7 @@ function openSearchModal() {
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8C8C8C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
         </svg>
-        <input id="smodal-input" type="text" placeholder="Search groups…"
+        <input id="smodal-input" type="text" placeholder="그룹명으로 일정 검색…"
           autocomplete="off" autocorrect="off" spellcheck="false"/>
         <button id="smodal-clear" style="display:none;border:none;background:none;padding:0;cursor:pointer;color:var(--txt2);font-size:16px;line-height:1;flex-shrink:0;">✕</button>
       </div>
