@@ -267,8 +267,9 @@ module.exports = async function handler(req, res) {
       const n = item.name || '';
       return /티켓/.test(n) || /\d+열/.test(n) || /구역/.test(n);
     };
+    const isWanted = item => /구함|구해요|구합니다/.test(item.name || '');
     const live = items
-      .filter(i => i.status === '0' && matchesArtist(i, aliases) && !isExcludedResult(i, artist) && !(eventType === 'concert' && isConcertNoise(i)))
+      .filter(i => i.status === '0' && matchesArtist(i, aliases) && !isExcludedResult(i, artist) && !isWanted(i) && !(eventType === 'concert' && isConcertNoise(i)))
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
     const itemsOut = live.slice(0, n).map(item => ({
