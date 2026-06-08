@@ -2449,7 +2449,10 @@ function openSearchModal() {
       row.onclick = () => {
         const targetDate = findLatestDateForArtist(artistName);
         closeSearchModal();
-        selectDate(targetDate, { syncCalendar: true, scrollToDetails: true });
+        // 모달 슬라이드아웃(340ms) 완료 후 캘린더 이동
+        setTimeout(() => {
+          selectDate(targetDate, { syncCalendar: true, scrollToDetails: true });
+        }, 360);
       };
       list.appendChild(row);
     });
