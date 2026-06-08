@@ -17,7 +17,7 @@ const KEYWORDS_BY_TYPE = {
     '콘서트', '콘포카', '콘굿', '콘입굿', '콘한정',
     '콘서트포카', '콘서트굿즈', '투어', '투어포카', '투어굿즈', '투어MD',
     '콘서트한정', '공연포카', '공연굿즈',
-    'Lucky Draw', 'LD', '럭키드로우', 'POB', 'Zone',
+    'Lucky Draw', '럭키드로우',
   ],
   // 팬미팅
   fanmeeting: [
@@ -46,7 +46,7 @@ const EN_TO_KR = {
   'NOWZ': '나우즈',
   'NAZE': '네이즈',
   // 세븐틴 유닛
-  'DxS': ['도겸승관', '도겸 승관', 'DXS'],
+  'DxS': ['도겸승관', '도겸 승관', 'DXS', '도겸x승관', '도겸X승관', '도겸x승간', '도겸X승간'],
   'BSS': ['부석순', '부석순'],
   'Jeonghan & Joshua': ['정한조슈아', '정한 조슈아'],
   'aespa': '에스파',
@@ -201,6 +201,11 @@ function isExcludedResult(item, artist) {
   return rules.some(rule => rule.test(text));
 }
 
+function matchesArtist(item, aliases) {
+  const text = `${item.name || ''} ${item.displayName || ''}`.toLowerCase();
+  return aliases.some(a => text.includes(a.toLowerCase()));
+}
+
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -257,10 +262,9 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 판매중인 것만 최신순. 번장 검색 결과에는 태그 매칭 상품도 포함되므로
-    // 상품명에 아티스트명이 없다는 이유로 다시 제거하지 않는다.
+    // 판매중 + 아티스트명 포함 + 제외 규칙 통과
     const live = items
-      .filter(i => i.status === '0' && !isExcludedResult(i, artist))
+      .filter(i => i.status === '0' && matchesArtist(i, aliases) && !isExcludedResult(i, artist))
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
     const itemsOut = live.slice(0, n).map(item => ({
