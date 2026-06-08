@@ -263,8 +263,9 @@ module.exports = async function handler(req, res) {
     }
 
     // 판매중 + 아티스트명 포함 + 제외 규칙 통과
+    const isTicket = item => /티켓/.test(item.name || '');
     const live = items
-      .filter(i => i.status === '0' && matchesArtist(i, aliases) && !isExcludedResult(i, artist))
+      .filter(i => i.status === '0' && matchesArtist(i, aliases) && !isExcludedResult(i, artist) && !(eventType === 'concert' && isTicket(i)))
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
     const itemsOut = live.slice(0, n).map(item => ({

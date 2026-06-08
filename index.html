@@ -1368,6 +1368,7 @@ function selectDate(ds, opts = {}){
       kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',dxs:'DxS',bss:'BSS',
     };
     const _fg = first.group_id || first.group; selectedArtistName = artistFromEventName(first.name) || (_fg ? (GROUP_SLUGS_MAP[_fg] || _fg) : first.name);
+    selectedEventType = first.type || 'other';
     allGroupsSelected = false;
   }
   buildCal();
