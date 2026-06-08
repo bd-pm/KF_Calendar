@@ -45,6 +45,10 @@ const STATIC_GOODS = {
 const EN_TO_KR = {
   'NOWZ': '나우즈',
   'NAZE': '네이즈',
+  // 세븐틴 유닛
+  'DxS': ['도겸승관', '도겸 승관', 'DXS'],
+  'BSS': ['부석순', '부석순'],
+  'Jeonghan & Joshua': ['정한조슈아', '정한 조슈아'],
   'aespa': '에스파',
   'IVE': '아이브',
   'LE SSERAFIM': '르세라핌',
