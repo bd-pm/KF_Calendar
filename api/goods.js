@@ -6,8 +6,35 @@ const fs = require('fs');
 const path = require('path');
 
 const BUNJANG_API = 'https://api.bunjang.co.kr/api/1/find_v2.json';
-const KEYWORDS = ['공방포', '역조공', '공방', '사녹'];
 const KRW_PER_USD = 1300;
+
+// 이벤트 타입별 검색 키워드 (아티스트명과 조합해서 OR 검색)
+const KEYWORDS_BY_TYPE = {
+  // 공방 (기존)
+  gonbang: ['공방포', '역조공', '공방', '사녹'],
+  // 콘서트
+  concert: [
+    '콘서트', '콘포카', '콘굿', '콘입굿', '콘한정',
+    '콘서트포카', '콘서트굿즈', '투어', '투어포카', '투어굿즈', '투어MD',
+    '콘서트한정', '공연포카', '공연굿즈',
+    'Lucky Draw', 'LD', '럭키드로우', 'POB', 'Zone',
+  ],
+  // 팬미팅
+  fanmeeting: [
+    '팬미팅', '팬콘', '팬사', '팬싸', '팬이벤트',
+    '팬미팅포카', '팬미팅굿즈', '팬콘포카', '팬콘굿즈',
+    '쇼케이스포카', '쇼케이스굿즈', '기념포카',
+  ],
+  // MD
+  md: [
+    'MD', '굿즈', '시그', '시그리', '시그니처',
+    '공홈MD', '공식MD', '공식굿즈', '위버스MD', '위버스굿즈',
+    '멤버십굿즈', '팬클럽굿즈', '팬클럽MD',
+    '포토북', '키링', '아크릴', '스탠디',
+  ],
+};
+// 타입 미지정 시 기본 (공방)
+const KEYWORDS = KEYWORDS_BY_TYPE.gonbang;
 const STATIC_GOODS = {
   bts: 'goods-bts.json',
   seventeen: 'goods-seventeen.json',
@@ -183,13 +210,13 @@ module.exports = async function handler(req, res) {
   }
 
   const n = Math.min(parseInt(req.query.n || '50', 10), 100);
+  const eventType = (req.query.type || 'gonbang').trim();
+  const keywords = KEYWORDS_BY_TYPE[eventType] || KEYWORDS_BY_TYPE.gonbang;
 
   try {
-    // 검색 쿼리 자체를 신뢰한다. 상품명/태그 번역과 띄어쓰기 차이 때문에
-    // 결과 후처리에서 아티스트명을 재검사하면 정상 상품이 누락될 수 있다.
     const aliases = getSearchAliases(artist);
     const queries = [];
-    for (const kw of KEYWORDS) {
+    for (const kw of keywords) {
       for (const alias of aliases) queries.push(`${alias} ${kw}`);
     }
     // 중복 쿼리 제거

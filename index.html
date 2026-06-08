@@ -102,13 +102,16 @@ body{
 }
 .type-filter::-webkit-scrollbar{display:none}
 .type-chip{
-  flex-shrink:0;height:30px;padding:0 13px;border-radius:9999px;
+  flex-shrink:0;height:30px;padding:0 11px 0 8px;border-radius:9999px;
   border:1px solid var(--border);
   background:#FFFFFF;color:var(--txt2);
   font-size:12px;font-weight:700;letter-spacing:0;
   cursor:pointer;transition:all .16s;
+  display:inline-flex;align-items:center;gap:6px;
 }
-.type-chip.on{background:#191919;color:#FFFFFF;border-color:#191919}
+.type-chip.on{background:#F6F6F6;color:var(--txt1);border-color:rgba(25,25,25,0.18)}
+.type-chip:not(.on){opacity:0.55}
+.chip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .nav-btn{
   width:30px;height:30px;border-radius:50%;
   border:none;
@@ -251,11 +254,8 @@ body{
   background:#FFFFFF;
 }
 
-/* chip bar — .app 직속 자식이므로 sticky 안정 동작 */
+/* chip bar — bottom 안에서 일정 리스트 아래 위치 */
 #chipBar{
-  position:sticky;
-  top:100px;
-  z-index:20;
   background:#FFFFFF;
 }
 #chipBar:not(:empty){
@@ -678,10 +678,11 @@ body{
   </div>
 </div>
 <div class="type-filter" id="typeFilter">
-  <button class="type-chip on" data-type="gonbang" onclick="toggleEventType('gonbang')">Music Shows</button>
-  <button class="type-chip on" data-type="concert" onclick="toggleEventType('concert')">Concerts</button>
-  <button class="type-chip on" data-type="fanmeeting" onclick="toggleEventType('fanmeeting')">Fan Meetings</button>
-  <button class="type-chip on" data-type="md" onclick="toggleEventType('md')">MD</button>
+  <button class="type-chip on" data-type="gonbang" onclick="toggleEventType('gonbang')"><span class="chip-dot" style="background:#8FB8E0"></span>Music Shows</button>
+  <button class="type-chip on" data-type="concert" onclick="toggleEventType('concert')"><span class="chip-dot" style="background:#E07A7A"></span>Concerts</button>
+  <button class="type-chip on" data-type="fanmeeting" onclick="toggleEventType('fanmeeting')"><span class="chip-dot" style="background:#9B7EC8"></span>Fan Meetings</button>
+  <button class="type-chip on" data-type="md" onclick="toggleEventType('md')"><span class="chip-dot" style="background:#C49A6C"></span>MD</button>
+  <button class="type-chip on" data-type="other" onclick="toggleEventType('other')"><span class="chip-dot" style="background:#7EB89A"></span>Other</button>
 </div>
 </div><!-- /hdr-wrap -->
 
@@ -691,10 +692,7 @@ body{
 <!-- DATE HEADER: .app 직속 (스크롤과 함께 올라감) -->
 <div id="dateHeader"></div>
 
-<!-- CHIP BAR: .app 직속 → sticky top:108px 안정 동작 -->
-<div id="chipBar"></div>
-
-<!-- BOTTOM: goods content only -->
+<!-- BOTTOM: schedule list + chip bar + goods -->
 <div class="bottom" id="bottom">
   <!-- rendered by JS -->
 </div>
@@ -823,17 +821,20 @@ let allGroupsSelected = false;
 
 // 공방 EVENTS 목록 (calendar dot 렌더용)
 let EVENTS = [];
-let activeEventTypes = new Set(['gonbang', 'concert', 'fanmeeting', 'md']);
+let activeEventTypes = new Set(['gonbang', 'concert', 'fanmeeting', 'md', 'other']);
+// 선택된 이벤트 (콘서트/팬미팅/MD 클릭 후 매물 연동용)
+let selectedEventId = null;
+let selectedEventType = 'gonbang'; // 현재 선택된 이벤트 타입 → goods API type 파라미터로 전달
 
 // ─────────────────────────────────────────
 //  SHOW LABELS
 // ─────────────────────────────────────────
 const SHOW_LABELS = {
-  music_core:    { name:'Show! Music Core', short:'Music Core',    day:'SAT', color:'#E8823A' },
-  inkigayo:      { name:'SBS Inkigayo',     short:'Inkigayo',      day:'SUN', color:'#A855C8' },
-  music_bank:    { name:'Music Bank',       short:'Music Bank',    day:'FRI', color:'#4CAF50' },
-  mcountdown:    { name:'M Countdown',      short:'M Countdown',   day:'THU', color:'#FF4757' },
-  show_champion: { name:'Show Champion',    short:'Show Champion', day:'WED', color:'#00C4B4' },
+  music_core:    { name:'Show! Music Core', short:'Music Core',    day:'SAT', color:'#C49A6C' },
+  inkigayo:      { name:'SBS Inkigayo',     short:'Inkigayo',      day:'SUN', color:'#9B7EC8' },
+  music_bank:    { name:'Music Bank',       short:'Music Bank',    day:'FRI', color:'#6EAF7A' },
+  mcountdown:    { name:'M Countdown',      short:'M Countdown',   day:'THU', color:'#E07A7A' },
+  show_champion: { name:'Show Champion',    short:'Show Champion', day:'WED', color:'#5BB8B0' },
 };
 const SHOW_DAY_INDEX = { SUN:0, MON:1, TUE:2, WED:3, THU:4, FRI:5, SAT:6 };
 
@@ -991,14 +992,19 @@ function eventTypeFromRow(row) {
   const type = m ? m[1] : 'event';
   if (type === 'goods' || type === 'merch' || type === 'popup') return 'md';
   if (type === 'fanmeet') return 'fanmeeting';
-  return ['concert', 'fanmeeting', 'md'].includes(type) ? type : 'fanmeeting';
+  return ['concert', 'fanmeeting', 'md', 'other'].includes(type) ? type : 'other';
 }
 
-function eventColor(type, source) {
-  if (type === 'concert') return '#D80C18';
-  if (type === 'fanmeeting') return '#4F7FC8';
-  if (type === 'md') return '#8C6A22';
-  return source === 'auto_event' ? '#7E8A98' : '#80B0F0';
+// 이벤트 타입별 파스텔 컬러
+const EVENT_COLORS = {
+  gonbang:    '#8FB8E0', // Music Show — 파스텔 블루
+  concert:    '#E07A7A', // Concert — 파스텔 레드
+  fanmeeting: '#9B7EC8', // Fan Meeting — 파스텔 퍼플
+  md:         '#C49A6C', // MD — 파스텔 브라운
+  other:      '#7EB89A', // Other — 파스텔 그린
+};
+function eventColor(type) {
+  return EVENT_COLORS[type] || EVENT_COLORS.other;
 }
 
 function toggleEventType(type) {
@@ -1135,7 +1141,7 @@ function buildWeek(area){
       const show = SHOW_LABELS[lineup.showName];
       scheduleColors.push(isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8'));
     }
-    manualEvents.forEach(event => scheduleColors.push(event.color || eventColor(event.type, event.source)));
+    manualEvents.forEach(event => scheduleColors.push(event.color || eventColor(event.type)));
 
     if(scheduleColors.length > 1){
       const dc=document.createElement('div');
@@ -1171,7 +1177,7 @@ function buildWeek(area){
       manualEvents.forEach(event => {
         const dot = document.createElement('div');
         dot.className = 'evt-dot';
-        dot.style.background = event.color || eventColor(event.type, event.source);
+        dot.style.background = event.color || eventColor(event.type);
         dot.title = event.name;
         dc.appendChild(dot);
       });
@@ -1236,7 +1242,7 @@ function buildMonth(area){
       const show = SHOW_LABELS[mLineup.showName];
       scheduleColors.push(isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8'));
     }
-    manualEvents.forEach(event => scheduleColors.push(event.color || eventColor(event.type, event.source)));
+    manualEvents.forEach(event => scheduleColors.push(event.color || eventColor(event.type)));
 
     if(scheduleColors.length > 1){
       const dotsEl=document.createElement('div');
@@ -1276,7 +1282,7 @@ function buildMonth(area){
       const event = manualEvents[0];
       const dot=document.createElement('div');
       dot.className='mdot';
-      dot.style.background=event.color || eventColor(event.type, event.source);
+      dot.style.background=event.color || eventColor(event.type);
       dotsEl.appendChild(dot);
       cell.appendChild(dotsEl);
 
@@ -1285,7 +1291,7 @@ function buildMonth(area){
       manualEvents.forEach(event => {
         const pill=document.createElement('div');
         pill.className='mevt-pill';
-        const color = event.color || eventColor(event.type, event.source);
+        const color = event.color || eventColor(event.type);
         pill.style.background=color+'33';
         pill.style.color=color;
         pill.textContent=event.name;
@@ -1306,6 +1312,9 @@ function buildMonth(area){
 function selectDate(ds, opts = {}){
   selectedDate = ds;
   selectedArtistName = null;
+  selectedEventId = null;
+  selectedEventType = 'gonbang';
+  allGroupsSelected = false;
   if (opts.syncCalendar) {
     const [y, mo, d] = ds.split('-').map(Number);
     const selected = new Date(y, mo - 1, d);
@@ -1313,7 +1322,38 @@ function selectDate(ds, opts = {}){
     monthPivot = new Date(y, mo - 1, 1);
   }
   const lineup = LINEUP_BY_DATE[ds];
-  allGroupsSelected = !!(lineup && (lineup.rawTitle || lineup.groups.length > 0));
+  const _hasLineup = !!(lineup && (lineup.rawTitle || lineup.groups.length > 0));
+  const _expectedShow = scheduledShowForDate(ds);
+  const _isCancelled = lineup?.source === 'cancelled';
+  const _rawArtists = lineup ? parseRawTitleStatic(lineup.rawTitle) : [];
+  const _chipCount = _rawArtists.length > 0 ? _rawArtists.length : (lineup ? lineup.groups.length : 0);
+  const _lineupUnavailable = !_isCancelled && _expectedShow && (!lineup || lineup.source === 'date_rule' || _chipCount === 0);
+  const _typeOrder = { concert: 0, fanmeeting: 1, md: 2, other: 3 };
+  const _otherEvents = EVENTS
+    .filter(e => e.date === ds && e.type !== 'gonbang' && activeEventTypes.has(e.type))
+    .sort((a, b) => (_typeOrder[a.type] ?? 9) - (_typeOrder[b.type] ?? 9));
+
+  // 카테고리 순 우선 첫 번째 일정 자동 선택
+  if (_expectedShow && !_isCancelled && !_lineupUnavailable) {
+    // 공방이 첫 번째이고 lineup 있으면 선택
+    selectedEventId = `gonbang-${_expectedShow.showName}`;
+    allGroupsSelected = _hasLineup;
+  } else if (_otherEvents.length > 0) {
+    // 공방 없거나 TBA면 첫 이벤트 선택
+    const first = _otherEvents[0];
+    selectedEventId = first.id || 'evt-0';
+    const GROUP_SLUGS_MAP = {
+      bts:'BTS',seventeen:'SEVENTEEN',enhypen:'ENHYPEN',aespa:'aespa',ive:'IVE',
+      lesserafim:'LE SSERAFIM',newjeans:'NewJeans',twice:'TWICE',blackpink:'BLACKPINK',
+      nct:'NCT',nctwish:'NCT WISH',nctdream:'NCT DREAM',nct127:'NCT 127',riize:'RIIZE',
+      tws:'TWS',day6:'DAY6',zerobaseone:'ZEROBASEONE',boynextdoor:'BOYNEXTDOOR',
+      babymonster:'BABYMONSTER',txt:'TOMORROW X TOGETHER',straykids:'Stray Kids',
+      ateez:'ATEEZ',itzy:'ITZY',nmixx:'NMIXX',plave:'PLAVE',kiss_of_life:'KISS OF LIFE',
+      kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',
+    };
+    selectedArtistName = first.group_id ? (GROUP_SLUGS_MAP[first.group_id] || first.group_id) : first.name;
+    allGroupsSelected = false;
+  }
   buildCal();
   renderBottom();
   if (opts.scrollToDetails) {
@@ -1489,118 +1529,83 @@ function scrollToBottom(){
 }
 
 // ─────────────────────────────────────────
-//  BOTTOM: date header + group chips + goods
+//  BOTTOM: date header + unified schedule list + goods
 // ─────────────────────────────────────────
 function renderBottom(){
   const bot=document.getElementById('bottom');
   bot.innerHTML='';
-
-  // dateHeader, chipBar도 초기화
   const dateHeader = document.getElementById('dateHeader');
   dateHeader.innerHTML='';
-  const chipBar = document.getElementById('chipBar');
-  chipBar.innerHTML='';
+  // chipBar는 bot 안에 동적으로 생성 (일정 리스트 아래, 매물 위)
+  const chipBar = document.createElement('div');
+  chipBar.id = 'chipBar';
 
   const [y,mo,d]=selectedDate.split('-').map(Number);
   const dateObj=new Date(y,mo-1,d);
   const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
   const lineup = LINEUP_BY_DATE[selectedDate];
-  const selectedEvents = eventsOnDate(selectedDate).filter(e => e.type !== 'gonbang');
   const show   = lineup ? (SHOW_LABELS[lineup.showName] || { name: lineup.showName, color:'#9B6FD8', short: lineup.showName }) : null;
   const expectedShow = show ? { showName: lineup.showName, ...show } : scheduledShowForDate(selectedDate);
   const isCancelled = lineup?.source === 'cancelled';
-
   const rawArtists = lineup ? parseRawTitleStatic(lineup.rawTitle) : [];
   const chipCount = rawArtists.length > 0 ? rawArtists.length : (lineup ? lineup.groups.length : 0);
   const lineupUnavailable = !isCancelled && expectedShow && (!lineup || lineup.source === 'date_rule' || chipCount === 0);
 
-  // ── Date header → #dateHeader (.app 직속, 스크롤과 함께 올라감) ──
+  // 콘서트/팬미팅/MD/Other 이벤트 — 카테고리 순 정렬
+  const EVENT_TYPE_ORDER = { concert: 0, fanmeeting: 1, md: 2, other: 3 };
+  const otherEvents = eventsOnDate(selectedDate)
+    .filter(e => e.type !== 'gonbang')
+    .sort((a, b) => (EVENT_TYPE_ORDER[a.type] ?? 9) - (EVENT_TYPE_ORDER[b.type] ?? 9));
+  const totalCount = (expectedShow ? 1 : 0) + otherEvents.length;
+
+  // group_id → 아티스트명
+  const GROUP_SLUGS_MAP = {
+    bts:'BTS',seventeen:'SEVENTEEN',enhypen:'ENHYPEN',aespa:'aespa',ive:'IVE',
+    lesserafim:'LE SSERAFIM',newjeans:'NewJeans',twice:'TWICE',blackpink:'BLACKPINK',
+    nct:'NCT',nctwish:'NCT WISH',nctdream:'NCT DREAM',nct127:'NCT 127',riize:'RIIZE',
+    tws:'TWS',day6:'DAY6',zerobaseone:'ZEROBASEONE',boynextdoor:'BOYNEXTDOOR',
+    babymonster:'BABYMONSTER',txt:'TOMORROW X TOGETHER',straykids:'Stray Kids',
+    ateez:'ATEEZ',itzy:'ITZY',nmixx:'NMIXX',plave:'PLAVE',kiss_of_life:'KISS OF LIFE',
+    kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',
+  };
+
+  function eventTypeLabel(type) {
+    if (type === 'concert')    return 'Concert';
+    if (type === 'fanmeeting') return 'Fan Meeting';
+    if (type === 'md')         return 'MD';
+    if (type === 'gonbang')    return 'Music Show';
+    return 'Event';
+  }
+
+  // ── 날짜 헤더 ──
   const hdr = document.createElement('div');
   hdr.className = 'sel-hdr';
-  if((lineup && show) || expectedShow){
-    hdr.innerHTML=`
-      <div>
-        <div class="sel-date">${dayNames[dateObj.getDay()]}, ${MONTH_NAMES[mo-1]} ${d}</div>
-        <div class="sel-sub" style="display:flex;align-items:center;gap:6px;margin-top:3px">
-          <span class="show-badge" style="background:${isCancelled ? '#7A7A7A' : expectedShow.color}">${expectedShow.short}</span>
-          <span class="show-badge" style="background:${isCancelled ? '#5A5A5A' : expectedShow.color}">${isCancelled ? 'Canceled' : (chipCount > 0 ? (lineup.episode ? 'EP '+lineup.episode+' · ' : '')+chipCount+' Artists' : 'Lineup TBA')}</span>
-        </div>
-      </div>
-      ${isCancelled ? `<div class="evt-badge" style="background:#5A5A5A">Canceled</div>` : (chipCount > 0 ? `<div class="evt-badge" style="background:${expectedShow.color}">${chipCount}</div>` : '')}
-    `;
-  } else {
-    hdr.innerHTML=`
-      <div>
-        <div class="sel-date">${dayNames[dateObj.getDay()]}, ${MONTH_NAMES[mo-1]} ${d}</div>
-        <div class="sel-sub">${selectedEvents.length ? `${selectedEvents.length} event${selectedEvents.length > 1 ? 's' : ''}` : 'No show scheduled'}</div>
-      </div>
-    `;
-  }
+  hdr.innerHTML = `
+    <div>
+      <div class="sel-date">${dayNames[dateObj.getDay()]}, ${MONTH_NAMES[mo-1]} ${d}</div>
+      <div class="sel-sub" style="margin-top:2px">${
+        totalCount > 0
+          ? `${totalCount} schedule${totalCount > 1 ? 's' : ''} · Tap to browse listings`
+          : 'No schedule'
+      }</div>
+    </div>
+  `;
   dateHeader.appendChild(hdr);
 
-  function appendEventList(events) {
-    if (!events.length) return;
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'padding:16px 16px 0;background:#FFFFFF';
-    const listStyle = events.length > 6
-      ? 'max-height:320px;overflow:auto;padding-right:2px;scrollbar-width:none'
-      : '';
-    wrap.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-size:13px;font-weight:800;color:var(--txt1)">Events</div>
-        <div style="font-size:12px;font-weight:700;color:var(--txt2)">${events.length} total</div>
-      </div>
-      <div style="${listStyle}">
-      ${events.map(event => {
-      const color = event.color || eventColor(event.type, event.source);
-      const label = event.type === 'concert' ? 'Concert' : event.type === 'fanmeeting' ? 'Fan Meeting' : event.type === 'md' ? 'MD' : 'Event';
-      return `
-        <div style="display:flex;gap:10px;padding:12px 0;border-bottom:1px solid #F0F0F0">
-          <div style="width:8px;height:8px;border-radius:50%;background:${color};margin-top:7px;flex-shrink:0"></div>
-          <div style="min-width:0;flex:1">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-              <span class="show-badge" style="background:${color}">${escHtml(label)}</span>
-              ${event.source === 'auto_event' ? '<span style="font-size:11px;color:var(--txt2);font-weight:700">Auto</span>' : ''}
-            </div>
-            <div style="font-size:14px;font-weight:700;color:var(--txt1);line-height:1.35">${escHtml(event.name)}</div>
-            ${event.venue ? `<div style="font-size:12px;color:var(--txt2);margin-top:3px">${escHtml(event.venue)}</div>` : ''}
-          </div>
-        </div>
-      `;
-      }).join('')}
-      </div>
-    `;
-    bot.appendChild(wrap);
-  }
-
+  // ── 빈 상태 안내 ──
   function appendEmptyNotice(title, body, action) {
     const empty = document.createElement('div');
     empty.style.cssText = 'padding:48px 20px 56px;text-align:center;';
     empty.innerHTML = `
-      <div style="
-        width:56px;height:56px;border-radius:16px;
-        background:#F2F2F2;
-        display:flex;align-items:center;justify-content:center;
-        font-size:26px;line-height:1;
-        margin:0 auto 16px;
-      ">🎤</div>
-      <div style="color:var(--txt1);font-size:14px;font-weight:600;letter-spacing:0;line-height:1.5;margin-bottom:6px">
-        ${escHtml(title)}
-      </div>
-      <div style="color:var(--txt2);font-size:13px;letter-spacing:0;line-height:1.6">
-        ${body}
-      </div>
+      <div style="width:56px;height:56px;border-radius:16px;background:#F2F2F2;display:flex;align-items:center;justify-content:center;font-size:26px;line-height:1;margin:0 auto 16px;">🎤</div>
+      <div style="color:var(--txt1);font-size:14px;font-weight:600;letter-spacing:0;line-height:1.5;margin-bottom:6px">${escHtml(title)}</div>
+      <div style="color:var(--txt2);font-size:13px;letter-spacing:0;line-height:1.6">${body}</div>
     `;
     if (action) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.style.cssText = `
-        margin-top:18px;height:38px;padding:0 16px;border:1px solid #E2E2E2;border-radius:9999px;
-        background:#FFFFFF;color:var(--txt1);font-size:13px;font-weight:700;letter-spacing:0;
-        display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;
-        box-shadow:0 1px 2px rgba(0,0,0,.04);-webkit-tap-highlight-color:transparent;
-      `;
+      btn.style.cssText = 'margin-top:18px;height:38px;padding:0 16px;border:1px solid #E2E2E2;border-radius:9999px;background:#FFFFFF;color:var(--txt1);font-size:13px;font-weight:700;letter-spacing:0;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.04);-webkit-tap-highlight-color:transparent;';
       btn.innerHTML = `${escHtml(action.label)} <span style="color:var(--txt2);font-weight:700">›</span>`;
       btn.onclick = action.onClick;
       empty.appendChild(btn);
@@ -1608,170 +1613,218 @@ function renderBottom(){
     bot.appendChild(empty);
   }
 
+  // 일정 없음
+  if (totalCount === 0) {
+    appendEmptyNotice('Select a date with a schedule', 'Fan postcards &amp; exclusive goods<br>will show up here');
+    return;
+  }
+
+  // ── 통합 일정 리스트 ──
+  const scheduleWrap = document.createElement('div');
+  scheduleWrap.style.cssText = 'padding:10px 16px 4px;background:#FFFFFF';
+
+  // 공방 row
+  if (expectedShow) {
+    const showColor = isCancelled ? '#AAAAAA' : expectedShow.color;
+    const showEid = `gonbang-${expectedShow.showName}`;
+    const isSelected = selectedEventId === showEid;
+    const statusText = isCancelled ? 'Canceled'
+      : lineupUnavailable ? 'Lineup TBA'
+      : chipCount > 0 ? `${lineup?.episode ? 'EP '+lineup.episode+' · ' : ''}${chipCount} Artists`
+      : 'Lineup TBA';
+
+    const row = document.createElement('div');
+    row.style.cssText = `display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;cursor:pointer;transition:background .14s;margin-bottom:4px;background:${isSelected ? showColor+'18' : 'transparent'};border:1.5px solid ${isSelected ? showColor+'70' : 'transparent'};-webkit-tap-highlight-color:transparent;`;
+    row.innerHTML = `
+      <div style="width:36px;height:36px;border-radius:10px;background:${showColor}20;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <div style="width:10px;height:10px;border-radius:50%;background:${showColor}"></div>
+      </div>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:10px;font-weight:700;color:${showColor};letter-spacing:0.03em;margin-bottom:2px;text-transform:uppercase">Music Show</div>
+        <div style="font-size:13px;font-weight:700;color:var(--txt1);line-height:1.3">${escHtml(expectedShow.name)}</div>
+        <div style="font-size:11px;color:var(--txt2);margin-top:2px">${escHtml(statusText)}</div>
+      </div>
+      <div style="color:${isSelected ? showColor : 'var(--txt3)'};font-size:15px;font-weight:700;flex-shrink:0">${isSelected ? '✓' : '›'}</div>
+    `;
+    row.addEventListener('mouseenter', () => { if (!isSelected) row.style.background = '#F6F6F6'; });
+    row.addEventListener('mouseleave', () => { if (!isSelected) row.style.background = 'transparent'; });
+    row.onclick = () => {
+      if (isCancelled || lineupUnavailable) return;
+      const toggling = selectedEventId === showEid;
+      selectedEventId = toggling ? null : showEid;
+      selectedEventType = 'gonbang';
+      selectedArtistName = null;
+      allGroupsSelected = !toggling;
+      const sy = window.scrollY;
+      renderBottom();
+      requestAnimationFrame(() => window.scrollTo({ top: sy, behavior: 'instant' }));
+    };
+    scheduleWrap.appendChild(row);
+  }
+
+  // 콘서트/팬미팅/MD/Other rows
+  otherEvents.forEach((event, idx) => {
+    const color = event.color || eventColor(event.type);
+    const label = eventTypeLabel(event.type);
+    const eid = event.id || `evt-${idx}`;
+    const isSelected = selectedEventId === eid;
+    const row = document.createElement('div');
+    row.style.cssText = `display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;cursor:pointer;transition:background .14s;margin-bottom:4px;background:${isSelected ? color+'18' : 'transparent'};border:1.5px solid ${isSelected ? color+'70' : 'transparent'};-webkit-tap-highlight-color:transparent;`;
+    row.innerHTML = `
+      <div style="width:36px;height:36px;border-radius:10px;background:${color}20;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <div style="width:10px;height:10px;border-radius:50%;background:${color}"></div>
+      </div>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:10px;font-weight:700;color:${color};letter-spacing:0.03em;margin-bottom:2px;text-transform:uppercase">${escHtml(label)}</div>
+        <div style="font-size:13px;font-weight:700;color:var(--txt1);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(event.name)}</div>
+        ${event.venue ? `<div style="font-size:11px;color:var(--txt2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(event.venue)}</div>` : ''}
+      </div>
+      <div style="color:${isSelected ? color : 'var(--txt3)'};font-size:15px;font-weight:700;flex-shrink:0">${isSelected ? '✓' : '›'}</div>
+    `;
+    row.addEventListener('mouseenter', () => { if (!isSelected) row.style.background = '#F6F6F6'; });
+    row.addEventListener('mouseleave', () => { if (!isSelected) row.style.background = 'transparent'; });
+    row.onclick = () => {
+      const toggling = selectedEventId === eid;
+      selectedEventId = toggling ? null : eid;
+      const artistQuery = event.group_id ? (GROUP_SLUGS_MAP[event.group_id] || event.group_id) : event.name;
+      selectedArtistName = toggling ? null : artistQuery;
+      selectedEventType = toggling ? 'gonbang' : (event.type || 'gonbang');
+      allGroupsSelected = false;
+      const sy = window.scrollY;
+      renderBottom();
+      requestAnimationFrame(() => window.scrollTo({ top: sy, behavior: 'instant' }));
+    };
+    scheduleWrap.appendChild(row);
+  });
+
+  bot.appendChild(scheduleWrap);
+
   const prevWeek = expectedShow ? previousWeekLineupFor(expectedShow.showName, selectedDate) : null;
   const prevWeekAction = prevWeek ? {
     label: `View last week's ${expectedShow.short} · ${prevWeek.count} Artists`,
     onClick: () => selectDate(prevWeek.date, { scrollToDetails: true, syncCalendar: true }),
   } : null;
 
-  appendEventList(selectedEvents);
+  // ── 공방 선택 시: canceled/TBA 안내 or 그룹 칩 + 매물 ──
+  if (selectedEventId && selectedEventId.startsWith('gonbang-')) {
+    if (isCancelled) {
+      appendEmptyNotice(`${expectedShow?.name || 'This music show'} did not air`, 'This episode appears to be off-air or canceled.<br>Fan goods will show when a lineup is available.', prevWeekAction);
+      return;
+    }
+    if (lineupUnavailable) {
+      appendEmptyNotice(`${expectedShow.name} lineup is not available yet`, 'The broadcaster has not published this lineup yet,<br>or the episode may be off-air.', prevWeekAction);
+      return;
+    }
 
-  if (isCancelled) {
-    appendEmptyNotice(
-      `${expectedShow?.name || 'This music show'} did not air`,
-      'This episode appears to be off-air or canceled.<br>Fan goods will show when a lineup is available.',
-      prevWeekAction
-    );
-    return;
-  }
+    if (lineup && chipCount > 0) {
+      const strip = document.createElement('div');
+      strip.className = 'chip-strip';
+      const pillBase = 'display:inline-flex;align-items:center;flex-shrink:0;height:32px;padding:0 16px;border-radius:9999px;font-size:13px;font-weight:700;letter-spacing:0;cursor:pointer;user-select:none;transition:all .15s;-webkit-tap-highlight-color:transparent;border:none;outline:none;';
 
-  if (lineupUnavailable) {
-    appendEmptyNotice(
-      `${expectedShow.name} lineup is not available yet`,
-      'The broadcaster has not published this lineup yet,<br>or the episode may be off-air.',
-      prevWeekAction
-    );
-    return;
-  }
-
-  // ── Group chips → #chipBar (.app 직속 sticky) ──
-  if(lineup && chipCount > 0){
-    const strip = document.createElement('div');
-    strip.className = 'chip-strip';
-
-    const pillBase = 'display:inline-flex;align-items:center;flex-shrink:0;height:32px;padding:0 16px;border-radius:9999px;font-size:13px;font-weight:700;letter-spacing:0;cursor:pointer;user-select:none;transition:all .15s;-webkit-tap-highlight-color:transparent;border:none;outline:none;';
-
-    // ── 전체 탭 ──
-    const allChip = document.createElement('button');
-    const allActive = allGroupsSelected;
-    allChip.style.cssText = pillBase + `background:${allActive ? '#191919' : '#F6F6F6'};color:${allActive ? '#FFFFFF' : '#8C8C8C'};`;
-    allChip.textContent = 'All';
-    if(allActive) allChip.dataset.active = 'true';
-    allChip.onclick = () => {
-      selectedArtistName = null;
-      allGroupsSelected = true;
-      const sy = window.scrollY;
-      renderBottom();
-      requestAnimationFrame(() => window.scrollTo({top: sy, behavior: 'instant'}));
-    };
-    strip.appendChild(allChip);
-
-    // ── 개별 그룹 칩 ──
-    const allRawList = rawArtists.length > 0 ? rawArtists : lineup.groups;
-    // My Groups 설정 시 해당 그룹만 표시, 아니면 전체
-    const rawList = (myGroups && myGroups.length > 0)
-      ? allRawList.filter(a => myGroups.includes(a))
-      : allRawList;
-    resolveArtistDisplayNames(rawList).then(() => {
-      strip.querySelectorAll('[data-artist]').forEach(chip => {
-        chip.textContent = artistDisplayName(chip.dataset.artist);
-      });
-    });
-
-    function makeChip(artistName) {
-      const chip = document.createElement('button');
-      const isActive = !allGroupsSelected && selectedArtistName === artistName;
-      chip.style.cssText = pillBase + `background:${isActive ? '#191919' : '#F6F6F6'};color:${isActive ? '#FFFFFF' : '#8C8C8C'};`;
-      chip.textContent = artistDisplayName(artistName);
-      chip.dataset.artist = artistName;
-      if(isActive) chip.dataset.active = 'true';
-      chip.onclick = () => {
-        const toggling = !allGroupsSelected && selectedArtistName === artistName;
-        selectedArtistName = toggling ? null : artistName;
-        allGroupsSelected = false;
+      const allChip = document.createElement('button');
+      allChip.style.cssText = pillBase + `background:${allGroupsSelected ? '#191919' : '#F6F6F6'};color:${allGroupsSelected ? '#FFFFFF' : '#8C8C8C'};`;
+      allChip.textContent = 'All';
+      if (allGroupsSelected) allChip.dataset.active = 'true';
+      allChip.onclick = () => {
+        selectedArtistName = null;
+        allGroupsSelected = true;
         const sy = window.scrollY;
         renderBottom();
-        requestAnimationFrame(() => window.scrollTo({top: sy, behavior: 'instant'}));
+        requestAnimationFrame(() => window.scrollTo({ top: sy, behavior: 'instant' }));
       };
-      return chip;
-    }
+      strip.appendChild(allChip);
 
-    function scrollActiveChipToCenter() {
-      const activeChip = strip.querySelector('[data-active="true"]');
-      if (activeChip) {
-        const center = activeChip.offsetLeft - (strip.offsetWidth - activeChip.offsetWidth) / 2;
-        strip.scrollLeft = Math.max(0, center);
+      const allRawList = rawArtists.length > 0 ? rawArtists : lineup.groups;
+      const rawList = (myGroups && myGroups.length > 0) ? allRawList.filter(a => myGroups.includes(a)) : allRawList;
+      resolveArtistDisplayNames(rawList).then(() => {
+        strip.querySelectorAll('[data-artist]').forEach(chip => { chip.textContent = artistDisplayName(chip.dataset.artist); });
+      });
+
+      function makeChip(artistName) {
+        const chip = document.createElement('button');
+        const isActive = !allGroupsSelected && selectedArtistName === artistName;
+        chip.style.cssText = pillBase + `background:${isActive ? '#191919' : '#F6F6F6'};color:${isActive ? '#FFFFFF' : '#8C8C8C'};`;
+        chip.textContent = artistDisplayName(artistName);
+        chip.dataset.artist = artistName;
+        if (isActive) chip.dataset.active = 'true';
+        chip.onclick = () => {
+          const toggling = !allGroupsSelected && selectedArtistName === artistName;
+          selectedArtistName = toggling ? null : artistName;
+          allGroupsSelected = false;
+          const sy = window.scrollY;
+          renderBottom();
+          requestAnimationFrame(() => window.scrollTo({ top: sy, behavior: 'instant' }));
+        };
+        return chip;
       }
-    }
 
-    // 1. CSV 순위 기준 즉시 정렬 후 칩 렌더
-    sortedArtists(rawList).then(({ initial, unranked }) => {
-      initial.forEach(name => strip.appendChild(makeChip(name)));
+      function scrollActiveChipToCenter() {
+        const ac = strip.querySelector('[data-active="true"]');
+        if (ac) strip.scrollLeft = Math.max(0, ac.offsetLeft - (strip.offsetWidth - ac.offsetWidth) / 2);
+      }
 
-      // 칩이 DOM에 붙은 직후 active 칩을 가운데로
-      setTimeout(scrollActiveChipToCenter, 0);
-
-      // 2. 순위 없는 그룹만 백그라운드에서 매물 수 조회 후 재정렬
-      if (unranked.length > 1) {
-        Promise.all(unranked.map(a =>
-          fetchGoodsCached(a, 1)
-            .then(r => r.ok ? r.json() : { items: [] })
-            .then(d => ({ name: a, count: (d.items || []).length }))
-            .catch(() => ({ name: a, count: 0 }))
-        )).then(results => {
-          results.sort((a, b) => b.count - a.count);
-          results.forEach(({ name }) => {
-            const chip = strip.querySelector(`[data-artist="${CSS.escape(name)}"]`);
-            if (chip) strip.appendChild(chip);
+      sortedArtists(rawList).then(({ initial, unranked }) => {
+        initial.forEach(name => strip.appendChild(makeChip(name)));
+        setTimeout(scrollActiveChipToCenter, 0);
+        if (unranked.length > 1) {
+          Promise.all(unranked.map(a =>
+            fetchGoodsCached(a, 1).then(r => r.ok ? r.json() : { items: [] }).then(d => ({ name: a, count: (d.items||[]).length })).catch(() => ({ name: a, count: 0 }))
+          )).then(results => {
+            results.sort((a, b) => b.count - a.count);
+            results.forEach(({ name }) => { const c = strip.querySelector(`[data-artist="${CSS.escape(name)}"]`); if (c) strip.appendChild(c); });
+            setTimeout(scrollActiveChipToCenter, 0);
           });
-          // 재정렬 후 다시 가운데로
-          setTimeout(scrollActiveChipToCenter, 0);
-        });
-      }
-    });
+        }
+      });
+      chipBar.appendChild(strip);
+    }
+    bot.appendChild(chipBar);
 
-    chipBar.appendChild(strip);
+    const div = document.createElement('div');
+    div.className = 'divider';
+    bot.appendChild(div);
+
+    if (selectedArtistName || allGroupsSelected) {
+      const liveGoodsArea = document.createElement('div');
+      liveGoodsArea.id = 'live-goods-area';
+      liveGoodsArea.style.cssText = 'padding:20px 0 0;background:#FFFFFF';
+      liveGoodsArea.innerHTML = `<div class="goods-grid">${Array.from({length:6}).map(()=>`<div class="skel-card"><div class="skel-img"></div><div class="skel-body"><div class="skel-base skel-price"></div><div class="skel-base skel-name1"></div><div class="skel-base skel-name2"></div></div></div>`).join('')}</div>`;
+      bot.appendChild(liveGoodsArea);
+      if (selectedArtistName) {
+        fetchAndShowLiveGoods(selectedArtistName, 'gonbang');
+      } else if (allGroupsSelected && lineup) {
+        const ra = parseRawTitleStatic(lineup.rawTitle);
+        fetchAllGroupGoods(ra.length > 0 ? ra : lineup.groups, show ? show.short : null);
+      }
+    } else {
+      const prompt = document.createElement('div');
+      prompt.style.cssText = 'padding:16px 16px 20px;text-align:center;color:var(--txt2);font-size:12.5px';
+      prompt.textContent = 'Select a group above to browse Bunjang listings';
+      bot.appendChild(prompt);
+    }
+    return;
   }
 
-  // ── Divider ──
-  const div=document.createElement('div');
-  div.className='divider';
-  bot.appendChild(div);
-
-  // ── Goods 섹션 ──
-  if(selectedArtistName || allGroupsSelected){
+  // ── 콘서트/팬미팅/MD 선택 시: 바로 매물 (이벤트 타입별 키워드 적용) ──
+  if (selectedArtistName) {
+    const div = document.createElement('div');
+    div.className = 'divider';
+    bot.appendChild(div);
     const liveGoodsArea = document.createElement('div');
     liveGoodsArea.id = 'live-goods-area';
-    liveGoodsArea.style.cssText = 'padding:20px 0 0;text-align:center;color:var(--txt2);font-size:13px;background:#FFFFFF';
-    const label = selectedArtistName || 'All';
-    liveGoodsArea.innerHTML = `<div class="goods-grid">${Array.from({length:6}).map(()=>`
-      <div class="skel-card">
-        <div class="skel-img"></div>
-        <div class="skel-body">
-          <div class="skel-base skel-price"></div>
-          <div class="skel-base skel-name1"></div>
-          <div class="skel-base skel-name2"></div>
-        </div>
-      </div>`).join('')}</div>`;
+    liveGoodsArea.style.cssText = 'padding:20px 0 0;background:#FFFFFF';
+    liveGoodsArea.innerHTML = `<div class="goods-grid">${Array.from({length:6}).map(()=>`<div class="skel-card"><div class="skel-img"></div><div class="skel-body"><div class="skel-base skel-price"></div><div class="skel-base skel-name1"></div><div class="skel-base skel-name2"></div></div></div>`).join('')}</div>`;
     bot.appendChild(liveGoodsArea);
-
-    // DOM에 붙인 직후 즉시 fetch
-    if(selectedArtistName){
-      fetchAndShowLiveGoods(selectedArtistName);
-    } else if(allGroupsSelected && lineup){
-      const ra = parseRawTitleStatic(lineup.rawTitle);
-      const artists = ra.length > 0 ? ra : lineup.groups;
-      const showLabel = show ? show.short : null;
-      fetchAllGroupGoods(artists, showLabel);
-    }
-  } else if(lineup){
-    const prompt = document.createElement('div');
-    prompt.style.cssText = 'padding:16px 16px 20px;text-align:center;color:var(--txt2);font-size:12.5px';
-    prompt.textContent = 'Select a group above to browse Bunjang listings';
-    bot.appendChild(prompt);
-  } else if(selectedEvents.length === 0) {
-    appendEmptyNotice(
-      'Select a date with a music show',
-      'Fan postcards &amp; exclusive goods<br>will show up here'
-    );
+    fetchAndShowLiveGoods(selectedArtistName, selectedEventType);
   }
 }
 
 // ─────────────────────────────────────────
 //  LIVE GOODS: 번장 실시간 검색
 // ─────────────────────────────────────────
-function goodsApiUrl(artistName, n) {
-  return `/api/goods?artist=${encodeURIComponent(artistName)}&n=${n}`;
+function goodsApiUrl(artistName, n, eventType) {
+  const t = eventType || 'gonbang';
+  return `/api/goods?artist=${encodeURIComponent(artistName)}&n=${n}&type=${encodeURIComponent(t)}`;
 }
 
 const GOODS_CACHE_TTL_MS = 1000 * 60 * 120; // 2시간
@@ -1802,8 +1855,8 @@ function applyEngNames(items) {
   });
 }
 
-function goodsCacheKey(artistName, n) {
-  return `${String(artistName || '').trim()}::${n}`;
+function goodsCacheKey(artistName, n, eventType) {
+  return `${String(artistName || '').trim()}::${n}::${eventType || 'gonbang'}`;
 }
 
 function readGoodsCache(key) {
@@ -1838,13 +1891,13 @@ function cachedJsonResponse(data) {
   };
 }
 
-function fetchGoodsCached(artistName, n) {
-  const key = goodsCacheKey(artistName, n);
+function fetchGoodsCached(artistName, n, eventType) {
+  const key = goodsCacheKey(artistName, n, eventType);
   const cached = readGoodsCache(key);
   if (cached) return Promise.resolve(cachedJsonResponse(cached));
   if (goodsInflight.has(key)) return goodsInflight.get(key);
 
-  const request = fetch(goodsApiUrl(artistName, n))
+  const request = fetch(goodsApiUrl(artistName, n, eventType))
     .then(async res => {
       if (!res.ok) return res;
       const data = await res.json();
@@ -2010,17 +2063,18 @@ function renderAllGoods(area, items, showName) {
   enrichGoodsInBackground(area, items.slice(0, 60));
 }
 
-async function fetchAndShowLiveGoods(artistName) {
+async function fetchAndShowLiveGoods(artistName, eventType) {
   const area = document.getElementById('live-goods-area');
   if(!area) return;
   const requestId = ++goodsRequestSeq;
+  const eType = eventType || 'gonbang';
 
   try {
     await resolveArtistDisplayNames([artistName]);
-    const cached = readGoodsCache(goodsCacheKey(artistName, 60));
+    const cached = readGoodsCache(goodsCacheKey(artistName, 60, eType));
     if (cached) renderSingleGoods(document.getElementById('live-goods-area'), artistName, cached.items || []);
 
-    const res = await fetchGoodsCached(artistName, 60);
+    const res = await fetchGoodsCached(artistName, 60, eType);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const items = data.items || [];
@@ -2134,7 +2188,7 @@ async function fetchMusicShowLineups() {
           type: eventType,
           venue: parsed.venue,
           source,
-          color: eventColor(eventType, source),
+          color: eventColor(eventType),
         });
         return;
       }
