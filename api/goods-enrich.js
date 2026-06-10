@@ -32,12 +32,11 @@ module.exports = async function handler(req, res) {
         });
         if (!r.ok) return;
         const html = await r.text();
-        // nameEng from Next.js __NEXT_DATA__ embedded JSON
-        const m = html.match(/"nameEng":"((?:[^"\\]|\\.)*)"/);
+        // og:title — "Product name | Bunjang Global"
+        const m = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/);
         if (m?.[1]) {
           const name = m[1]
-            .replace(/\\"/g, '"')
-            .replace(/\\n/g, ' ')
+            .replace(/\s*\|\s*Bunjang Global\s*$/i, '')
             .replace(/\s+/g, ' ')
             .trim();
           if (name.length > 1) nameMap[pid] = name;
