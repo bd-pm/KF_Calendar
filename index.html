@@ -732,7 +732,6 @@ body{
   <button class="type-chip on" data-type="gonbang" onclick="toggleEventType('gonbang')"><span class="chip-dot" style="background:#8FB8E0"></span>Music Shows</button>
   <button class="type-chip on" data-type="concert" onclick="toggleEventType('concert')"><span class="chip-dot" style="background:#E07A7A"></span>Concerts</button>
   <button class="type-chip on" data-type="fanmeeting" onclick="toggleEventType('fanmeeting')"><span class="chip-dot" style="background:#9B7EC8"></span>Fan Meetings</button>
-  <button class="type-chip on" data-type="md" onclick="toggleEventType('md')"><span class="chip-dot" style="background:#C49A6C"></span>MD</button>
   <button class="type-chip on" data-type="other" onclick="toggleEventType('other')"><span class="chip-dot" style="background:#7EB89A"></span>Other</button>
 </div>
 </div><!-- /hdr-wrap -->
@@ -872,7 +871,7 @@ let allGroupsSelected = false;
 
 // 공방 EVENTS 목록 (calendar dot 렌더용)
 let EVENTS = [];
-let activeEventTypes = new Set(['gonbang', 'concert', 'fanmeeting', 'md', 'other']);
+let activeEventTypes = new Set(['gonbang', 'concert', 'fanmeeting', 'other']);
 // 선택된 이벤트 (콘서트/팬미팅/MD 클릭 후 매물 연동용)
 let selectedEventId = null;
 let selectedEventType = 'gonbang'; // 현재 선택된 이벤트 타입 → goods API type 파라미터로 전달
@@ -1061,9 +1060,8 @@ function eventTypeFromRow(row) {
   const showName = String(row?.showName || row?.show_name || '');
   const m = showName.match(/^event_([^_]+)/);
   const type = m ? m[1] : 'event';
-  if (type === 'goods' || type === 'merch' || type === 'popup') return 'md';
   if (type === 'fanmeet') return 'fanmeeting';
-  return ['concert', 'fanmeeting', 'md', 'other'].includes(type) ? type : 'other';
+  return ['concert', 'fanmeeting', 'other'].includes(type) ? type : 'other';
 }
 
 // 이벤트 타입별 파스텔 컬러
@@ -1071,7 +1069,6 @@ const EVENT_COLORS = {
   gonbang:    '#8FB8E0', // Music Show — 파스텔 블루
   concert:    '#E07A7A', // Concert — 파스텔 레드
   fanmeeting: '#9B7EC8', // Fan Meeting — 파스텔 퍼플
-  md:         '#C49A6C', // MD — 파스텔 브라운
   other:      '#7EB89A', // Other — 파스텔 그린
 };
 function eventColor(type) {
@@ -1398,7 +1395,7 @@ function selectDate(ds, opts = {}){
   const _rawArtists = lineup ? parseRawTitleStatic(lineup.rawTitle) : [];
   const _chipCount = _rawArtists.length > 0 ? _rawArtists.length : (lineup ? lineup.groups.length : 0);
   const _lineupUnavailable = !_isCancelled && _expectedShow && (!lineup || lineup.source === 'date_rule' || _chipCount === 0);
-  const _typeOrder = { concert: 0, fanmeeting: 1, md: 2, other: 3 };
+  const _typeOrder = { concert: 0, fanmeeting: 1, other: 2 };
   const _otherEvents = EVENTS
     .filter(e => e.date === ds && e.type !== 'gonbang' && activeEventTypes.has(e.type))
     .sort((a, b) => (_typeOrder[a.type] ?? 9) - (_typeOrder[b.type] ?? 9));
@@ -1644,7 +1641,6 @@ function renderBottom(){
   function eventTypeLabel(type) {
     if (type === 'concert')    return 'Concert';
     if (type === 'fanmeeting') return 'Fan Meeting';
-    if (type === 'md')         return 'MD';
     if (type === 'gonbang')    return 'Music Show';
     return 'Event';
   }

@@ -104,7 +104,7 @@ function decodeEntities(value) {
 
 function inferType(text, fallback) {
   const s = String(text || '').toLowerCase();
-  if (/\b(md|merch|merchandise|official goods|popup|pop-up)\b|굿즈|공식\s*md/i.test(text)) return 'md';
+  // MD 카테고리 제거 — md 타입 이벤트는 크롤링하지 않음
   if (/fan\s*meeting|fanmeet|fan\s*sign|fansign|meet\s*&\s*greet|팬미팅|팬싸|사인회/i.test(text)) return 'fanmeeting';
   if (/concert|tour|live|festival|showcase|on\s*stage|fan\s*con|콘서트|투어|페스티벌|쇼케이스|공연|행사/i.test(text)) return 'concert';
   return fallback || 'event';
@@ -112,7 +112,7 @@ function inferType(text, fallback) {
 
 function shouldKeepTimespreadEvent(name) {
   if (/방송|생일|기념일|컴백|티저|뮤비|발매|음원|챌린지|당첨자\s*발표/i.test(name)) return false;
-  return /concert|tour|live|festival|showcase|on\s*stage|fan\s*meeting|fanmeet|fansign|fan\s*sign|md|merch|popup|pop-up|콘서트|투어|페스티벌|쇼케이스|팬미팅|팬싸|팬사인|사인회|공연|행사|팝업|굿즈|공식\s*md/i.test(name);
+  return /concert|tour|live|festival|showcase|on\s*stage|fan\s*meeting|fanmeet|fansign|fan\s*sign|콘서트|투어|페스티벌|쇼케이스|팬미팅|팬싸|팬사인|사인회|공연|행사/i.test(name);
 }
 
 function normalizeGroupId(name) {
