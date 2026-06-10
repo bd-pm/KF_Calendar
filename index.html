@@ -2582,7 +2582,10 @@ function openGroupModal(artistName) {
       </button>
       <div style="flex:1;min-width:0;">
         <div style="font-size:17px;font-weight:700;color:var(--txt1);line-height:1.2;">${escHtml(displayName)}</div>
-        <div style="font-size:11px;color:var(--txt2);margin-top:1px;">Schedules &amp; Fan Goods</div>
+      </div>
+      <div class="toggle-wrap" id="gmodal-toggle">
+        <button class="toggle-btn${view === 'week' ? ' on' : ''}" id="gmodal-btnWeek">Week</button>
+        <button class="toggle-btn${view === 'month' ? ' on' : ''}" id="gmodal-btnMonth">Month</button>
       </div>
     </div>
     <div class="gmodal-body" id="gmodal-body"></div>
@@ -2674,6 +2677,27 @@ function openGroupModal(artistName) {
   });
 
   requestAnimationFrame(() => requestAnimationFrame(() => modal.classList.add('open')));
+
+  // Week/Month 토글 — gmodal 전용 (setView 후 gmodal 버튼도 동기화)
+  modal.querySelector('#gmodal-btnWeek').onclick = () => {
+    view = 'week';
+    modal.querySelector('#gmodal-btnWeek').className = 'toggle-btn on';
+    modal.querySelector('#gmodal-btnMonth').className = 'toggle-btn';
+    // 홈 토글도 동기화
+    const hw = document.getElementById('btnWeek'); if(hw) hw.className = 'toggle-btn on';
+    const hm = document.getElementById('btnMonth'); if(hm) hm.className = 'toggle-btn';
+    buildGModalCal();
+    renderGModalBottom();
+  };
+  modal.querySelector('#gmodal-btnMonth').onclick = () => {
+    view = 'month';
+    modal.querySelector('#gmodal-btnWeek').className = 'toggle-btn';
+    modal.querySelector('#gmodal-btnMonth').className = 'toggle-btn on';
+    const hw = document.getElementById('btnWeek'); if(hw) hw.className = 'toggle-btn';
+    const hm = document.getElementById('btnMonth'); if(hm) hm.className = 'toggle-btn on';
+    buildGModalCal();
+    renderGModalBottom();
+  };
 
   modal.querySelector('#gmodal-back').onclick = () => {
     groupFilter = null;
