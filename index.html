@@ -1407,7 +1407,7 @@ function selectDate(ds, opts = {}){
   if (_expectedShow && !_isCancelled && !_lineupUnavailable) {
     // 공방이 첫 번째이고 lineup 있으면 선택
     selectedEventId = `gonbang-${_expectedShow.showName}`;
-    allGroupsSelected = _hasLineup;
+    allGroupsSelected = true;
   } else if (_otherEvents.length > 0) {
     // 공방 없거나 TBA면 첫 이벤트 선택
     const first = _otherEvents[0];
@@ -1855,7 +1855,9 @@ function renderBottom(){
     div.className = 'divider';
     bot.appendChild(div);
 
-    if (selectedArtistName || allGroupsSelected) {
+    // gonbang 선택 시 항상 All로 goods 로드
+    const _gonbangSelected = !!(selectedEventId && selectedEventId.startsWith('gonbang-'));
+    if (selectedArtistName || allGroupsSelected || _gonbangSelected) {
       const liveGoodsArea = document.createElement('div');
       liveGoodsArea.id = 'live-goods-area';
       liveGoodsArea.style.cssText = 'padding:20px 0 0;background:#FFFFFF';
@@ -1863,9 +1865,12 @@ function renderBottom(){
       bot.appendChild(liveGoodsArea);
       if (selectedArtistName) {
         fetchAndShowLiveGoods(selectedArtistName, 'gonbang');
-      } else if (allGroupsSelected && lineup) {
+      } else if ((allGroupsSelected || _gonbangSelected) && lineup) {
         const ra = parseRawTitleStatic(lineup.rawTitle);
         fetchAllGroupGoods(ra.length > 0 ? ra : lineup.groups, show ? show.short : null);
+      } else if (_gonbangSelected && !lineup) {
+        // lineup 데이터 없는 날 — 빈 상태 안내
+        liveGoodsArea.innerHTML = '<div style="padding:32px 20px;text-align:center;color:var(--txt2);font-size:13px;">Lineup not yet announced</div>';
       }
     } else {
       const prompt = document.createElement('div');
