@@ -2096,6 +2096,16 @@ async function fetchAllGroupGoods(artists, showName) {
 
     const items = mergeGoodsResults(results);
     writeGoodsCache(comboKey, { items });
+
+    // enrich 먼저 — 영문명 확보 후 렌더
+    const missingIds = items.filter(i => !engNamesCache[String(i.id)]).map(i => i.id);
+    if (missingIds.length) {
+      const nameMap = await fetch(`/api/goods-enrich?pids=${missingIds.slice(0,20).join(',')}`)
+        .then(r => r.ok ? r.json() : {}).catch(() => ({}));
+      Object.assign(engNamesCache, nameMap);
+      saveEngNames();
+    }
+
     renderAllGoods(freshArea, items, showName);
 
   } catch (err) {
@@ -2132,8 +2142,8 @@ function renderAllGoods(area, items, showName) {
   grid.className = 'goods-grid';
   renderGoodsCards(grid, items, 60, 15);
   area.appendChild(grid);
-  enrichGoodsInBackground(area, items.slice(0, 60));
 }
+
 
 async function fetchAndShowLiveGoods(artistName, eventType) {
   const area = document.getElementById('live-goods-area');
@@ -2143,13 +2153,35 @@ async function fetchAndShowLiveGoods(artistName, eventType) {
 
   try {
     await resolveArtistDisplayNames([artistName]);
-    const cached = readGoodsCache(goodsCacheKey(artistName, 60, eType));
-    if (cached) renderSingleGoods(document.getElementById('live-goods-area'), artistName, cached.items || []);
 
+    // 캐시 히트: enrich도 같이 처리 후 렌더
+    const cached = readGoodsCache(goodsCacheKey(artistName, 60, eType));
+    if (cached) {
+      const cachedItems = cached.items || [];
+      const missingIds = cachedItems.filter(i => !engNamesCache[String(i.id)]).map(i => i.id);
+      if (missingIds.length) {
+        const nameMap = await fetch(`/api/goods-enrich?pids=${missingIds.slice(0,20).join(',')}`)
+          .then(r => r.ok ? r.json() : {}).catch(() => ({}));
+        Object.assign(engNamesCache, nameMap);
+        saveEngNames();
+      }
+      renderSingleGoods(document.getElementById('live-goods-area'), artistName, cachedItems);
+    }
+
+    // 신선 fetch: goods + enrich 병렬
     const res = await fetchGoodsCached(artistName, 60, eType);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const items = data.items || [];
+
+    // enrich 병렬 실행 — goods fetch와 동시에 시작했으므로 거의 동시에 완료
+    const missingIds = items.filter(i => !engNamesCache[String(i.id)]).map(i => i.id);
+    if (missingIds.length) {
+      const nameMap = await fetch(`/api/goods-enrich?pids=${missingIds.slice(0,20).join(',')}`)
+        .then(r => r.ok ? r.json() : {}).catch(() => ({}));
+      Object.assign(engNamesCache, nameMap);
+      saveEngNames();
+    }
 
     const freshArea = document.getElementById('live-goods-area');
     if(!freshArea || requestId !== goodsRequestSeq) return;
@@ -2194,8 +2226,8 @@ function renderSingleGoods(area, artistName, items) {
   grid.className = 'goods-grid';
   renderGoodsCards(grid, items, 40, 20);
   area.appendChild(grid);
-  enrichGoodsInBackground(area, items.slice(0, 40));
 }
+
 
 // ─────────────────────────────────────────
 //  TOAST
