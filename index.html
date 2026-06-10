@@ -1151,14 +1151,13 @@ function goToday(){
 //  VIEW TITLE
 // ─────────────────────────────────────────
 function updateTitle(){
+  const titleText = view==='week'
+    ? MONTH_NAMES[addDays(weekStart,3).getMonth()]
+    : MONTH_NAMES[monthPivot.getMonth()];
   const t=document.getElementById('viewTitle');
-  if(view==='week'){
-    // Show the month that has the majority of days in this week (Thu = day 4)
-    const midWeek=addDays(weekStart,3);
-    t.textContent=MONTH_NAMES[midWeek.getMonth()];
-  } else {
-    t.textContent=MONTH_NAMES[monthPivot.getMonth()];
-  }
+  if(t) t.textContent=titleText;
+  const gt=document.getElementById('gmodal-view-title');
+  if(gt) gt.textContent=titleText;
 }
 
 // ─────────────────────────────────────────
@@ -2580,12 +2579,24 @@ function openGroupModal(artistName) {
           <path d="M19 12H5M12 5l-7 7 7 7"/>
         </svg>
       </button>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:17px;font-weight:700;color:var(--txt1);line-height:1.2;">${escHtml(displayName)}</div>
+      <span style="font-size:17px;font-weight:700;color:var(--txt1);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(displayName)}</span>
+    </div>
+    <div class="view-bar" id="gmodal-view-bar">
+      <div class="view-l">
+        <button class="nav-btn" id="gmodal-prev">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="view-title" id="gmodal-view-title"></div>
+        <button class="nav-btn" id="gmodal-next">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
       </div>
-      <div class="toggle-wrap" id="gmodal-toggle">
-        <button class="toggle-btn${view === 'week' ? ' on' : ''}" id="gmodal-btnWeek">Week</button>
-        <button class="toggle-btn${view === 'month' ? ' on' : ''}" id="gmodal-btnMonth">Month</button>
+      <div class="view-r">
+        <button class="today-btn" id="gmodal-today">Today</button>
+        <div class="toggle-wrap">
+          <button class="toggle-btn${view === 'week' ? ' on' : ''}" id="gmodal-btnWeek">Week</button>
+          <button class="toggle-btn${view === 'month' ? ' on' : ''}" id="gmodal-btnMonth">Month</button>
+        </div>
       </div>
     </div>
     <div class="gmodal-body" id="gmodal-body"></div>
@@ -2678,23 +2689,33 @@ function openGroupModal(artistName) {
 
   requestAnimationFrame(() => requestAnimationFrame(() => modal.classList.add('open')));
 
-  // Week/Month 토글 — gmodal 전용 (setView 후 gmodal 버튼도 동기화)
-  modal.querySelector('#gmodal-btnWeek').onclick = () => {
-    view = 'week';
-    modal.querySelector('#gmodal-btnWeek').className = 'toggle-btn on';
-    modal.querySelector('#gmodal-btnMonth').className = 'toggle-btn';
-    // 홈 토글도 동기화
-    const hw = document.getElementById('btnWeek'); if(hw) hw.className = 'toggle-btn on';
-    const hm = document.getElementById('btnMonth'); if(hm) hm.className = 'toggle-btn';
+  function gSetView(v) {
+    view = v;
+    modal.querySelector('#gmodal-btnWeek').className = 'toggle-btn' + (v==='week'?' on':'');
+    modal.querySelector('#gmodal-btnMonth').className = 'toggle-btn' + (v==='month'?' on':'');
+    const hw = document.getElementById('btnWeek'); if(hw) hw.className = 'toggle-btn'+(v==='week'?' on':'');
+    const hm = document.getElementById('btnMonth'); if(hm) hm.className = 'toggle-btn'+(v==='month'?' on':'');
     buildGModalCal();
     renderGModalBottom();
-  };
-  modal.querySelector('#gmodal-btnMonth').onclick = () => {
-    view = 'month';
-    modal.querySelector('#gmodal-btnWeek').className = 'toggle-btn';
-    modal.querySelector('#gmodal-btnMonth').className = 'toggle-btn on';
-    const hw = document.getElementById('btnWeek'); if(hw) hw.className = 'toggle-btn';
-    const hm = document.getElementById('btnMonth'); if(hm) hm.className = 'toggle-btn on';
+  }
+  function gNavPrev() {
+    if(view==='week') weekStart=addDays(weekStart,-7);
+    else monthPivot=new Date(monthPivot.getFullYear(),monthPivot.getMonth()-1,1);
+    buildGModalCal();
+  }
+  function gNavNext() {
+    if(view==='week') weekStart=addDays(weekStart,7);
+    else monthPivot=new Date(monthPivot.getFullYear(),monthPivot.getMonth()+1,1);
+    buildGModalCal();
+  }
+  modal.querySelector('#gmodal-btnWeek').onclick = () => gSetView('week');
+  modal.querySelector('#gmodal-btnMonth').onclick = () => gSetView('month');
+  modal.querySelector('#gmodal-prev').onclick = gNavPrev;
+  modal.querySelector('#gmodal-next').onclick = gNavNext;
+  modal.querySelector('#gmodal-today').onclick = () => {
+    weekStart = getWeekStart(TODAY);
+    monthPivot = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+    selectDate(dKey(TODAY));
     buildGModalCal();
     renderGModalBottom();
   };
