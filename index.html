@@ -526,7 +526,7 @@ body{
   -webkit-tap-highlight-color:transparent;
 }
 .gmodal-back:hover{background:#F2F2F2;}
-.gmodal-body{overflow-y:auto;flex:1;padding-bottom:40px;}
+.gmodal-body{overflow-y:auto;flex:1;}
 .gmodal-section-hdr{
   padding:16px 20px 8px;
   font-size:11px;font-weight:700;letter-spacing:.08em;
@@ -1030,7 +1030,11 @@ function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===
 function isFuture(ds){ return ds > dKey(TODAY); }
 
 function eventsOnDate(ds){
-  return EVENTS.filter(e=>e.date===ds && activeEventTypes.has(e.type));
+  return EVENTS.filter(e => {
+    if (e.date !== ds || !activeEventTypes.has(e.type)) return false;
+    if (groupFilter && e.type !== 'gonbang') return groupFilterMatchesEvent(e);
+    return true;
+  });
 }
 
 function isManualCalendarEvent(row) {
@@ -2339,6 +2343,7 @@ function clearMyGroups() {
 
 localStorage.removeItem(MY_GROUPS_KEY); // 기존 저장된 그룹 필터 초기화
 let myGroups = null; // 그룹 필터 비활성화 (검색 → Bunjang 이동으로 전환)
+let groupFilter = null; // 그룹 검색 뷰 전용 필터 (artistName string)
 
 // 버튼 상태 업데이트
 function updateMyGroupsBtn() {
@@ -2560,141 +2565,14 @@ function openGroupModal(artistName) {
   if (document.querySelector('.gmodal')) return;
   const displayName = artistDisplayName(artistName);
 
-  // 이 그룹이 포함된 모든 날짜+이벤트 수집
-  const GROUP_SLUGS_MAP_G = {
-    bts:'BTS',seventeen:'SEVENTEEN',enhypen:'ENHYPEN',aespa:'aespa',ive:'IVE',
-    lesserafim:'LE SSERAFIM',newjeans:'NewJeans',twice:'TWICE',blackpink:'BLACKPINK',
-    nct:'NCT',nctwish:'NCT WISH',nctdream:'NCT DREAM',nct127:'NCT 127',riize:'RIIZE',
-    tws:'TWS',day6:'DAY6',zerobaseone:'ZEROBASEONE',boynextdoor:'BOYNEXTDOOR',
-    babymonster:'BABYMONSTER',txt:'TOMORROW X TOGETHER',straykids:'Stray Kids',
-    ateez:'ATEEZ',itzy:'ITZY',nmixx:'NMIXX',plave:'PLAVE',kiss_of_life:'KISS OF LIFE',
-    kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',dxs:'DxS',bss:'BSS',
-  };
-  const alias = artistName.toLowerCase();
+  // groupFilter 세팅 → buildCal/renderBottom이 이 아티스트 일정만 보여줌
+  groupFilter = artistName;
 
-  // 아티스트 매칭: 정확한 단어 경계 매칭 (짧은 alias가 다른 이름 안에 포함되는 오매칭 방지)
-  function artistMatches(candidate) {
-    const c = candidate.toLowerCase().trim();
-    const a = alias.trim();
-    if (c === a) return true;
-    // alias가 candidate의 완전한 단어로 존재하는지 (예: "bts" in "방탄소년단 bts 슈가")
-    const wordRe = new RegExp('(?<![a-z0-9])' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![a-z0-9])', 'i');
-    return wordRe.test(c);
-  }
-
-  // gonbang 날짜 중 이 아티스트 포함된 것
-  const gonbangItems = [];
-  for (const [date, lineup] of Object.entries(LINEUP_BY_DATE)) {
-    const artists = parseRawTitleStatic(lineup.rawTitle);
-    const list = artists.length > 0 ? artists : lineup.groups;
-    if (list.some(a => artistMatches(a))) {
-      const show = SHOW_LABELS[lineup.showName] || { name: lineup.showName, color: '#9B6FD8' };
-      gonbangItems.push({ date, name: show.name, type: 'gonbang', color: '#8FB8E0', venue: lineup.episode ? `EP ${lineup.episode}` : '', artistName });
-    }
-  }
-  // 콘서트/팬미팅/MD 이벤트 중 이 아티스트 포함된 것
-  const otherItems = [];
-  for (const evt of EVENTS) {
-    if (evt.type === 'gonbang') continue;
-    const mapped = GROUP_SLUGS_MAP_G[evt.group] || evt.group || '';
-    const evtArtist = artistFromEventName(evt.name) || mapped;
-    if (artistMatches(evtArtist)) {
-      otherItems.push({ date: evt.date, name: evt.name, type: evt.type, color: eventColor(evt.type), venue: evt.venue || '', artistName: artistFromEventName(evt.name) || artistName });
-    }
-  }
-
-  // 날짜순 정렬 (미래 먼저, 그 다음 과거 최신순)
-  const today = dKey(new Date());
-  const sortByDate = (a, b) => {
-    const af = a.date >= today, bf = b.date >= today;
-    if (af && bf) return a.date < b.date ? -1 : 1;
-    if (!af && !bf) return a.date > b.date ? -1 : 1;
-    return af ? -1 : 1;
-  };
-  gonbangItems.sort(sortByDate);
-  otherItems.sort(sortByDate);
-
-  const allItems = [...otherItems, ...gonbangItems]; // 콘서트 등 우선, 공방은 뒤
-  // 가장 첫 번째(가장 가까운 미래 or 최근 과거) 아이템 auto-select
-  let selectedIdx = allItems.length > 0 ? 0 : -1;
+  // 가장 가까운 미래 일정(또는 최근 과거)으로 날짜 이동
+  const targetDate = findLatestDateForArtist(artistName);
 
   const modal = document.createElement('div');
   modal.className = 'gmodal';
-
-  function typeLabel(t) {
-    if (t === 'gonbang') return 'Music Show';
-    if (t === 'concert') return 'Concert';
-    if (t === 'fanmeeting') return 'Fan Meeting';
-    if (t === 'md') return 'MD';
-    return 'Event';
-  }
-
-  function renderGoods(wrapEl, item) {
-    wrapEl.innerHTML = '<div style="padding:12px 0 4px;text-align:center;color:var(--txt2);font-size:12px;">Loading listings…</div>';
-    const eType = item.type === 'gonbang' ? 'gonbang' : item.type;
-    fetch(goodsApiUrl(item.artistName, 12, eType))
-      .then(r => r.ok ? r.json() : { items: [] })
-      .then(data => {
-        const items = (data.items || []).slice(0, 8);
-        if (!items.length) {
-          wrapEl.innerHTML = '<div class="gmodal-empty">No listings found</div>';
-          return;
-        }
-        wrapEl.innerHTML = '<div class="gmodal-goods-grid"></div>';
-        const grid = wrapEl.querySelector('.gmodal-goods-grid');
-        items.forEach(it => {
-          const card = document.createElement('a');
-          card.className = 'gmodal-goods-card';
-          card.href = `https://globalbunjang.com/product/${it.id}`;
-          card.target = '_blank';
-          card.rel = 'noopener';
-          card.innerHTML = `<img src="${escHtml(it.imageUrl)}" loading="lazy" alt=""><div class="gmodal-goods-card-body"><div class="gmodal-goods-price">${escHtml(it.displayPrice || '')}</div><div class="gmodal-goods-name">${escHtml(it.displayName || it.name || '')}</div></div>`;
-          grid.appendChild(card);
-        });
-      })
-      .catch(() => { wrapEl.innerHTML = '<div class="gmodal-empty">Failed to load</div>'; });
-  }
-
-  function renderBody() {
-    const body = modal.querySelector('.gmodal-body');
-    if (!body) return;
-    body.innerHTML = '';
-
-    if (!allItems.length) {
-      body.innerHTML = '<div class="gmodal-empty">No schedules found for this group.</div>';
-      return;
-    }
-
-    allItems.forEach((item, idx) => {
-      const row = document.createElement('div');
-      row.className = 'gmodal-evt-row' + (idx === selectedIdx ? ' selected' : '');
-      const dateObj = new Date(item.date + 'T00:00:00');
-      const dateFmt = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      row.innerHTML = `
-        <div class="gmodal-evt-dot" style="background:${item.color}"></div>
-        <div class="gmodal-evt-info">
-          <div class="gmodal-evt-name">${escHtml(item.name)}</div>
-          <div class="gmodal-evt-meta">${escHtml(typeLabel(item.type))} · ${dateFmt}${item.venue ? ' · ' + escHtml(item.venue) : ''}</div>
-        </div>
-        <span style="color:var(--txt3);font-size:15px;font-weight:700;flex-shrink:0">${idx === selectedIdx ? '✓' : '›'}</span>
-      `;
-      row.onclick = () => {
-        if (selectedIdx === idx) return;
-        selectedIdx = idx;
-        renderBody();
-      };
-      body.appendChild(row);
-
-      // 선택된 항목 바로 아래 상품 표시
-      if (idx === selectedIdx) {
-        const wrap = document.createElement('div');
-        wrap.className = 'gmodal-goods-wrap';
-        body.appendChild(wrap);
-        renderGoods(wrap, item);
-      }
-    });
-  }
-
   modal.innerHTML = `
     <div class="gmodal-hdr">
       <button class="gmodal-back" id="gmodal-back" aria-label="Back">
@@ -2704,20 +2582,108 @@ function openGroupModal(artistName) {
       </button>
       <div style="flex:1;min-width:0;">
         <div style="font-size:17px;font-weight:700;color:var(--txt1);line-height:1.2;">${escHtml(displayName)}</div>
-        <div style="font-size:11px;color:var(--txt2);margin-top:1px;">${allItems.length ? allItems.length + ' schedule' + (allItems.length > 1 ? 's' : '') : 'No schedules found'}</div>
+        <div style="font-size:11px;color:var(--txt2);margin-top:1px;">Schedules &amp; Fan Goods</div>
       </div>
     </div>
-    <div class="gmodal-body"></div>
+    <div class="gmodal-body" id="gmodal-body"></div>
   `;
-
   document.body.appendChild(modal);
-  renderBody();
+
+  // gmodal-body 안에 기존 앱 UI(typeFilter + calArea + dateHeader + bottom)를 복제
+  const body = modal.querySelector('#gmodal-body');
+
+  // type filter 복제
+  const tfClone = document.getElementById('typeFilter').cloneNode(true);
+  tfClone.querySelectorAll('[onclick]').forEach(btn => {
+    const type = btn.dataset.type;
+    if (type) {
+      btn.removeAttribute('onclick');
+      btn.addEventListener('click', () => {
+        toggleEventType(type);
+        // 버튼 상태 동기화
+        tfClone.querySelectorAll('.type-chip').forEach(b => {
+          b.classList.toggle('on', activeEventTypes.has(b.dataset.type));
+        });
+        buildGModalCal();
+      });
+      btn.classList.toggle('on', activeEventTypes.has(type));
+    }
+  });
+  body.appendChild(tfClone);
+
+  // 캘린더 영역
+  const calArea = document.createElement('div');
+  calArea.className = 'cal-area';
+  calArea.id = 'gmodal-cal-area';
+  body.appendChild(calArea);
+
+  // dateHeader
+  const dh = document.createElement('div');
+  dh.id = 'gmodal-date-header';
+  body.appendChild(dh);
+
+  // bottom
+  const btm = document.createElement('div');
+  btm.className = 'bottom';
+  btm.id = 'gmodal-bottom';
+  body.appendChild(btm);
+
+  // 캘린더/하단 렌더 함수 — 기존 buildCal/renderBottom의 타겟을 gmodal 요소로 교체
+  function buildGModalCal() {
+    updateTitle();
+    const area = document.getElementById('gmodal-cal-area');
+    if (!area) return;
+    area.innerHTML = '';
+    if (view === 'week') buildWeek(area);
+    else buildMonth(area);
+  }
+
+  function renderGModalBottom() {
+    const bot = document.getElementById('gmodal-bottom');
+    const hdr = document.getElementById('gmodal-date-header');
+    if (!bot || !hdr) return;
+    // 임시로 실제 DOM ID를 gmodal 요소로 교체
+    const realBot = document.getElementById('bottom');
+    const realHdr = document.getElementById('dateHeader');
+    realBot.id = '__bottom_hidden';
+    realHdr.id = '__dateHeader_hidden';
+    btm.id = 'bottom';
+    dh.id = 'dateHeader';
+    renderBottom();
+    btm.id = 'gmodal-bottom';
+    dh.id = 'gmodal-date-header';
+    realBot.id = 'bottom';
+    realHdr.id = 'dateHeader';
+  }
+
+  // selectDate override — gmodal 내에서 날짜 클릭 시 gmodal bottom 갱신
+  modal._origSelectDate = null; // no override needed; selectDate already updates selectedDate + calls renderBottom
+  // 캘린더 cell onclick은 selectDate(ds)를 호출 → renderBottom()이 실제 #bottom을 업데이트하므로
+  // gmodal-bottom도 같이 갱신되도록 renderBottom을 패치
+  const origRenderBottom = window._gmodalOrigRenderBottom || null;
+
+  // 렌더
+  buildGModalCal();
+  // 날짜 선택 (가장 최근 일정)
+  selectDate(targetDate, { syncCalendar: true });
+  renderGModalBottom();
+
+  // 캘린더 cell 클릭 시 gmodal bottom도 갱신
+  calArea.addEventListener('click', () => {
+    setTimeout(() => renderGModalBottom(), 0);
+  });
 
   requestAnimationFrame(() => requestAnimationFrame(() => modal.classList.add('open')));
 
   modal.querySelector('#gmodal-back').onclick = () => {
+    groupFilter = null;
     modal.classList.remove('open');
-    setTimeout(() => modal.remove(), 340);
+    setTimeout(() => {
+      modal.remove();
+      // 홈 캘린더 복구
+      buildCal();
+      renderBottom();
+    }, 340);
   };
 }
 
@@ -2739,12 +2705,47 @@ function applyMyGroups() {
 
 // 캘린더 dot/날짜 필터: 내 그룹 설정 시 해당 그룹 포함 날짜만 강조
 function dateHasMyGroup(ds) {
+  // groupFilter 모드: 해당 아티스트가 공방에 출연하거나 이벤트가 있으면 true
+  if (groupFilter) {
+    const lineup = LINEUP_BY_DATE[ds];
+    if (lineup) {
+      const artists = parseRawTitleStatic(lineup.rawTitle);
+      const list = artists.length > 0 ? artists : lineup.groups;
+      if (list.some(a => groupFilterMatches(a))) return true;
+    }
+    return eventsOnDate(ds).some(e => e.type !== 'gonbang' && groupFilterMatchesEvent(e));
+  }
   if (!myGroups || myGroups.length === 0) return true; // 전체 모드
   const lineup = LINEUP_BY_DATE[ds];
   if (!lineup) return false;
   const artists = parseRawTitleStatic(lineup.rawTitle);
   const list = artists.length > 0 ? artists : lineup.groups;
   return myGroups.some(g => list.includes(g));
+}
+
+// groupFilter 매칭 헬퍼
+function groupFilterMatches(candidate) {
+  if (!groupFilter) return true;
+  const a = groupFilter.toLowerCase().trim();
+  const c = (candidate || '').toLowerCase().trim();
+  if (c === a) return true;
+  const wordRe = new RegExp('(?<![a-z0-9])' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![a-z0-9])', 'i');
+  return wordRe.test(c);
+}
+function groupFilterMatchesEvent(evt) {
+  if (!groupFilter) return true;
+  const GROUP_SLUGS_GF = {
+    bts:'BTS',seventeen:'SEVENTEEN',enhypen:'ENHYPEN',aespa:'aespa',ive:'IVE',
+    lesserafim:'LE SSERAFIM',newjeans:'NewJeans',twice:'TWICE',blackpink:'BLACKPINK',
+    nct:'NCT',nctwish:'NCT WISH',nctdream:'NCT DREAM',nct127:'NCT 127',riize:'RIIZE',
+    tws:'TWS',day6:'DAY6',zerobaseone:'ZEROBASEONE',boynextdoor:'BOYNEXTDOOR',
+    babymonster:'BABYMONSTER',txt:'TOMORROW X TOGETHER',straykids:'Stray Kids',
+    ateez:'ATEEZ',itzy:'ITZY',nmixx:'NMIXX',plave:'PLAVE',kiss_of_life:'KISS OF LIFE',
+    kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',dxs:'DxS',bss:'BSS',
+  };
+  const mapped = GROUP_SLUGS_GF[evt.group] || evt.group || '';
+  const evtArtist = artistFromEventName(evt.name) || mapped;
+  return groupFilterMatches(evtArtist);
 }
 
 // ─────────────────────────────────────────
