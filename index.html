@@ -2011,39 +2011,31 @@ function renderGoodsCards(grid, items, limit, delayStep) {
   });
 }
 
-// 백그라운드 영어명 enrichment — 렌더 직후 호출, 20개씩 배치
+// 백그라운드 영어명 enrichment — 렌더 직후 호출
+// Bunjang Global 배치 API 사용 — 100개까지 한 번에 처리
 function enrichGoodsInBackground(area, items) {
   const missing = items.filter(item => !engNamesCache[String(item.id)]);
   if (!missing.length) return;
-  // 20개씩 배치로 순서대로 처리
-  const batches = [];
-  for (let i = 0; i < missing.length; i += 20) batches.push(missing.slice(i, i + 20));
-  let delay = 0;
-  batches.forEach(batch => {
-    setTimeout(() => {
-      const pids = batch.map(i => i.id).join(',');
-      fetch(`/api/goods-enrich?pids=${pids}`)
-        .then(r => r.ok ? r.json() : {})
-        .then(nameMap => {
-          if (!Object.keys(nameMap).length) return;
-          Object.assign(engNamesCache, nameMap);
-          saveEngNames();
-          // DOM 패치 — 현재 보이는 카드 이름 교체
-          const target = area || document.getElementById('live-goods-area');
-          if (target) {
-            target.querySelectorAll('.gcard[data-pid]').forEach(card => {
-              const eng = nameMap[card.dataset.pid];
-              if (eng) {
-                const el = card.querySelector('.gcard-name');
-                if (el) el.textContent = eng;
-              }
-            });
+  const pids = missing.map(i => i.id).join(',');
+  fetch(`/api/goods-enrich?pids=${pids}`)
+    .then(r => r.ok ? r.json() : {})
+    .then(nameMap => {
+      if (!Object.keys(nameMap).length) return;
+      Object.assign(engNamesCache, nameMap);
+      saveEngNames();
+      // DOM 패치 — 현재 보이는 카드 이름 교체
+      const target = area || document.getElementById('live-goods-area');
+      if (target) {
+        target.querySelectorAll('.gcard[data-pid]').forEach(card => {
+          const eng = nameMap[card.dataset.pid];
+          if (eng) {
+            const el = card.querySelector('.gcard-name');
+            if (el) el.textContent = eng;
           }
-        })
-        .catch(() => {});
-    }, delay);
-    delay += 150; // 배치 간 간격 (서버 부하 분산)
-  });
+        });
+      }
+    })
+    .catch(() => {});
 }
 
 function sortGoodsByWindow(items, anchorDateStr) {
