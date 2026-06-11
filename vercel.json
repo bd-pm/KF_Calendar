@@ -8,6 +8,14 @@
     {
       "path": "/api/sync-events",
       "schedule": "10 6 * * 1-5"
+    },
+    {
+      "path": "/api/prefetch-goods",
+      "schedule": "10 15 * * *"
+    },
+    {
+      "path": "/api/prefetch-goods",
+      "schedule": "10 9 * * *"
     }
   ],
   "headers": [

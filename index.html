@@ -1901,7 +1901,7 @@ function goodsApiUrl(artistName, n, eventType) {
 }
 
 const GOODS_CACHE_TTL_MS = 1000 * 60 * 120; // 2시간
-const GOODS_CACHE_PREFIX = 'kf_goods_cache_v4:';
+const GOODS_CACHE_PREFIX = 'kf_goods_cache_v5:';
 const goodsMemoryCache = new Map();
 const goodsInflight = new Map();
 let goodsRequestSeq = 0;
@@ -2011,29 +2011,39 @@ function renderGoodsCards(grid, items, limit, delayStep) {
   });
 }
 
-// 백그라운드 영어명 enrichment — 렌더 직후 호출
+// 백그라운드 영어명 enrichment — 렌더 직후 호출, 20개씩 배치
 function enrichGoodsInBackground(area, items) {
   const missing = items.filter(item => !engNamesCache[String(item.id)]);
   if (!missing.length) return;
-  const pids = missing.map(i => i.id).join(',');
-  fetch(`/api/goods-enrich?pids=${pids}`)
-    .then(r => r.ok ? r.json() : {})
-    .then(nameMap => {
-      if (!Object.keys(nameMap).length) return;
-      Object.assign(engNamesCache, nameMap);
-      saveEngNames();
-      // DOM 패치 — 현재 보이는 카드 이름만 교체
-      if (area) {
-        area.querySelectorAll('.gcard[data-pid]').forEach(card => {
-          const eng = nameMap[card.dataset.pid];
-          if (eng) {
-            const el = card.querySelector('.gcard-name');
-            if (el) el.textContent = eng;
+  // 20개씩 배치로 순서대로 처리
+  const batches = [];
+  for (let i = 0; i < missing.length; i += 20) batches.push(missing.slice(i, i + 20));
+  let delay = 0;
+  batches.forEach(batch => {
+    setTimeout(() => {
+      const pids = batch.map(i => i.id).join(',');
+      fetch(`/api/goods-enrich?pids=${pids}`)
+        .then(r => r.ok ? r.json() : {})
+        .then(nameMap => {
+          if (!Object.keys(nameMap).length) return;
+          Object.assign(engNamesCache, nameMap);
+          saveEngNames();
+          // DOM 패치 — 현재 보이는 카드 이름 교체
+          const target = area || document.getElementById('live-goods-area');
+          if (target) {
+            target.querySelectorAll('.gcard[data-pid]').forEach(card => {
+              const eng = nameMap[card.dataset.pid];
+              if (eng) {
+                const el = card.querySelector('.gcard-name');
+                if (el) el.textContent = eng;
+              }
+            });
           }
-        });
-      }
-    })
-    .catch(() => {});
+        })
+        .catch(() => {});
+    }, delay);
+    delay += 150; // 배치 간 간격 (서버 부하 분산)
+  });
 }
 
 function sortGoodsByWindow(items, anchorDateStr) {
@@ -2074,10 +2084,12 @@ async function fetchAllGroupGoods(artists, showName) {
   const requestId = ++goodsRequestSeq;
   const comboKey = goodsCacheKey(`__all__:${artists.join('|')}`, 60);
 
-  // 1) combo 캐시 히트 → 즉시 렌더 후 return
+  // 1) combo 캐시 히트 → 즉시 렌더 후 백그라운드 enrich
   const cachedCombo = readGoodsCache(comboKey);
   if (cachedCombo) {
-    renderAllGoods(document.getElementById('live-goods-area'), cachedCombo.items || [], showName);
+    const cachedItems = cachedCombo.items || [];
+    renderAllGoods(document.getElementById('live-goods-area'), cachedItems, showName);
+    enrichGoodsInBackground(null, cachedItems);
     return;
   }
 
@@ -2085,18 +2097,18 @@ async function fetchAllGroupGoods(artists, showName) {
   const individualCaches = artists.map(a => readGoodsCache(goodsCacheKey(a, 12)));
   const allIndividualCached = individualCaches.every(c => c !== null);
   if (allIndividualCached) {
-    // 모두 캐시됨 → 즉시 렌더 + combo 캐시 저장
     const items = mergeGoodsResults(individualCaches.map(c => c.items || []));
     writeGoodsCache(comboKey, { items });
     renderAllGoods(document.getElementById('live-goods-area'), items, showName);
+    enrichGoodsInBackground(null, items);
     return;
   }
   const partialItems = individualCaches.some(c => c !== null)
-    ? mergeGoodsResults(individualCaches.map((c, i) => c ? c.items || [] : []))
+    ? mergeGoodsResults(individualCaches.map(c => c ? c.items || [] : []))
     : null;
   if (partialItems && partialItems.length > 0) {
-    // 일부 캐시 → 즉시 부분 렌더 (나머지 로딩 중 표시)
     renderAllGoods(document.getElementById('live-goods-area'), partialItems, showName);
+    enrichGoodsInBackground(null, partialItems);
   }
 
   try {
@@ -2115,16 +2127,9 @@ async function fetchAllGroupGoods(artists, showName) {
     const items = mergeGoodsResults(results);
     writeGoodsCache(comboKey, { items });
 
-    // enrich 먼저 — 영문명 확보 후 렌더
-    const missingIds = items.filter(i => !engNamesCache[String(i.id)]).map(i => i.id);
-    if (missingIds.length) {
-      const nameMap = await fetch(`/api/goods-enrich?pids=${missingIds.slice(0,20).join(',')}`)
-        .then(r => r.ok ? r.json() : {}).catch(() => ({}));
-      Object.assign(engNamesCache, nameMap);
-      saveEngNames();
-    }
-
+    // 즉시 렌더 후 백그라운드 enrich
     renderAllGoods(freshArea, items, showName);
+    enrichGoodsInBackground(freshArea, items);
 
   } catch (err) {
     const a = document.getElementById('live-goods-area');
@@ -2172,39 +2177,27 @@ async function fetchAndShowLiveGoods(artistName, eventType) {
   try {
     await resolveArtistDisplayNames([artistName]);
 
-    // 캐시 히트: enrich도 같이 처리 후 렌더
+    // 캐시 히트 → 즉시 렌더 후 백그라운드 enrich
     const cached = readGoodsCache(goodsCacheKey(artistName, 60, eType));
     if (cached) {
       const cachedItems = cached.items || [];
-      const missingIds = cachedItems.filter(i => !engNamesCache[String(i.id)]).map(i => i.id);
-      if (missingIds.length) {
-        const nameMap = await fetch(`/api/goods-enrich?pids=${missingIds.slice(0,20).join(',')}`)
-          .then(r => r.ok ? r.json() : {}).catch(() => ({}));
-        Object.assign(engNamesCache, nameMap);
-        saveEngNames();
-      }
-      renderSingleGoods(document.getElementById('live-goods-area'), artistName, sortGoodsByWindow(cachedItems, selectedDate));
+      renderSingleGoods(document.getElementById('live-goods-area'), artistName, cachedItems);
+      enrichGoodsInBackground(null, cachedItems);
+      return;
     }
 
-    // 신선 fetch: goods + enrich 병렬
+    // 신선 fetch
     const res = await fetchGoodsCached(artistName, 60, eType);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const items = sortGoodsByWindow(data.items || [], selectedDate);
 
-    // enrich 병렬 실행 — goods fetch와 동시에 시작했으므로 거의 동시에 완료
-    const missingIds = items.filter(i => !engNamesCache[String(i.id)]).map(i => i.id);
-    if (missingIds.length) {
-      const nameMap = await fetch(`/api/goods-enrich?pids=${missingIds.slice(0,20).join(',')}`)
-        .then(r => r.ok ? r.json() : {}).catch(() => ({}));
-      Object.assign(engNamesCache, nameMap);
-      saveEngNames();
-    }
-
     const freshArea = document.getElementById('live-goods-area');
     if(!freshArea || requestId !== goodsRequestSeq) return;
 
+    // 즉시 렌더 후 백그라운드 enrich (전체 배치)
     renderSingleGoods(freshArea, artistName, items);
+    enrichGoodsInBackground(freshArea, items);
 
   } catch(err) {
     const area2 = document.getElementById('live-goods-area');
@@ -2258,7 +2251,7 @@ function toast(msg){
   setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(()=>t.remove(),350)},2200);
 }
 
-// 오늘 ±1~3일 아티스트 상품 백그라운드 프리패치 (lineup 로드 후 호출)
+// 오늘 ±1~3일 아티스트 상품 백그라운드 프리패치 + enrich (lineup 로드 후 호출)
 function prefetchNearbyGoods() {
   const seen = new Set();
   for (let i = -1; i <= 3; i++) {
@@ -2269,8 +2262,16 @@ function prefetchNearbyGoods() {
   }
   let delay = 300;
   seen.forEach(artist => {
-    setTimeout(() => fetchGoodsCached(artist, 12).catch(() => {}), delay);
-    delay += 200;
+    setTimeout(() => {
+      fetchGoodsCached(artist, 60)
+        .then(r => r.ok ? r.json() : { items: [] })
+        .then(data => {
+          const items = data.items || [];
+          if (items.length) enrichGoodsInBackground(null, items);
+        })
+        .catch(() => {});
+    }, delay);
+    delay += 400;
   });
 }
 
