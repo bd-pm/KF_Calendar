@@ -197,7 +197,17 @@ function isExcludedResult(item, artist) {
 
 function matchesArtist(item, aliases) {
   const text = `${item.name || ''} ${item.displayName || ''}`.toLowerCase();
-  return aliases.some(a => text.includes(a.toLowerCase()));
+  return aliases.some(a => {
+    const alias = a.toLowerCase();
+    const idx = text.indexOf(alias);
+    if (idx < 0) return false;
+    // 한국어 alias는 단어 경계 불필요
+    if (/[가-힣]/.test(alias)) return true;
+    // 영문/숫자 alias는 앞뒤가 알파벳/숫자가 아닌지 확인 (단어 경계)
+    const before = idx === 0 ? '' : text[idx - 1];
+    const after = text[idx + alias.length] || '';
+    return !/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after);
+  });
 }
 
 
