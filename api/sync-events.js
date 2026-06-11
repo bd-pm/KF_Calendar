@@ -110,6 +110,84 @@ function inferType(text, fallback) {
   return fallback || 'event';
 }
 
+// 한국어 도시명 → 영어
+const CITY_KO_EN = {
+  '서울': 'Seoul', '인천': 'Incheon', '부산': 'Busan', '대구': 'Daegu',
+  '대전': 'Daejeon', '광주': 'Gwangju', '수원': 'Suwon', '고양': 'Goyang',
+  '성남': 'Seongnam', '울산': 'Ulsan', '제주': 'Jeju',
+  '도쿄': 'Tokyo', '오사카': 'Osaka', '나고야': 'Nagoya', '요코하마': 'Yokohama',
+  '후쿠오카': 'Fukuoka', '삿포로': 'Sapporo', '고베': 'Kobe', '교토': 'Kyoto',
+  '치바': 'Chiba', '아이치': 'Aichi', '효고': 'Hyogo',
+  '방콕': 'Bangkok', '싱가포르': 'Singapore', '마닐라': 'Manila',
+  '자카르타': 'Jakarta', '쿠알라룸푸르': 'Kuala Lumpur', '호치민': 'Ho Chi Minh City',
+  '홍콩': 'Hong Kong', '마카오': 'Macau', '타이베이': 'Taipei',
+  '가오슝': 'Kaohsiung', '상하이': 'Shanghai', '베이징': 'Beijing',
+  '런던': 'London', '파리': 'Paris', '베를린': 'Berlin', '암스테르담': 'Amsterdam',
+  '마드리드': 'Madrid', '바르셀로나': 'Barcelona', '로마': 'Rome',
+  '브뤼셀': 'Brussels', '뮌헨': 'Munich', '취리히': 'Zurich',
+  '뉴욕': 'New York', '로스앤젤레스': 'Los Angeles', '시카고': 'Chicago',
+  '댈러스': 'Dallas', '휴스턴': 'Houston', '시애틀': 'Seattle',
+  '밴쿠버': 'Vancouver', '토론토': 'Toronto', '멕시코시티': 'Mexico City',
+  '상파울루': 'São Paulo', '부에노스아이레스': 'Buenos Aires',
+  '시드니': 'Sydney', '멜버른': 'Melbourne', '오클랜드': 'Auckland',
+  '두바이': 'Dubai', '방갈로르': 'Bangalore',
+};
+
+// 한국어 예매/공지 suffix → 영어
+const SUFFIX_KO_EN = [
+  [/\s*멤버십\s*사전\s*인증$/i, ' - Membership Pre-Verification'],
+  [/\s*멤버십\s*선예매$/i, ' - Membership Presale'],
+  [/\s*멤버십\s*선예매\s*신청$/i, ' - Membership Presale Application'],
+  [/\s*일반\s*예매\s*오픈$/i, ' - General Sale Open'],
+  [/\s*일반\s*예매$/i, ' - General Sale'],
+  [/\s*일반예매$/i, ' - General Sale'],
+  [/\s*얼리버드$/i, ' - Early Bird'],
+  [/\s*휠체어석\s*예매$/i, ' - Wheelchair Seat Booking'],
+  [/\s*당락\s*발표[^a-z]*입금\s*기간$/i, ' - Result Announcement & Payment'],
+  [/\s*선예매$/i, ' - Presale'],
+  [/\s*예매$/i, ' - Ticketing'],
+  [/\s*스폰서사[^)]*\)\s*선예매$/i, ' - Sponsor Presale'],
+];
+
+function translateEventName(name) {
+  let s = String(name || '');
+
+  // "- 도시명 suffix" 패턴 처리 (도시+suffix 함께)
+  s = s.replace(/[-–]\s*([가-힣]+)\s*(멤버십\s*사전\s*인증|멤버십\s*선예매\s*신청|멤버십\s*선예매|일반\s*예매\s*오픈|일반\s*예매|일반예매|얼리버드|휠체어석\s*예매|당락\s*발표[^가-힣]*입금\s*기간|선예매|예매)?(\s*\(\d[^)]*\))?$/g,
+    (match, city, suffix, date) => {
+      const en = CITY_KO_EN[city];
+      if (!en) return match;
+      const suffixMap = {
+        '멤버십 사전 인증': ' - Membership Pre-Verification',
+        '멤버십 선예매 신청': ' - Membership Presale Application',
+        '멤버십 선예매': ' - Membership Presale',
+        '일반 예매 오픈': ' - General Sale Open',
+        '일반 예매': ' - General Sale',
+        '일반예매': ' - General Sale',
+        '얼리버드': ' - Early Bird',
+        '휠체어석 예매': ' - Wheelchair Seat Booking',
+        '선예매': ' - Presale',
+        '예매': ' - Ticketing',
+      };
+      const suffixKey = suffix ? suffix.replace(/\s+/g, ' ').trim() : '';
+      // 당락 발표 패턴은 키가 가변적이므로 별도 처리
+      if (suffixKey && /당락\s*발표/.test(suffixKey)) return `- ${en}${date ? ` ${date.trim()}` : ''} - Result Announcement & Payment`;
+      const enSuffix = suffixKey ? (suffixMap[suffixKey] || ` - ${suffixKey}`) : '';
+      return `- ${en}${date ? ` ${date.trim()}` : ''}${enSuffix}`;
+    }
+  );
+
+  // suffix만 있는 경우 (도시명 없이)
+  for (const [pattern, replacement] of SUFFIX_KO_EN) {
+    if (pattern.test(s)) {
+      s = s.replace(pattern, replacement);
+      break;
+    }
+  }
+
+  return s.trim();
+}
+
 function shouldKeepTimespreadEvent(name) {
   if (/방송|생일|기념일|컴백|티저|뮤비|발매|음원|챌린지|당첨자\s*발표/i.test(name)) return false;
   return /concert|tour|live|festival|showcase|on\s*stage|fan\s*meeting|fanmeet|fansign|fan\s*sign|콘서트|투어|페스티벌|쇼케이스|팬미팅|팬싸|팬사인|사인회|공연|행사/i.test(name);
@@ -217,14 +295,15 @@ function parseTimespreadEvents(html, { from, to, group_id }) {
   const itemRe = /"name":"([^"]+)","url":"([^"]+)"/g;
   let m;
   while ((m = itemRe.exec(html))) {
-    const name = decodeEntities(m[1].replace(/\\u([0-9a-f]{4})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16))));
-    if (!shouldKeepTimespreadEvent(name)) continue;
+    const rawName = decodeEntities(m[1].replace(/\\u([0-9a-f]{4})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16))));
+    if (!shouldKeepTimespreadEvent(rawName)) continue;
+    const name = translateEventName(rawName);
     const sourceUrl = decodeEntities(m[2].replace(/\\\//g, '/'));
-    const dateMatch = sourceUrl.match(/(20\d{2})-(\d{2})-(\d{2})/) || name.match(/(20\d{2})[.-](\d{2})[.-](\d{2})/);
+    const dateMatch = sourceUrl.match(/(20\d{2})-(\d{2})-(\d{2})/) || rawName.match(/(20\d{2})[.-](\d{2})[.-](\d{2})/);
     if (!dateMatch) continue;
     const date = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
     if (!dateInRange(date, from, to)) continue;
-    const type = inferType(name, 'fanmeeting');
+    const type = inferType(rawName, 'fanmeeting');
     const key = `${date}:${name}:${sourceUrl}`;
     if (seen.has(key)) continue;
     seen.add(key);
