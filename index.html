@@ -2173,7 +2173,7 @@ async function fetchAndShowLiveGoods(artistName, eventType) {
     const cached = readGoodsCache(goodsCacheKey(artistName, 60, eType));
     if (cached) {
       const cachedItems = cached.items || [];
-      renderSingleGoods(document.getElementById('live-goods-area'), artistName, cachedItems);
+      renderSingleGoods(document.getElementById('live-goods-area'), artistName, cachedItems, eType);
       enrichGoodsInBackground(null, cachedItems);
       return;
     }
@@ -2188,7 +2188,7 @@ async function fetchAndShowLiveGoods(artistName, eventType) {
     if(!freshArea || requestId !== goodsRequestSeq) return;
 
     // 즉시 렌더 후 백그라운드 enrich (전체 배치)
-    renderSingleGoods(freshArea, artistName, items);
+    renderSingleGoods(freshArea, artistName, items, eType);
     enrichGoodsInBackground(freshArea, items);
 
   } catch(err) {
@@ -2197,17 +2197,25 @@ async function fetchAndShowLiveGoods(artistName, eventType) {
   }
 }
 
-function renderSingleGoods(area, artistName, items) {
+function renderSingleGoods(area, artistName, items, eventType) {
   if (!area) return;
   area.innerHTML = '';
 
   const displayName = allGroupsSelected ? "Today's Artists" : artistDisplayName(artistName);
+
+  // > 버튼 검색 키워드: 이벤트 타입별 대표 키워드
+  const eType = eventType || selectedEventType || 'gonbang';
+  const searchKwMap = { concert: '콘서트', fanmeeting: '팬미팅', gonbang: '공방' };
+  const searchKw = searchKwMap[eType] || '';
+  const searchQ = encodeURIComponent(artistName + (searchKw ? ' ' + searchKw : ''));
+  const chevronUrl = `https://globalbunjang.com/search?q=${searchQ}&order=date&utm_source=kf-calendar&utm_medium=social&utm_campaign=fan-goods-postcards`;
+
   const hdr = document.createElement('div');
   hdr.className = 'goods-intro';
   hdr.innerHTML = `
     <div class="goods-intro-title-row">
       <div class="goods-intro-title">${escHtml(displayName)} Fan Goods &amp; Postcards</div>
-      <a href="https://globalbunjang.com/search?q=${encodeURIComponent(artistName+' 공방')}&order=date&utm_source=kf-calendar&utm_medium=social&utm_campaign=fan-goods-postcards" target="_blank" rel="noopener" class="goods-intro-chevron">
+      <a href="${chevronUrl}" target="_blank" rel="noopener" class="goods-intro-chevron">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
       </a>
     </div>
