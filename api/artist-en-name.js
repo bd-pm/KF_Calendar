@@ -2,7 +2,7 @@
 // 한국어 아티스트명 → 공식 영문명 변환
 // 우선순위: 수동 맵 → Supabase 캐시 → Melon 검색 → 원본 유지
 
-const { OFFICIAL_ARTIST_NAMES } = require('./artist-official-names');
+const { OFFICIAL_ARTIST_NAMES } = require('../lib/artist-official-names');
 
 const SUPA_URL         = process.env.SUPA_URL || 'https://kzffotlfdtubkbxsjqiv.supabase.co';
 const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
