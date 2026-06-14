@@ -2035,6 +2035,24 @@ function enrichGoodsInBackground(area, items) {
     .catch(() => {});
 }
 
+function sortGoodsByWindow(items, anchorDateStr) {
+  if (!anchorDateStr) {
+    return items.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  }
+  const [y, mo, d] = anchorDateStr.split('-').map(Number);
+  const anchorTs = Math.floor(new Date(y, mo - 1, d).getTime() / 1000);
+  const windowEndTs = anchorTs + 7 * 24 * 3600;
+  const inWindow = [];
+  const outWindow = [];
+  for (const item of items) {
+    const t = item.updatedAt || 0;
+    (t >= anchorTs && t < windowEndTs ? inWindow : outWindow).push(item);
+  }
+  inWindow.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  outWindow.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return [...inWindow, ...outWindow];
+}
+
 function mergeGoodsResults(results) {
   const seen = new Set();
   const items = [];
@@ -2045,8 +2063,7 @@ function mergeGoodsResults(results) {
       items.push(item);
     }
   }
-  items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-  return items;
+  return sortGoodsByWindow(items, selectedDate);
 }
 
 // 전체 탭: 여러 그룹을 각각 검색해서 합치기
@@ -2165,14 +2182,14 @@ async function fetchAndShowLiveGoods(artistName, eventType) {
         Object.assign(engNamesCache, nameMap);
         saveEngNames();
       }
-      renderSingleGoods(document.getElementById('live-goods-area'), artistName, cachedItems);
+      renderSingleGoods(document.getElementById('live-goods-area'), artistName, sortGoodsByWindow(cachedItems, selectedDate));
     }
 
     // 신선 fetch: goods + enrich 병렬
     const res = await fetchGoodsCached(artistName, 60, eType);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    const items = data.items || [];
+    const items = sortGoodsByWindow(data.items || [], selectedDate);
 
     // enrich 병렬 실행 — goods fetch와 동시에 시작했으므로 거의 동시에 완료
     const missingIds = items.filter(i => !engNamesCache[String(i.id)]).map(i => i.id);
