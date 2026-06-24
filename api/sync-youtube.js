@@ -250,45 +250,84 @@ async function upsertRows(rows, { backfill = false } = {}) {
   if (rows.length === 0) return 0;
   const today = new Date(); today.setHours(0,0,0,0);
   const todayKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  // 날짜 필터
+  const filtered = rows.filter(row => backfill || row.broad_date >= todayKey);
+  if (filtered.length === 0) return 0;
+
+  // skeleton(date_rule) rows는 기존 데이터가 있으면 건드리지 않음 — 별도 처리
+  const skeletonRows = filtered.filter(r => r.source === 'date_rule');
+  const dataRows = filtered.filter(r => r.source !== 'date_rule');
+
   const hdrs = {
     apikey: SUPA_SERVICE_KEY,
     Authorization: `Bearer ${SUPA_SERVICE_KEY}`,
     'Content-Type': 'application/json',
-    Prefer: 'return=minimal',
   };
+
   let ok = 0;
-  for (const row of rows) {
-    // 오늘 이전 날짜는 건드리지 않음 — backfill 모드 예외
-    if (!backfill && row.broad_date < todayKey) { ok++; continue; }
-    const ex = await fetch(
-      `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${row.show_name}&broad_date=eq.${row.broad_date}&select=id,source`,
+
+  // skeleton: INSERT only (ignore if exists)
+  if (skeletonRows.length > 0) {
+    const r = await fetch(`${SUPA_URL}/rest/v1/music_show_lineups`, {
+      method: 'POST',
+      headers: { ...hdrs, Prefer: 'resolution=ignore-duplicates,return=minimal' },
+      body: JSON.stringify(skeletonRows),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (r.ok) ok += skeletonRows.length;
+  }
+
+  // data rows: fetch existing to check source protection, then PATCH in parallel
+  if (dataRows.length > 0) {
+    const dates = dataRows.map(r => r.broad_date);
+    const showName = dataRows[0].show_name;
+    const existing = await fetch(
+      `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${showName}&broad_date=in.(${dates.join(',')})&select=id,broad_date,source`,
       { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` },
-        signal: AbortSignal.timeout(10000) }
+        signal: AbortSignal.timeout(15000) }
     ).then(r => r.json()).catch(() => []);
-    if (ex.length > 0) {
-      // manual 최우선 보호 — 자동 소스가 절대 덮어쓰지 않음
-      if (ex[0].source === 'manual') { ok++; continue; }
-      // inkigayo는 YouTube가 메인 소스 — naver(3개만) 위에 덮어씀
-      // 다른 쇼는 naver 보호 유지
-      if (ex[0].source === 'naver' && row.show_name !== 'inkigayo') { ok++; continue; }
-      if (row.source === 'date_rule' && ex[0].source !== 'date_rule') { ok++; continue; }
-      await fetch(`${SUPA_URL}/rest/v1/music_show_lineups?id=eq.${ex[0].id}`, {
-        method: 'PATCH',
-        headers: hdrs,
-        body: JSON.stringify({ groups: row.groups, raw_title: row.raw_title, source: row.source }),
-        signal: AbortSignal.timeout(10000),
-      });
-      ok++;
-    } else {
-      const ins = await fetch(`${SUPA_URL}/rest/v1/music_show_lineups`, {
+
+    const exMap = Object.fromEntries(existing.map(e => [e.broad_date, e]));
+
+    const patches = [];
+    const inserts = [];
+    for (const row of dataRows) {
+      const ex = exMap[row.broad_date];
+      if (ex) {
+        if (ex.source === 'manual') continue;
+        if (ex.source === 'naver' && row.show_name !== 'inkigayo') continue;
+        patches.push({ id: ex.id, row });
+      } else {
+        inserts.push(row);
+      }
+    }
+
+    // PATCH in parallel (batches of 10)
+    for (let i = 0; i < patches.length; i += 10) {
+      await Promise.all(patches.slice(i, i + 10).map(({ id, row }) =>
+        fetch(`${SUPA_URL}/rest/v1/music_show_lineups?id=eq.${id}`, {
+          method: 'PATCH',
+          headers: { ...hdrs, Prefer: 'return=minimal' },
+          body: JSON.stringify({ groups: row.groups, raw_title: row.raw_title, source: row.source }),
+          signal: AbortSignal.timeout(15000),
+        })
+      ));
+      ok += Math.min(10, patches.length - i);
+    }
+
+    // INSERT new rows
+    if (inserts.length > 0) {
+      const r = await fetch(`${SUPA_URL}/rest/v1/music_show_lineups`, {
         method: 'POST',
-        headers: hdrs,
-        body: JSON.stringify([row]),
-        signal: AbortSignal.timeout(10000),
+        headers: { ...hdrs, Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(inserts),
+        signal: AbortSignal.timeout(15000),
       });
-      if (ins.ok) ok++;
+      if (r.ok) ok += inserts.length;
     }
   }
+
   return ok;
 }
 
