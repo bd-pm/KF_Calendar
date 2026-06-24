@@ -367,6 +367,12 @@ body{
   padding:24px 20px;font-size:13px;color:var(--txt2);text-align:center;letter-spacing:0;
 }
 
+/* sort bar */
+.sort-bar{
+  display:flex;gap:6px;flex-wrap:wrap;
+  padding:0 0 12px;
+}
+
 /* goods intro section */
 .goods-intro{
   padding:0 20px 16px;
@@ -1934,10 +1940,22 @@ function enrichGoodsInBackground(area, items) {
     .catch(() => {});
 }
 
+// ── 상품 정렬 상태 ──
+let goodsSortOrder = 'latest'; // 'latest' | 'price-high' | 'price-low'
+
 function itemPriceUsd(item) {
   if (Number.isFinite(Number(item.priceGlobal))) return Number(item.priceGlobal);
   return (Number(item.price) || 0) / KRW_PER_USD;
 }
+
+function sortGoodsItems(items) {
+  const s = items.slice();
+  if (goodsSortOrder === 'price-high') return s.sort((a, b) => itemPriceUsd(b) - itemPriceUsd(a));
+  if (goodsSortOrder === 'price-low')  return s.sort((a, b) => itemPriceUsd(a) - itemPriceUsd(b));
+  // 'latest' — window sort
+  return sortGoodsByWindow(s, selectedDate);
+}
+
 function sortGoodsByWindow(items, anchorDateStr) {
   // 1순위: 해당 일자 +7일 이내 등록 상품 → 2순위: 최신순 → 3순위: 가격 높은순
   const cmp = (a, b) => {
@@ -1962,6 +1980,42 @@ function sortGoodsByWindow(items, anchorDateStr) {
   return [...inWindow, ...outWindow];
 }
 
+// ── 정렬 버튼 바 렌더 ──
+const SORT_OPTIONS = [
+  { key: 'latest',     label: 'Latest' },
+  { key: 'price-high', label: 'Price: High' },
+  { key: 'price-low',  label: 'Price: Low' },
+];
+function renderSortBar(area, allItems, gridLimit, delayStep) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sort-bar';
+
+  function build() {
+    wrap.innerHTML = '';
+    SORT_OPTIONS.forEach(({ key, label }) => {
+      const btn = document.createElement('button');
+      const isOn = goodsSortOrder === key;
+      btn.type = 'button';
+      btn.textContent = label;
+      btn.style.cssText = `height:28px;padding:0 12px;border-radius:9999px;font-size:12px;font-weight:700;letter-spacing:0;border:1.5px solid ${isOn ? 'var(--txt1)' : 'var(--border2)'};background:${isOn ? 'var(--txt1)' : 'transparent'};color:${isOn ? '#FFFFFF' : 'var(--txt2)'};cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent;flex-shrink:0;`;
+      btn.onclick = () => {
+        if (goodsSortOrder === key) return;
+        goodsSortOrder = key;
+        // 정렬 재적용: 기존 grid를 sortGoodsItems로 교체
+        const existingGrid = area.querySelector('.goods-grid');
+        if (existingGrid) {
+          existingGrid.innerHTML = '';
+          renderGoodsCards(existingGrid, sortGoodsItems(allItems), gridLimit, delayStep);
+        }
+        build();
+      };
+      wrap.appendChild(btn);
+    });
+  }
+  build();
+  return wrap;
+}
+
 function mergeGoodsResults(results) {
   const seen = new Set();
   const items = [];
@@ -1972,7 +2026,7 @@ function mergeGoodsResults(results) {
       items.push(item);
     }
   }
-  return sortGoodsByWindow(items, selectedDate);
+  return sortGoodsByWindow(items, selectedDate); // merge는 항상 window sort (캐시 저장용); 렌더 시 sortGoodsItems로 재정렬
 }
 
 // 전체 탭: 여러 그룹을 각각 검색해서 합치기
@@ -2044,6 +2098,7 @@ function renderAllGoods(area, items, showName, artists) {
 
   const hdr = document.createElement('div');
   hdr.className = 'goods-intro';
+  const sortedItems = sortGoodsItems(items);
   hdr.innerHTML = `
     <div class="goods-intro-title-row">
       <div class="goods-intro-title">K-pop photocards & goods,<br>fresh from ${showName ? escHtml(showName) : 'today\'s show'}</div>
@@ -2051,9 +2106,7 @@ function renderAllGoods(area, items, showName, artists) {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
       </a>
     </div>
-    <div class="goods-intro-footer">
-      <div class="goods-intro-sub">${items.length > 0 ? `${items.length} listings · Latest` : 'No listings found'}</div>
-    </div>
+    <div class="goods-intro-sub" style="margin-bottom:10px">${items.length > 0 ? `${items.length} listings` : 'No listings found'}</div>
   `;
   area.appendChild(hdr);
 
@@ -2065,9 +2118,11 @@ function renderAllGoods(area, items, showName, artists) {
     return;
   }
 
+  hdr.appendChild(renderSortBar(area, items, 60, 15));
+
   const grid = document.createElement('div');
   grid.className = 'goods-grid';
-  renderGoodsCards(grid, items, 60, 15);
+  renderGoodsCards(grid, sortedItems, 60, 15);
   area.appendChild(grid);
 }
 
@@ -2123,6 +2178,7 @@ function renderSingleGoods(area, artistName, items, eventType) {
 
   const hdr = document.createElement('div');
   hdr.className = 'goods-intro';
+  const sortedItems = sortGoodsItems(items);
   hdr.innerHTML = `
     <div class="goods-intro-title-row">
       <div class="goods-intro-title">${escHtml(displayName)} Fan Goods &amp; Postcards</div>
@@ -2130,9 +2186,7 @@ function renderSingleGoods(area, artistName, items, eventType) {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
       </a>
     </div>
-    <div class="goods-intro-footer">
-      <div class="goods-intro-sub">${items.length > 0 ? `${items.length} listings · Latest` : 'No listings found'}</div>
-    </div>
+    <div class="goods-intro-sub" style="margin-bottom:10px">${items.length > 0 ? `${items.length} listings` : 'No listings found'}</div>
   `;
   area.appendChild(hdr);
 
@@ -2144,9 +2198,11 @@ function renderSingleGoods(area, artistName, items, eventType) {
     return;
   }
 
+  hdr.appendChild(renderSortBar(area, items, 40, 20));
+
   const grid = document.createElement('div');
   grid.className = 'goods-grid';
-  renderGoodsCards(grid, items, 40, 20);
+  renderGoodsCards(grid, sortedItems, 40, 20);
   area.appendChild(grid);
 }
 
@@ -2475,12 +2531,8 @@ function openSearchModal() {
 function openGroupModal(artistName) {
   if (document.querySelector('.gmodal')) return;
   const displayName = artistDisplayName(artistName);
-
-  // groupFilter 세팅 → buildCal/renderBottom이 이 아티스트 일정만 보여줌
   groupFilter = artistName;
-
-  // 가장 가까운 미래 일정(또는 최근 과거)으로 날짜 이동
-  const targetDate = findLatestDateForArtist(artistName);
+  goodsSortOrder = 'latest';
 
   const modal = document.createElement('div');
   modal.className = 'gmodal';
@@ -2493,148 +2545,71 @@ function openGroupModal(artistName) {
       </button>
       <span style="font-size:17px;font-weight:700;color:var(--txt1);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(displayName)}</span>
     </div>
-    <div class="view-bar" id="gmodal-view-bar">
-      <div class="view-l">
-        <button class="nav-btn" id="gmodal-prev">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <div class="view-title" id="gmodal-view-title"></div>
-        <button class="nav-btn" id="gmodal-next">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        </button>
-      </div>
-      <div class="view-r">
-        <button class="today-btn" id="gmodal-today">Today</button>
-        <div class="toggle-wrap">
-          <button class="toggle-btn${view === 'week' ? ' on' : ''}" id="gmodal-btnWeek">Week</button>
-          <button class="toggle-btn${view === 'month' ? ' on' : ''}" id="gmodal-btnMonth">Month</button>
-        </div>
-      </div>
-    </div>
     <div class="gmodal-body" id="gmodal-body"></div>
   `;
   document.body.appendChild(modal);
 
-  // gmodal-body 안에 기존 앱 UI(typeFilter + calArea + dateHeader + bottom)를 복제
   const body = modal.querySelector('#gmodal-body');
+  body.style.cssText = 'overflow-y:auto;flex:1;background:#FFFFFF;';
 
-
-  // 캘린더 영역
-  const calArea = document.createElement('div');
-  calArea.className = 'cal-area';
-  calArea.id = 'gmodal-cal-area';
-  body.appendChild(calArea);
-
-  // dateHeader
-  const dh = document.createElement('div');
-  dh.id = 'gmodal-date-header';
-  body.appendChild(dh);
-
-  // bottom
-  const btm = document.createElement('div');
-  btm.className = 'bottom';
-  btm.id = 'gmodal-bottom';
-  body.appendChild(btm);
-
-  // 캘린더/하단 렌더 함수 — 기존 buildCal/renderBottom의 타겟을 gmodal 요소로 교체
-  function buildGModalCal() {
-    updateTitle();
-    const area = document.getElementById('gmodal-cal-area');
-    if (!area) return;
-    area.innerHTML = '';
-    if (view === 'week') buildWeek(area);
-    else buildMonth(area);
-  }
-
-  function renderGModalBottom() {
-    const bot = document.getElementById('gmodal-bottom');
-    const hdr = document.getElementById('gmodal-date-header');
-    if (!bot || !hdr) return;
-    // 임시로 실제 DOM ID를 gmodal 요소로 교체
-    const realBot = document.getElementById('bottom');
-    const realHdr = document.getElementById('dateHeader');
-    realBot.id = '__bottom_hidden';
-    realHdr.id = '__dateHeader_hidden';
-    btm.id = 'bottom';
-    dh.id = 'dateHeader';
-    renderBottom();
-    btm.id = 'gmodal-bottom';
-    dh.id = 'gmodal-date-header';
-    realBot.id = 'bottom';
-    realHdr.id = 'dateHeader';
-    // gmodal btm 안의 live-goods-area를 직접 참조해 fetchAndShowLiveGoods 재호출
-    // (DOM에 live-goods-area가 두 개 존재할 때 getElementById가 잘못된 요소를 잡는 문제 방지)
-    const gLGA = btm.querySelector('[id="live-goods-area"]');
-    if (gLGA && selectedArtistName) {
-      fetchAndShowLiveGoods(selectedArtistName, selectedEventType || 'gonbang', gLGA);
-    } else if (gLGA && (allGroupsSelected || (selectedEventId && selectedEventId.startsWith('gonbang-')))) {
-      const lineup = LINEUP_BY_DATE[selectedDate];
-      if (lineup) {
-        const ra = parseRawTitleStatic(lineup.rawTitle);
-        fetchAllGroupGoods(ra.length > 0 ? ra : lineup.groups, null, gLGA);
-      }
-    }
-  }
-
-  // selectDate override — gmodal 내에서 날짜 클릭 시 gmodal bottom 갱신
-  modal._origSelectDate = null; // no override needed; selectDate already updates selectedDate + calls renderBottom
-  // 캘린더 cell onclick은 selectDate(ds)를 호출 → renderBottom()이 실제 #bottom을 업데이트하므로
-  // gmodal-bottom도 같이 갱신되도록 renderBottom을 패치
-  const origRenderBottom = window._gmodalOrigRenderBottom || null;
-
-  // 날짜 선택 (가장 최근 일정) — syncCalendar가 weekStart/monthPivot를 targetDate로 맞춤
-  selectDate(targetDate, { syncCalendar: true });
-  // 이후 캘린더 렌더 (selectDate가 weekStart/monthPivot 갱신 후)
-  buildGModalCal();
-  renderGModalBottom();
-
-  // 캘린더 cell 클릭 시 gmodal bottom도 갱신
-  calArea.addEventListener('click', () => {
-    setTimeout(() => renderGModalBottom(), 0);
-  });
+  // 상품 영역
+  const goodsArea = document.createElement('div');
+  goodsArea.id = 'gmodal-goods-area';
+  goodsArea.style.cssText = 'padding:20px 0 0;background:#FFFFFF;min-height:200px;';
+  goodsArea.innerHTML = `<div class="goods-grid">${Array.from({length:6}).map(()=>`<div class="skel-card"><div class="skel-img"></div><div class="skel-body"><div class="skel-base skel-price"></div><div class="skel-base skel-name1"></div><div class="skel-base skel-name2"></div></div></div>`).join('')}</div>`;
+  body.appendChild(goodsArea);
 
   requestAnimationFrame(() => requestAnimationFrame(() => modal.classList.add('open')));
 
-  function gSetView(v) {
-    view = v;
-    modal.querySelector('#gmodal-btnWeek').className = 'toggle-btn' + (v==='week'?' on':'');
-    modal.querySelector('#gmodal-btnMonth').className = 'toggle-btn' + (v==='month'?' on':'');
-    const hw = document.getElementById('btnWeek'); if(hw) hw.className = 'toggle-btn'+(v==='week'?' on':'');
-    const hm = document.getElementById('btnMonth'); if(hm) hm.className = 'toggle-btn'+(v==='month'?' on':'');
-    buildGModalCal();
-    renderGModalBottom();
+  // 상품 fetch & 렌더
+  const searchQ = encodeURIComponent(displayName + ' 공방');
+  const chevronUrl = `https://globalbunjang.com/search?q=${searchQ}&order=date&utm_source=kf-calendar&utm_medium=social&utm_campaign=kpop-groups`;
+
+  function renderGroupGoods(items) {
+    goodsArea.innerHTML = '';
+    const sortedItems = sortGoodsItems(items);
+    const hdr = document.createElement('div');
+    hdr.className = 'goods-intro';
+    hdr.innerHTML = `
+      <div class="goods-intro-title-row">
+        <div class="goods-intro-title">${escHtml(displayName)} Fan Goods &amp; Postcards</div>
+        <a href="${chevronUrl}" target="_blank" rel="noopener" class="goods-intro-chevron">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </a>
+      </div>
+      <div class="goods-intro-sub" style="margin-bottom:10px">${items.length > 0 ? `${items.length} listings` : 'No listings found'}</div>
+    `;
+    goodsArea.appendChild(hdr);
+    if (items.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'goods-empty';
+      empty.textContent = `No fan goods listings found for ${displayName}.`;
+      goodsArea.appendChild(empty);
+      return;
+    }
+    hdr.appendChild(renderSortBar(goodsArea, items, 60, 15));
+    const grid = document.createElement('div');
+    grid.className = 'goods-grid';
+    renderGoodsCards(grid, sortedItems, 60, 15);
+    goodsArea.appendChild(grid);
+    enrichGoodsInBackground(goodsArea, items);
   }
-  function gNavPrev() {
-    if(view==='week') weekStart=addDays(weekStart,-7);
-    else monthPivot=new Date(monthPivot.getFullYear(),monthPivot.getMonth()-1,1);
-    buildGModalCal();
+
+  const cacheKey = goodsCacheKey(artistName, 60, 'gonbang');
+  const cached = readGoodsCache(cacheKey);
+  if (cached) {
+    renderGroupGoods(cached.items || []);
+  } else {
+    fetchGoodsCached(artistName, 60, 'gonbang')
+      .then(r => r.ok ? r.json() : { items: [] })
+      .then(data => { renderGroupGoods(data.items || []); })
+      .catch(() => { goodsArea.innerHTML = `<div class="goods-empty">Failed to load listings.</div>`; });
   }
-  function gNavNext() {
-    if(view==='week') weekStart=addDays(weekStart,7);
-    else monthPivot=new Date(monthPivot.getFullYear(),monthPivot.getMonth()+1,1);
-    buildGModalCal();
-  }
-  modal.querySelector('#gmodal-btnWeek').onclick = () => gSetView('week');
-  modal.querySelector('#gmodal-btnMonth').onclick = () => gSetView('month');
-  modal.querySelector('#gmodal-prev').onclick = gNavPrev;
-  modal.querySelector('#gmodal-next').onclick = gNavNext;
-  modal.querySelector('#gmodal-today').onclick = () => {
-    weekStart = getWeekStart(TODAY);
-    monthPivot = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
-    selectDate(dKey(TODAY));
-    buildGModalCal();
-    renderGModalBottom();
-  };
 
   modal.querySelector('#gmodal-back').onclick = () => {
     groupFilter = null;
     modal.classList.remove('open');
-    setTimeout(() => {
-      modal.remove();
-      // 홈 캘린더 복구
-      buildCal();
-      renderBottom();
-    }, 340);
+    setTimeout(() => modal.remove(), 340);
   };
 }
 
