@@ -125,7 +125,6 @@ select option{background:#0d0d14}
   <div class="tab on"  onclick="showTab('calendar')">📅 Calendar</div>
   <div class="tab"     onclick="showTab('lineups')">🎤 Lineups</div>
   <div class="tab"     onclick="showTab('feedback')">Feedback</div>
-  <div class="tab"     onclick="showTab('add')">+ Add Event</div>
 </div>
 
 <div class="content">
@@ -144,7 +143,7 @@ select option{background:#0d0d14}
           oninput="filterGroupInput(this.value)">
         <div style="width:1px;background:#333;margin:0 2px"></div>
         <div class="fchip crawl on"  onclick="toggleFilter('src','naver')">Crawled</div>
-        <div class="fchip manual on" onclick="toggleFilter('src','manual')">Manual</div>
+        <div class="fchip manual on" onclick="toggleFilter('src','manual')">Direct input</div>
       </div>
     </div>
 
@@ -152,20 +151,6 @@ select option{background:#0d0d14}
     <div class="detail-panel" id="detail-panel">
       <div class="detail-title" id="dp-name"></div>
       <div class="detail-meta" id="dp-meta"></div>
-      <!-- inline edit form -->
-      <div id="dp-edit" style="display:none;margin-bottom:14px">
-        <div class="edit-row"><label>Name</label><input id="ep-name"></div>
-        <div class="edit-row"><label>Venue</label><input id="ep-venue"></div>
-        <div class="edit-row"><label>Date</label><input id="ep-date" type="date"></div>
-        <div class="edit-row"><label>Type</label>
-          <select id="ep-type">
-            <option value="comeback">Comeback</option><option value="concert">Concert</option>
-            <option value="tour">Tour</option><option value="fansign">Fan Sign</option>
-            <option value="fancon">Fan Con</option><option value="release">Release</option>
-            <option value="special">Special</option>
-          </select>
-        </div>
-      </div>
       <div class="detail-actions" id="dp-actions"></div>
     </div>
 
@@ -241,36 +226,6 @@ select option{background:#0d0d14}
     <div id="fb-list"><div class="empty">Loading…</div></div>
   </div>
 
-  <!-- ═══════════════ ADD EVENT TAB ═══════════════ -->
-  <div id="tab-add" style="display:none">
-    <div class="sec-hdr"><h2>Add Event Manually</h2></div>
-    <div class="form-card">
-      <div class="form-grid">
-        <div><label>Group</label>
-          <select id="a-group">
-            <option value="bts">BTS</option>
-            <option value="enhypen">ENHYPEN</option>
-            <option value="seventeen">SEVENTEEN</option>
-          </select>
-        </div>
-        <div><label>Type</label>
-          <select id="a-type">
-            <option value="comeback">Comeback</option><option value="concert">Concert</option>
-            <option value="tour">Tour</option><option value="fansign">Fan Sign</option>
-            <option value="fancon">Fan Con</option><option value="release">Release</option>
-            <option value="special">Special</option>
-          </select>
-        </div>
-        <div class="form-full"><label>Event Name</label><input id="a-name" placeholder="e.g. ARIRANG World Tour — Seoul Night 1"></div>
-        <div class="form-full"><label>Venue</label><input id="a-venue" placeholder="e.g. Goyang Stadium, South Korea"></div>
-        <div><label>Date Start</label><input id="a-date-start" type="date"></div>
-        <div><label>Date End (optional)</label><input id="a-date-end" type="date"></div>
-        <div class="form-full"><label>Source URL (optional)</label><input id="a-url" placeholder="https://…"></div>
-      </div>
-      <button class="btn-primary" style="width:100%" onclick="addEvent()">Add Event</button>
-      <div id="a-msg" style="margin-top:10px;font-size:13px;text-align:center;min-height:18px"></div>
-    </div>
-  </div>
 
 </div><!-- /content -->
 
@@ -294,29 +249,19 @@ async function api(path, opts={}) {
   return res;
 }
 
-function parseManualCalendarEvent(row) {
-  const raw = String(row.raw_title || '');
-  const text = raw.includes(' - ') ? raw.slice(raw.indexOf(' - ') + 3) : raw;
-  const [nameVenue] = text.split('|').map(s => s.trim());
-  const atIdx = nameVenue.indexOf(' @ ');
-  return {
-    ...row,
-    event_name: atIdx >= 0 ? nameVenue.slice(0, atIdx).trim() : nameVenue.trim(),
-    venue: atIdx >= 0 ? nameVenue.slice(atIdx + 3).trim() : '',
-  };
-}
 
 function displayNameForEvent(row) {
-  if (row.source === 'manual_event') return parseManualCalendarEvent(row).event_name || 'Manual event';
   return SHOW_LABELS_ADMIN[row.show_name] || row.show_name;
 }
 
+// 어드민에서 직접 입력한 공방 lineup: source='manual'
+// 크롤링된 것: source='naver', 'imbc_api', 'youtube_api', 'date_rule' 등
 function isManualSource(row) {
-  return (row.source || 'manual') === 'manual' || row.source === 'manual_event';
+  return (row.source || 'manual') === 'manual';
 }
 
 // ── STATE ──
-const TABS = ['calendar','lineups','feedback','add'];
+const TABS = ['calendar','lineups','feedback'];
 let allEvents = [];
 let calYear, calMonth;
 let filterGroup = '';
@@ -589,7 +534,8 @@ async function loadAllEvents() {
       allEvents = []; return;
     }
     const data = JSON.parse(text);
-    allEvents = Array.isArray(data) ? data.filter(e => e.source !== 'cancelled') : [];
+    // manual_event = 비-공방 이벤트 (콘서트 등) — 더 이상 사용하지 않으므로 제외
+    allEvents = Array.isArray(data) ? data.filter(e => e.source !== 'cancelled' && e.source !== 'manual_event' && !String(e.show_name||'').startsWith('event_')) : [];
   } catch(e) {
     document.getElementById('topbar-stats').textContent = `Fetch error: ${e.message}`;
     allEvents = [];
@@ -601,7 +547,7 @@ function updateTopbar() {
   const manual  = allEvents.filter(e=>isManualSource(e)).length;
   const visible = visibleEvents().length;
   document.getElementById('topbar-stats').textContent =
-    `Total ${allEvents.length} (Crawled ${crawled} · Manual ${manual}) · Visible ${visible}`;
+    `Total ${allEvents.length} (Crawled ${crawled} · Direct input ${manual}) · Visible ${visible}`;
 }
 
 // ── CALENDAR ──
@@ -682,17 +628,18 @@ function renderCal() {
       const pill = document.createElement('div');
       const isCrawled = !isManualSource(e);
       pill.className = `cal-pill ${isCrawled ? 'src-crawl' : 'src-manual'}`;
-      const showColor = e.source === 'manual_event' ? '#80b0f0' : SHOW_COLORS_ADMIN[e.show_name];
+      const showColor = SHOW_COLORS_ADMIN[e.show_name];
       if(showColor) pill.style.cssText += `;border-left:3px solid ${showColor}`;
       // Shorten show label: 'MBC Music Core' → 'Music Core'
       const fullLabel = displayNameForEvent(e);
       const shortName = fullLabel.replace(/🎵 /,'').replace(/^[A-Za-z]+ M? /,'').replace(/^[A-Za-z]+ /,'');
       const artistCount = (e.groups||[]).length;
-      pill.textContent = e.source === 'manual_event' ? shortName : (artistCount ? `${shortName} (${artistCount})` : shortName);
+      pill.textContent = artistCount ? `${shortName} (${artistCount})` : shortName;
       const titleArtists = e.raw_title
         ? e.raw_title.replace(/^[^-]+-\s*/,'').slice(0,80)
         : (e.groups||[]).join(', ').slice(0,80);
-      pill.title = `${fullLabel}\n${titleArtists}`;
+      const srcLabel = isCrawled ? 'Crawled' : 'Direct input';
+      pill.title = `[${srcLabel}] ${fullLabel}\n${titleArtists}`;
       pill.onclick = () => openDetail(e);
       cell.appendChild(pill);
     });
@@ -725,14 +672,11 @@ function openDetail(e) {
   panel.classList.add('open');
   document.getElementById('dp-edit').style.display='none';
 
-  const manualCalendarEvent = e.source === 'manual_event';
-  const parsedManualEvent = manualCalendarEvent ? parseManualCalendarEvent(e) : null;
-  const showLabel = manualCalendarEvent ? parsedManualEvent.event_name : (SHOW_LABELS_ADMIN[e.show_name] || e.show_name);
-  const showColor = manualCalendarEvent ? '#80b0f0' : (SHOW_COLORS_ADMIN[e.show_name] || '#9B6FD8');
-  const isCancelled = e.source === 'cancelled';
-  const isCrawled = !isManualSource(e) && !isCancelled;
-  const srcText   = isCancelled ? 'Canceled' : (isCrawled ? 'Crawled' : 'Manual');
-  const srcClass  = isCancelled ? '' : (isCrawled ? 'badge-crawl' : 'badge-manual');
+  const showLabel = SHOW_LABELS_ADMIN[e.show_name] || e.show_name;
+  const showColor = SHOW_COLORS_ADMIN[e.show_name] || '#9B6FD8';
+  const isCrawled = !isManualSource(e);
+  const srcText   = isCrawled ? 'Crawled' : 'Direct input';
+  const srcClass  = isCrawled ? 'badge-crawl' : 'badge-manual';
 
   // Artists: parse raw_title first, fallback to groups[]
   const rawParts = e.raw_title
@@ -749,8 +693,8 @@ function openDetail(e) {
   document.getElementById('dp-name').innerHTML =
     `<span style="color:${showColor}">${showLabel}</span>`;
   document.getElementById('dp-meta').innerHTML = `
-    <span class="badge ${srcClass}" style="${isCancelled ? 'background:#5A5A5A;color:#fff' : ''}">${srcText}</span>
-    &nbsp;📅 ${e.broad_date}${e.episode_number ? ` &nbsp;·&nbsp; EP ${e.episode_number}` : ''}${parsedManualEvent?.venue ? ` &nbsp;·&nbsp; ${parsedManualEvent.venue}` : ''}<br><br>
+    <span class="badge ${srcClass}">${srcText}</span>
+    &nbsp;📅 ${e.broad_date}${e.episode_number ? ` &nbsp;·&nbsp; EP ${e.episode_number}` : ''}<br><br>
     ${groupBadges || '<span style="color:#555;font-size:12px">No group mapping</span>'}
     ${artistList.length ? `<div style="margin-top:8px;font-size:11px;color:#777;line-height:1.8">${artistList.join(' · ')}</div>` : ''}
   `;
@@ -759,28 +703,13 @@ function openDetail(e) {
   actions.innerHTML='';
   const btnGoLineups = document.createElement('button');
   btnGoLineups.className='btn-edit btn-sm';
-  btnGoLineups.textContent = manualCalendarEvent ? 'Delete event' : 'Edit lineup';
+  btnGoLineups.textContent = 'Edit lineup';
   btnGoLineups.onclick = () => {
-    if (manualCalendarEvent) {
-      if(!confirm('Delete this event?')) return;
-      fetch(`/api/lineup-upsert?id=${e.id}`, { method:'DELETE' })
-        .then(async res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-          await loadAllEvents();
-          renderCal();
-          updateTopbar();
-          panel.classList.remove('open');
-        })
-        .catch(err => alert('Delete failed: ' + err.message));
-      return;
-    }
     panel.classList.remove('open');
-    // Switch tabs (do not call loadLineups directly)
     TABS.forEach(t => {
       document.getElementById(`tab-${t}`).style.display = t==='lineups' ? 'block' : 'none';
       document.querySelectorAll('.tab')[TABS.indexOf(t)].classList.toggle('on', t==='lineups');
     });
-    // Populate the form after loadLineups completes
     loadLineups(() => {
       editLineup(e.id, e.show_name, e.broad_date, e.episode_number, e.raw_title || '');
     });
@@ -791,30 +720,6 @@ function openDetail(e) {
   actions.append(btnGoLineups, btnClose);
 }
 
-async function saveEdit() {
-  if(!editingId) return;
-  const body = {
-    name:       document.getElementById('ep-name').value.trim(),
-    venue:      document.getElementById('ep-venue').value.trim(),
-    date_start: document.getElementById('ep-date').value,
-    type:       document.getElementById('ep-type').value,
-  };
-  await api(`events?id=eq.${editingId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify(body)});
-  await loadAllEvents();
-  renderCal();
-  document.getElementById('detail-panel').classList.remove('open');
-}
-
-async function deleteEvent(id) {
-  if(!confirm('Delete this event?')) return;
-  await api(`events?id=eq.${id}`, {method:'DELETE', prefer:'return=minimal'});
-  await loadAllEvents();
-  renderCal();
-  document.getElementById('detail-panel').classList.remove('open');
-  updateTopbar();
-}
-
-// ── SUBMISSIONS ──
 // ── FEEDBACK ──
 async function loadFeedback() {
   const el = document.getElementById('fb-list');
@@ -850,26 +755,6 @@ async function loadFeedback() {
   });
 }
 
-// ── ADD EVENT ──
-async function addEvent() {
-  const group=document.getElementById('a-group').value;
-  const type=document.getElementById('a-type').value;
-  const name=document.getElementById('a-name').value.trim();
-  const venue=document.getElementById('a-venue').value.trim();
-  const ds=document.getElementById('a-date-start').value;
-  const de=document.getElementById('a-date-end').value||null;
-  const url=document.getElementById('a-url').value.trim();
-  const msg=document.getElementById('a-msg');
-  if(!name||!ds){msg.style.color='#d06060';msg.textContent='Name and date required.';return;}
-  msg.style.color='#888';msg.textContent='Saving…';
-  const res=await fetch('/api/lineup-upsert',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({kind:'event',group_id:group,type,name,venue,date_start:ds,date_end:de,source_url:url})});
-  if(res.ok||res.status===201){
-    msg.style.color='#60d090';msg.textContent='✓ Event added!';
-    ['a-name','a-venue','a-date-start','a-date-end','a-url'].forEach(id=>document.getElementById(id).value='');
-    await loadAllEvents(); renderCal(); updateTopbar();
-  } else { msg.style.color='#d06060';msg.textContent='Error: '+(await res.text()); }
-}
 </script>
 </body>
 </html>

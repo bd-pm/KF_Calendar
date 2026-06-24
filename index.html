@@ -738,9 +738,6 @@ body{
 </div>
 <div class="type-filter" id="typeFilter">
   <button class="type-chip on" data-type="gonbang" onclick="toggleEventType('gonbang')"><span class="chip-dot" style="background:#8FB8E0"></span>Music Shows</button>
-  <button class="type-chip on" data-type="concert" onclick="toggleEventType('concert')"><span class="chip-dot" style="background:#E07A7A"></span>Concerts</button>
-  <button class="type-chip on" data-type="fanmeeting" onclick="toggleEventType('fanmeeting')"><span class="chip-dot" style="background:#9B7EC8"></span>Fan Meetings</button>
-  <button class="type-chip on" data-type="other" onclick="toggleEventType('other')"><span class="chip-dot" style="background:#7EB89A"></span>Other</button>
 </div>
 </div><!-- /hdr-wrap -->
 
@@ -879,7 +876,7 @@ let allGroupsSelected = false;
 
 // 공방 EVENTS 목록 (calendar dot 렌더용)
 let EVENTS = [];
-let activeEventTypes = new Set(['gonbang', 'concert', 'fanmeeting', 'other']);
+let activeEventTypes = new Set(['gonbang']);
 // 선택된 이벤트 (콘서트/팬미팅/MD 클릭 후 매물 연동용)
 let selectedEventId = null;
 let selectedEventType = 'gonbang'; // 현재 선택된 이벤트 타입 → goods API type 파라미터로 전달
@@ -888,11 +885,11 @@ let selectedEventType = 'gonbang'; // 현재 선택된 이벤트 타입 → good
 //  SHOW LABELS
 // ─────────────────────────────────────────
 const SHOW_LABELS = {
-  music_core:    { name:'Show! Music Core', short:'Music Core',    day:'SAT', color:'#C49A6C' },
-  inkigayo:      { name:'SBS Inkigayo',     short:'Inkigayo',      day:'SUN', color:'#9B7EC8' },
-  music_bank:    { name:'Music Bank',       short:'Music Bank',    day:'FRI', color:'#6EAF7A' },
-  mcountdown:    { name:'M Countdown',      short:'M Countdown',   day:'THU', color:'#E07A7A' },
-  show_champion: { name:'Show Champion',    short:'Show Champion', day:'WED', color:'#5BB8B0' },
+  music_core:    { name:'Show! Music Core', short:'Music Core',    day:'SAT', color:'#8FB8E0' },
+  inkigayo:      { name:'SBS Inkigayo',     short:'Inkigayo',      day:'SUN', color:'#8FB8E0' },
+  music_bank:    { name:'Music Bank',       short:'Music Bank',    day:'FRI', color:'#8FB8E0' },
+  mcountdown:    { name:'M Countdown',      short:'M Countdown',   day:'THU', color:'#8FB8E0' },
+  show_champion: { name:'Show Champion',    short:'Show Champion', day:'WED', color:'#8FB8E0' },
 };
 const SHOW_DAY_INDEX = { SUN:0, MON:1, TUE:2, WED:3, THU:4, FRI:5, SAT:6 };
 
@@ -1075,9 +1072,9 @@ function eventTypeFromRow(row) {
 // 이벤트 타입별 파스텔 컬러
 const EVENT_COLORS = {
   gonbang:    '#8FB8E0', // Music Show — 파스텔 블루
-  concert:    '#E07A7A', // Concert — 파스텔 레드
-  fanmeeting: '#9B7EC8', // Fan Meeting — 파스텔 퍼플
-  other:      '#7EB89A', // Other — 파스텔 그린
+  concert:    '#E8918C', // Concert — 파스텔 코랄
+  fanmeeting: '#B39DDB', // Fan Meeting — 파스텔 라벤더
+  other:      '#80C9A0', // Other — 파스텔 민트
 };
 function eventColor(type) {
   return EVENT_COLORS[type] || EVENT_COLORS.other;
@@ -1210,52 +1207,15 @@ function buildWeek(area){
     const lineup = LINEUP_BY_DATE[ds];
     const isCancelled = lineup?.source === 'cancelled';
     const hasVisibleLineup = activeEventTypes.has('gonbang') && lineup && (isCancelled || dateHasMyGroup(ds));
-    const manualEvents = eventsOnDate(ds).filter(e => e.source === 'manual_event' || e.source === 'auto_event');
-    const scheduleColors = [];
     if(hasVisibleLineup){
       const show = SHOW_LABELS[lineup.showName];
-      scheduleColors.push(isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8'));
-    }
-    manualEvents.forEach(event => scheduleColors.push(event.color || eventColor(event.type)));
-
-    if(scheduleColors.length > 1){
+      const color = isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8');
       const dc=document.createElement('div');
       dc.className='dots-col';
-      scheduleColors.forEach(color => {
-        const dot=document.createElement('div');
-        dot.className='evt-dot';
-        dot.style.background=color;
-        dc.appendChild(dot);
-      });
-      cell.appendChild(dc);
-    } else if(hasVisibleLineup){
-      const dc=document.createElement('div');
-      dc.className='dots-col';
-      const show = SHOW_LABELS[lineup.showName];
-      const showColor = isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8');
       const dot=document.createElement('div');
       dot.className='evt-dot';
-      dot.style.background=showColor;
-      dot.title=(show?show.short:lineup.showName)+(isCancelled ? ' Canceled' : ' Lineup');
+      dot.style.background=color;
       dc.appendChild(dot);
-      const showShort = show ? show.short : lineup.showName;
-      if(showShort){
-        const cnt=document.createElement('div');
-        cnt.style.cssText=`font-size:8px;color:${showColor};font-weight:700;line-height:1;margin-top:2px;letter-spacing:0;text-align:center;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap`;
-        cnt.textContent=isCancelled ? 'Canceled' : showShort;
-        dc.appendChild(cnt);
-      }
-      cell.appendChild(dc);
-    } else if(manualEvents.length === 1){
-      const dc=document.createElement('div');
-      dc.className='dots-col';
-      manualEvents.forEach(event => {
-        const dot = document.createElement('div');
-        dot.className = 'evt-dot';
-        dot.style.background = event.color || eventColor(event.type);
-        dot.title = event.name;
-        dc.appendChild(dot);
-      });
       cell.appendChild(dc);
     }
 
@@ -1311,68 +1271,16 @@ function buildMonth(area){
     const mLineup = LINEUP_BY_DATE[ds];
     const isCancelled = mLineup?.source === 'cancelled';
     const hasVisibleLineup = activeEventTypes.has('gonbang') && mLineup && (isCancelled || dateHasMyGroup(ds));
-    const manualEvents = eventsOnDate(ds).filter(e => e.source === 'manual_event' || e.source === 'auto_event');
-    const scheduleColors = [];
     if(hasVisibleLineup){
       const show = SHOW_LABELS[mLineup.showName];
-      scheduleColors.push(isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8'));
-    }
-    manualEvents.forEach(event => scheduleColors.push(event.color || eventColor(event.type)));
-
-    if(scheduleColors.length > 1){
-      const dotsEl=document.createElement('div');
-      dotsEl.className='mday-dots';
-      scheduleColors.forEach(color => {
-        const dot=document.createElement('div');
-        dot.className='mdot';
-        dot.style.background=color;
-        dotsEl.appendChild(dot);
-      });
-      cell.appendChild(dotsEl);
-    } else if(hasVisibleLineup){
-      const show = SHOW_LABELS[mLineup.showName];
-      const showColor = isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8');
+      const color = isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8');
       const dotsEl=document.createElement('div');
       dotsEl.className='mday-dots';
       const dot=document.createElement('div');
       dot.className='mdot';
-      dot.style.background=showColor;
+      dot.style.background=color;
       dotsEl.appendChild(dot);
       cell.appendChild(dotsEl);
-
-      const pillsEl=document.createElement('div');
-      pillsEl.className='mday-evts';
-      const pill=document.createElement('div');
-      pill.className='mevt-pill';
-      pill.style.background=showColor+'33';
-      pill.style.color=showColor;
-      const mRaw = parseRawTitleStatic(mLineup.rawTitle);
-      const mCount = mRaw.length > 0 ? mRaw.length : mLineup.groups.length;
-      pill.textContent=isCancelled ? `${show?show.short:mLineup.showName} · Canceled` : (show?show.short:mLineup.showName)+(mCount?` · ${mCount}`:'');
-      pillsEl.appendChild(pill);
-      cell.appendChild(pillsEl);
-    } else if(manualEvents.length === 1){
-      const dotsEl=document.createElement('div');
-      dotsEl.className='mday-dots';
-      const event = manualEvents[0];
-      const dot=document.createElement('div');
-      dot.className='mdot';
-      dot.style.background=event.color || eventColor(event.type);
-      dotsEl.appendChild(dot);
-      cell.appendChild(dotsEl);
-
-      const pillsEl=document.createElement('div');
-      pillsEl.className='mday-evts';
-      manualEvents.forEach(event => {
-        const pill=document.createElement('div');
-        pill.className='mevt-pill';
-        const color = event.color || eventColor(event.type);
-        pill.style.background=color+'33';
-        pill.style.color=color;
-        pill.textContent=event.name;
-        pillsEl.appendChild(pill);
-      });
-      cell.appendChild(pillsEl);
     }
 
     cell.onclick=()=>{ selectDate(ds, { scrollToDetails: true }); };
@@ -1403,32 +1311,16 @@ function selectDate(ds, opts = {}){
   const _rawArtists = lineup ? parseRawTitleStatic(lineup.rawTitle) : [];
   const _chipCount = _rawArtists.length > 0 ? _rawArtists.length : (lineup ? lineup.groups.length : 0);
   const _lineupUnavailable = !_isCancelled && _expectedShow && (!lineup || lineup.source === 'date_rule' || _chipCount === 0);
-  const _typeOrder = { concert: 0, fanmeeting: 1, other: 2 };
-  const _otherEvents = EVENTS
-    .filter(e => e.date === ds && e.type !== 'gonbang' && activeEventTypes.has(e.type))
-    .sort((a, b) => (_typeOrder[a.type] ?? 9) - (_typeOrder[b.type] ?? 9));
-
-  // 카테고리 순 우선 첫 번째 일정 자동 선택
   if (_expectedShow && !_isCancelled && !_lineupUnavailable) {
-    // 공방이 첫 번째이고 lineup 있으면 선택
+    // 공방이 있으면 선택
     selectedEventId = `gonbang-${_expectedShow.showName}`;
-    allGroupsSelected = true;
-  } else if (_otherEvents.length > 0) {
-    // 공방 없거나 TBA면 첫 이벤트 선택
-    const first = _otherEvents[0];
-    selectedEventId = first.id || 'evt-0';
-    const GROUP_SLUGS_MAP = {
-      bts:'BTS',seventeen:'SEVENTEEN',enhypen:'ENHYPEN',aespa:'aespa',ive:'IVE',
-      lesserafim:'LE SSERAFIM',newjeans:'NewJeans',twice:'TWICE',blackpink:'BLACKPINK',
-      nct:'NCT',nctwish:'NCT WISH',nctdream:'NCT DREAM',nct127:'NCT 127',riize:'RIIZE',
-      tws:'TWS',day6:'DAY6',zerobaseone:'ZEROBASEONE',boynextdoor:'BOYNEXTDOOR',
-      babymonster:'BABYMONSTER',txt:'TOMORROW X TOGETHER',straykids:'Stray Kids',
-      ateez:'ATEEZ',itzy:'ITZY',nmixx:'NMIXX',plave:'PLAVE',kiss_of_life:'KISS OF LIFE',
-      kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',dxs:'DxS',bss:'BSS',
-    };
-    const _fg = first.group_id || first.group; selectedArtistName = artistFromEventName(first.name) || (_fg ? (GROUP_SLUGS_MAP[_fg] || _fg) : first.name);
-    selectedEventType = first.type || 'other';
-    allGroupsSelected = false;
+    // groupFilter 모드에서는 해당 아티스트 칩 자동 선택
+    if (groupFilter) {
+      selectedArtistName = groupFilter;
+      allGroupsSelected = false;
+    } else {
+      allGroupsSelected = true;
+    }
   }
   buildCal();
   renderBottom();
@@ -1628,30 +1520,7 @@ function renderBottom(){
   const chipCount = rawArtists.length > 0 ? rawArtists.length : (lineup ? lineup.groups.length : 0);
   const lineupUnavailable = !isCancelled && expectedShow && (!lineup || lineup.source === 'date_rule' || chipCount === 0);
 
-  // 콘서트/팬미팅/MD/Other 이벤트 — 카테고리 순 정렬
-  const EVENT_TYPE_ORDER = { concert: 0, fanmeeting: 1, md: 2, other: 3 };
-  const otherEvents = eventsOnDate(selectedDate)
-    .filter(e => e.type !== 'gonbang')
-    .sort((a, b) => (EVENT_TYPE_ORDER[a.type] ?? 9) - (EVENT_TYPE_ORDER[b.type] ?? 9));
-  const totalCount = (expectedShow ? 1 : 0) + otherEvents.length;
-
-  // group_id → 아티스트명
-  const GROUP_SLUGS_MAP = {
-    bts:'BTS',seventeen:'SEVENTEEN',enhypen:'ENHYPEN',aespa:'aespa',ive:'IVE',
-    lesserafim:'LE SSERAFIM',newjeans:'NewJeans',twice:'TWICE',blackpink:'BLACKPINK',
-    nct:'NCT',nctwish:'NCT WISH',nctdream:'NCT DREAM',nct127:'NCT 127',riize:'RIIZE',
-    tws:'TWS',day6:'DAY6',zerobaseone:'ZEROBASEONE',boynextdoor:'BOYNEXTDOOR',
-    babymonster:'BABYMONSTER',txt:'TOMORROW X TOGETHER',straykids:'Stray Kids',
-    ateez:'ATEEZ',itzy:'ITZY',nmixx:'NMIXX',plave:'PLAVE',kiss_of_life:'KISS OF LIFE',
-    kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',dxs:'DxS',bss:'BSS',
-  };
-
-  function eventTypeLabel(type) {
-    if (type === 'concert')    return 'Concert';
-    if (type === 'fanmeeting') return 'Fan Meeting';
-    if (type === 'gonbang')    return 'Music Show';
-    return 'Event';
-  }
+  const totalCount = (expectedShow ? 1 : 0);
 
   // ── 날짜 헤더 ──
   const hdr = document.createElement('div');
@@ -1736,41 +1605,6 @@ function renderBottom(){
     };
     scheduleWrap.appendChild(row);
   }
-
-  // 콘서트/팬미팅/MD/Other rows
-  otherEvents.forEach((event, idx) => {
-    const color = event.color || eventColor(event.type);
-    const label = eventTypeLabel(event.type);
-    const eid = event.id || `evt-${idx}`;
-    const isSelected = selectedEventId === eid;
-    const row = document.createElement('div');
-    row.style.cssText = `display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;cursor:pointer;transition:background .14s;margin-bottom:4px;background:${isSelected ? color+'18' : 'transparent'};border:1.5px solid ${isSelected ? color+'70' : 'transparent'};-webkit-tap-highlight-color:transparent;`;
-    row.innerHTML = `
-      <div style="width:36px;height:36px;border-radius:10px;background:${color}20;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <div style="width:10px;height:10px;border-radius:50%;background:${color}"></div>
-      </div>
-      <div style="min-width:0;flex:1">
-        <div style="font-size:10px;font-weight:700;color:${color};letter-spacing:0.03em;margin-bottom:2px;text-transform:uppercase">${escHtml(label)}</div>
-        <div style="font-size:13px;font-weight:700;color:var(--txt1);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(event.name)}</div>
-        ${event.venue ? `<div style="font-size:11px;color:var(--txt2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(event.venue)}</div>` : ''}
-      </div>
-      <div style="color:${isSelected ? color : 'var(--txt3)'};font-size:15px;font-weight:700;flex-shrink:0">${isSelected ? '✓' : '›'}</div>
-    `;
-    row.addEventListener('mouseenter', () => { if (!isSelected) row.style.background = '#F6F6F6'; });
-    row.addEventListener('mouseleave', () => { if (!isSelected) row.style.background = 'transparent'; });
-    row.onclick = () => {
-      const toggling = selectedEventId === eid;
-      selectedEventId = toggling ? null : eid;
-      const _gid = event.group_id || event.group; const artistQuery = artistFromEventName(event.name) || (_gid ? (GROUP_SLUGS_MAP[_gid] || _gid) : event.name);
-      selectedArtistName = toggling ? null : artistQuery;
-      selectedEventType = toggling ? 'gonbang' : (event.type || 'gonbang');
-      allGroupsSelected = false;
-      const sy = window.scrollY;
-      renderBottom();
-      requestAnimationFrame(() => window.scrollTo({ top: sy, behavior: 'instant' }));
-    };
-    scheduleWrap.appendChild(row);
-  });
 
   bot.appendChild(scheduleWrap);
 
@@ -1885,18 +1719,6 @@ function renderBottom(){
     return;
   }
 
-  // ── 콘서트/팬미팅/MD 선택 시: 바로 매물 (이벤트 타입별 키워드 적용) ──
-  if (selectedArtistName) {
-    const div = document.createElement('div');
-    div.className = 'divider';
-    bot.appendChild(div);
-    const liveGoodsArea = document.createElement('div');
-    liveGoodsArea.id = 'live-goods-area';
-    liveGoodsArea.style.cssText = 'padding:20px 0 0;background:#FFFFFF';
-    liveGoodsArea.innerHTML = `<div class="goods-grid">${Array.from({length:6}).map(()=>`<div class="skel-card"><div class="skel-img"></div><div class="skel-body"><div class="skel-base skel-price"></div><div class="skel-base skel-name1"></div><div class="skel-base skel-name2"></div></div></div>`).join('')}</div>`;
-    bot.appendChild(liveGoodsArea);
-    fetchAndShowLiveGoods(selectedArtistName, selectedEventType);
-  }
 }
 
 // ─────────────────────────────────────────
@@ -2077,8 +1899,8 @@ function mergeGoodsResults(results) {
 }
 
 // 전체 탭: 여러 그룹을 각각 검색해서 합치기
-async function fetchAllGroupGoods(artists, showName) {
-  const area = document.getElementById('live-goods-area');
+async function fetchAllGroupGoods(artists, showName, _areaOverride) {
+  const area = _areaOverride || document.getElementById('live-goods-area');
   if (!area) return;
   const requestId = ++goodsRequestSeq;
   const comboKey = goodsCacheKey(`__all__:${artists.join('|')}`, 60);
@@ -2087,7 +1909,7 @@ async function fetchAllGroupGoods(artists, showName) {
   const cachedCombo = readGoodsCache(comboKey);
   if (cachedCombo) {
     const cachedItems = cachedCombo.items || [];
-    renderAllGoods(document.getElementById('live-goods-area'), cachedItems, showName);
+    renderAllGoods(area, cachedItems, showName, artists);
     enrichGoodsInBackground(null, cachedItems);
     return;
   }
@@ -2098,7 +1920,7 @@ async function fetchAllGroupGoods(artists, showName) {
   if (allIndividualCached) {
     const items = mergeGoodsResults(individualCaches.map(c => c.items || []));
     writeGoodsCache(comboKey, { items });
-    renderAllGoods(document.getElementById('live-goods-area'), items, showName);
+    renderAllGoods(area, items, showName, artists);
     enrichGoodsInBackground(null, items);
     return;
   }
@@ -2106,7 +1928,7 @@ async function fetchAllGroupGoods(artists, showName) {
     ? mergeGoodsResults(individualCaches.map(c => c ? c.items || [] : []))
     : null;
   if (partialItems && partialItems.length > 0) {
-    renderAllGoods(document.getElementById('live-goods-area'), partialItems, showName);
+    renderAllGoods(area, partialItems, showName, artists);
     enrichGoodsInBackground(null, partialItems);
   }
 
@@ -2120,31 +1942,37 @@ async function fetchAllGroupGoods(artists, showName) {
       )
     );
 
-    const freshArea = document.getElementById('live-goods-area');
-    if (!freshArea || !allGroupsSelected || requestId !== goodsRequestSeq) return;
+    if (!allGroupsSelected || requestId !== goodsRequestSeq) return;
 
     const items = mergeGoodsResults(results);
     writeGoodsCache(comboKey, { items });
 
     // 즉시 렌더 후 백그라운드 enrich
-    renderAllGoods(freshArea, items, showName);
-    enrichGoodsInBackground(freshArea, items);
+    renderAllGoods(area, items, showName, artists);
+    enrichGoodsInBackground(area, items);
 
   } catch (err) {
-    const a = document.getElementById('live-goods-area');
-    if (a && requestId === goodsRequestSeq) a.innerHTML = `<div style="padding:16px 14px;color:var(--txt2);font-size:12px">Failed to load listings: ${escHtml(err.message)}</div>`;
+    if (requestId === goodsRequestSeq) area.innerHTML = `<div style="padding:16px 14px;color:var(--txt2);font-size:12px">Failed to load listings: ${escHtml(err.message)}</div>`;
   }
 }
 
-function renderAllGoods(area, items, showName) {
+function renderAllGoods(area, items, showName, artists) {
   if (!area) return;
   area.innerHTML = '';
+
+  // chevron: 첫 번째 아티스트 기준 "[그룹명] 공방" 검색
+  const firstArtist = (artists && artists.length > 0) ? artistDisplayName(artists[0]) : null;
+  const chevronQ = encodeURIComponent((firstArtist || '') + ' 공방');
+  const chevronUrl = `https://globalbunjang.com/search?q=${chevronQ}&order=date&utm_source=kf-calendar&utm_medium=social&utm_campaign=fan-goods-postcards`;
 
   const hdr = document.createElement('div');
   hdr.className = 'goods-intro';
   hdr.innerHTML = `
     <div class="goods-intro-title-row">
       <div class="goods-intro-title">K-pop photocards & goods,<br>fresh from ${showName ? escHtml(showName) : 'today\'s show'}</div>
+      <a href="${chevronUrl}" target="_blank" rel="noopener" class="goods-intro-chevron">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </a>
     </div>
     <div class="goods-intro-footer">
       <div class="goods-intro-sub">${items.length > 0 ? `${items.length} listings · Latest` : 'No listings found'}</div>
@@ -2167,8 +1995,9 @@ function renderAllGoods(area, items, showName) {
 }
 
 
-async function fetchAndShowLiveGoods(artistName, eventType) {
-  const area = document.getElementById('live-goods-area');
+async function fetchAndShowLiveGoods(artistName, eventType, _areaOverride) {
+  // _areaOverride: gmodal처럼 DOM에 live-goods-area가 여러 개 있을 때 올바른 요소 직접 전달
+  const area = _areaOverride || document.getElementById('live-goods-area');
   if(!area) return;
   const requestId = ++goodsRequestSeq;
   const eType = eventType || 'gonbang';
@@ -2180,7 +2009,7 @@ async function fetchAndShowLiveGoods(artistName, eventType) {
     const cached = readGoodsCache(goodsCacheKey(artistName, 60, eType));
     if (cached) {
       const cachedItems = cached.items || [];
-      renderSingleGoods(document.getElementById('live-goods-area'), artistName, cachedItems, eType);
+      renderSingleGoods(area, artistName, cachedItems, eType);
       enrichGoodsInBackground(null, cachedItems);
       return;
     }
@@ -2191,16 +2020,14 @@ async function fetchAndShowLiveGoods(artistName, eventType) {
     const data = await res.json();
     const items = sortGoodsByWindow(data.items || [], selectedDate);
 
-    const freshArea = document.getElementById('live-goods-area');
-    if(!freshArea || requestId !== goodsRequestSeq) return;
+    if(requestId !== goodsRequestSeq) return;
 
     // 즉시 렌더 후 백그라운드 enrich (전체 배치)
-    renderSingleGoods(freshArea, artistName, items, eType);
-    enrichGoodsInBackground(freshArea, items);
+    renderSingleGoods(area, artistName, items, eType);
+    enrichGoodsInBackground(area, items);
 
   } catch(err) {
-    const area2 = document.getElementById('live-goods-area');
-    if(area2 && requestId === goodsRequestSeq) area2.innerHTML = `<div style="padding:16px 14px;color:var(--txt2);font-size:12px">Failed to load listings: ${escHtml(err.message)}</div>`;
+    if(requestId === goodsRequestSeq) area.innerHTML = `<div style="padding:16px 14px;color:var(--txt2);font-size:12px">Failed to load listings: ${escHtml(err.message)}</div>`;
   }
 }
 
@@ -2301,27 +2128,11 @@ async function fetchMusicShowLineups() {
     const rows = await res.json();
 
     LINEUP_BY_DATE = {};
-    const manualEvents = [];
     (Array.isArray(rows) ? rows : []).forEach(r => {
       if (r.source === 'cancelled') return;
       const dateKey = (r.broad_date || '').slice(0, 10);
       if (!dateKey) return;
-      if (isManualCalendarEvent(r)) {
-        const parsed = parseManualCalendarEvent(r);
-        const eventType = eventTypeFromRow(r);
-        const source = r.source === 'auto_event' ? 'auto_event' : 'manual_event';
-        manualEvents.push({
-          id: `${source}-${r.id || dateKey}`,
-          group: (r.groups || [])[0] || 'manual',
-          date: dateKey,
-          name: parsed.name || 'Manual event',
-          type: eventType,
-          venue: parsed.venue,
-          source,
-          color: eventColor(eventType),
-        });
-        return;
-      }
+      if (isManualCalendarEvent(r)) return; // 공방 외 이벤트 무시
       // 같은 날짜에 여러 row가 있으면 manual > naver > imbc/youtube > date_rule 순
       const existing = LINEUP_BY_DATE[dateKey];
       const priority = { manual: 5, naver: 3, imbc_api: 1, youtube_api: 1, imbc: 1, date_rule: 0 };
@@ -2350,7 +2161,7 @@ async function fetchMusicShowLineups() {
         color: show.color,
       };
     });
-    EVENTS = [...lineupEvents, ...manualEvents];
+    EVENTS = [...lineupEvents];
 
     // 근처 날짜 아티스트 상품 프리패치 (500ms 지연 — UI 렌더 우선)
     setTimeout(prefetchNearbyGoods, 500);
@@ -2458,21 +2269,6 @@ function getAllArtistsFromLineups() {
     const list = artists.length > 0 ? artists : lineup.groups;
     list.forEach(a => set.add(a));
   }
-  // 공방 외 이벤트(콘서트/팬미팅/MD 등)의 그룹도 포함
-  for (const evt of EVENTS) {
-    if (evt.type !== 'gonbang' && evt.group && evt.group !== 'manual') {
-      const mapped = {
-        bts:'BTS',seventeen:'SEVENTEEN',enhypen:'ENHYPEN',aespa:'aespa',ive:'IVE',
-        lesserafim:'LE SSERAFIM',newjeans:'NewJeans',twice:'TWICE',blackpink:'BLACKPINK',
-        nct:'NCT',nctwish:'NCT WISH',nctdream:'NCT DREAM',nct127:'NCT 127',riize:'RIIZE',
-        tws:'TWS',day6:'DAY6',zerobaseone:'ZEROBASEONE',boynextdoor:'BOYNEXTDOOR',
-        babymonster:'BABYMONSTER',txt:'TOMORROW X TOGETHER',straykids:'Stray Kids',
-        ateez:'ATEEZ',itzy:'ITZY',nmixx:'NMIXX',plave:'PLAVE',kiss_of_life:'KISS OF LIFE',
-        kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',dxs:'DxS',bss:'BSS',
-      }[evt.group] || evt.group;
-      set.add(mapped);
-    }
-  }
   return [...set].sort((a, b) => {
     const ga = ARTIST_TO_GROUP_FRONT[a], gb = ARTIST_TO_GROUP_FRONT[b];
     const ra = ga ? (GROUP_RANK[ga] ?? 999) : 999;
@@ -2493,24 +2289,6 @@ function findLatestDateForArtist(artistName) {
     const list = (artists.length > 0 ? artists : lineup.groups).map(a => a.toLowerCase());
     if (aliases.some(a => list.some(l => l.includes(a) || a.includes(l)))) {
       dates.push(date);
-    }
-  }
-  // EVENTS(콘서트 등)에서도 수집
-  const GROUP_SLUGS_MAP_LOCAL = {
-    bts:'BTS',seventeen:'SEVENTEEN',enhypen:'ENHYPEN',aespa:'aespa',ive:'IVE',
-    lesserafim:'LE SSERAFIM',newjeans:'NewJeans',twice:'TWICE',blackpink:'BLACKPINK',
-    nct:'NCT',nctwish:'NCT WISH',nctdream:'NCT DREAM',nct127:'NCT 127',riize:'RIIZE',
-    tws:'TWS',day6:'DAY6',zerobaseone:'ZEROBASEONE',boynextdoor:'BOYNEXTDOOR',
-    babymonster:'BABYMONSTER',txt:'TOMORROW X TOGETHER',straykids:'Stray Kids',
-    ateez:'ATEEZ',itzy:'ITZY',nmixx:'NMIXX',plave:'PLAVE',kiss_of_life:'KISS OF LIFE',
-    kissolife:'KISS OF LIFE',illit:'ILLIT',treasure:'TREASURE',dxs:'DxS',bss:'BSS',
-  };
-  for (const evt of EVENTS) {
-    if (evt.type === 'gonbang') continue;
-    const mapped = (GROUP_SLUGS_MAP_LOCAL[evt.group] || evt.group || '').toLowerCase();
-    const evtArtist = (artistFromEventName(evt.name) || mapped).toLowerCase();
-    if (aliases.some(a => evtArtist.includes(a) || a.includes(evtArtist))) {
-      dates.push(evt.date);
     }
   }
   if (!dates.length) return today;
@@ -2583,7 +2361,7 @@ function openSearchModal() {
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8C8C8C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
         </svg>
-        <input id="smodal-input" type="text" placeholder="그룹명으로 일정 검색…"
+        <input id="smodal-input" type="text" placeholder="Search by group name…"
           autocomplete="off" autocorrect="off" spellcheck="false"/>
         <button id="smodal-clear" style="display:none;border:none;background:none;padding:0;cursor:pointer;color:var(--txt2);font-size:16px;line-height:1;flex-shrink:0;">✕</button>
       </div>
@@ -2727,6 +2505,18 @@ function openGroupModal(artistName) {
     dh.id = 'gmodal-date-header';
     realBot.id = 'bottom';
     realHdr.id = 'dateHeader';
+    // gmodal btm 안의 live-goods-area를 직접 참조해 fetchAndShowLiveGoods 재호출
+    // (DOM에 live-goods-area가 두 개 존재할 때 getElementById가 잘못된 요소를 잡는 문제 방지)
+    const gLGA = btm.querySelector('[id="live-goods-area"]');
+    if (gLGA && selectedArtistName) {
+      fetchAndShowLiveGoods(selectedArtistName, selectedEventType || 'gonbang', gLGA);
+    } else if (gLGA && (allGroupsSelected || (selectedEventId && selectedEventId.startsWith('gonbang-')))) {
+      const lineup = LINEUP_BY_DATE[selectedDate];
+      if (lineup) {
+        const ra = parseRawTitleStatic(lineup.rawTitle);
+        fetchAllGroupGoods(ra.length > 0 ? ra : lineup.groups, null, gLGA);
+      }
+    }
   }
 
   // selectDate override — gmodal 내에서 날짜 클릭 시 gmodal bottom 갱신
@@ -2735,10 +2525,10 @@ function openGroupModal(artistName) {
   // gmodal-bottom도 같이 갱신되도록 renderBottom을 패치
   const origRenderBottom = window._gmodalOrigRenderBottom || null;
 
-  // 렌더
-  buildGModalCal();
-  // 날짜 선택 (가장 최근 일정)
+  // 날짜 선택 (가장 최근 일정) — syncCalendar가 weekStart/monthPivot를 targetDate로 맞춤
   selectDate(targetDate, { syncCalendar: true });
+  // 이후 캘린더 렌더 (selectDate가 weekStart/monthPivot 갱신 후)
+  buildGModalCal();
   renderGModalBottom();
 
   // 캘린더 cell 클릭 시 gmodal bottom도 갱신
@@ -2817,7 +2607,7 @@ function dateHasMyGroup(ds) {
       const list = artists.length > 0 ? artists : lineup.groups;
       if (list.some(a => groupFilterMatches(a))) return true;
     }
-    return eventsOnDate(ds).some(e => e.type !== 'gonbang' && groupFilterMatchesEvent(e));
+    return false;
   }
   if (!myGroups || myGroups.length === 0) return true; // 전체 모드
   const lineup = LINEUP_BY_DATE[ds];
