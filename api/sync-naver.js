@@ -190,6 +190,23 @@ const ARTIST_TO_GROUP = {
   'KiiiKiii':'kiikikii',
   'AMPERS&ONE':'ampersandone','앰퍼샌드원':'ampersandone',
   'BOYNEXTDOOR':'boynextdoor','보이넥스트도어':'boynextdoor',
+  // ── Show Champion intro/lineup artists ──
+  'RIIZE':'riize','라이즈':'riize',
+  'FIFTY FIFTY':'fiftyfifty','피프티피프티':'fiftyfifty',
+  'ONF':'onf','온앤오프':'onf','온앤오프(ONF)':'onf',
+  '로시':'rothy','Rothy':'rothy',
+  '음율':'umyull','UmYull':'umyull',
+  '안신애':'ansinae',
+  '신인류':'shinnewtype',
+  'BE BOYS':'beboys','비보이즈':'beboys',
+  'LOVEONE':'loveone','러브원':'loveone',
+  'YUHZ':'yuhz','유어즈':'yuhz',
+  '5TION':'5tion','오션':'5tion',
+  'VVS':'vvs','븨븨에스':'vvs',
+  'Gavy NJ':'gavynj','가비엔제이':'gavynj',
+  '우디':'woody','Woody':'woody',
+  'NOWZ':'nowz','나우즈':'nowz',
+  'Jay Chang':'jaychang',
 };
 
 function mapArtists(names) {
@@ -325,6 +342,7 @@ function splitShowChampionArtistNames(name) {
   for (const part of raw.split(/\s+X\s+/i)) {
     const parens = [...part.matchAll(/\(([^)]+)\)/g)].map(m => clean(m[1])).filter(Boolean);
     const outside = clean(part.replace(/\([^)]*\)/g, '').trim());
+    // Prefer the token that is already mapped
     if (outside && ARTIST_TO_GROUP[outside]) {
       out.push(outside);
       continue;
@@ -332,6 +350,12 @@ function splitShowChampionArtistNames(name) {
     const mappedParen = parens.find(token => ARTIST_TO_GROUP[token]);
     if (mappedParen) {
       out.push(mappedParen);
+      continue;
+    }
+    // Prefer Latin (English) name over Korean: if outside is Korean and parens has Latin, use Latin
+    const latinParen = parens.find(token => /[A-Za-z]/.test(token) && !/^[가-힣\s]+$/.test(token));
+    if (outside && /^[가-힣]/.test(outside) && latinParen) {
+      out.push(latinParen);
       continue;
     }
     if (outside) out.push(outside);
