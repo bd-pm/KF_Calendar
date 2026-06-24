@@ -682,11 +682,21 @@ body{
   background:#FFFFFF;
   padding:32px 20px 0;
 }
-.hero-inner{ display:flex;flex-direction:column;gap:12px; }
+.hero-inner{ display:flex;flex-direction:column;gap:12px;align-items:center; }
 .hero-title{ font-size:28px;font-weight:800;color:#191919;line-height:1.2;letter-spacing:0;text-align:center; }
 .hero-desc{ font-size:14px;font-weight:400;color:#666666;line-height:1.6;letter-spacing:0;margin:0;text-align:center; }
-.hero-img-wrap{ padding:0 20px 32px; }
+.hero-img-wrap{ padding:0 20px 24px; }
 .hero-img-wrap img{ width:100%;height:auto;display:block; }
+.hero-cta{
+  display:inline-block;margin:0 auto 32px;
+  padding:12px 32px;border-radius:8px;
+  background:#FFFFFF;color:#191919;
+  border:1px solid rgba(25,25,25,0.15);
+  font-size:14px;font-weight:600;letter-spacing:0;
+  cursor:pointer;transition:background 0.2s ease,border-color 0.2s ease;
+}
+.hero-cta:hover{ background:#F6F6F6;border-color:rgba(25,25,25,0.25); }
+.hero-cta:active{ background:#F0F0F0;transform:scale(0.98); }
 </style>
 </head>
 <body>
@@ -734,6 +744,7 @@ body{
     <p class="hero-desc">Exclusive fan gifts prepared by artists<br>at music show recordings.</p>
     <div class="hero-img-wrap"><img src="/hero_image.svg" alt="K-pop photocards"></div>
   </div>
+  <button class="hero-cta" onclick="document.getElementById('bottom').scrollIntoView({behavior:'smooth'})">Shop today's goods</button>
 </div>
 
 <div style="height:10px;background:#F4F4F4;"></div>
