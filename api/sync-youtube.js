@@ -293,6 +293,7 @@ async function upsertRows(rows, { backfill = false } = {}) {
 }
 
 module.exports = async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store, no-cache');
   const secret = req.query.secret || (req.headers.authorization || '').replace('Bearer ', '');
   if (SYNC_SECRET && secret !== SYNC_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
