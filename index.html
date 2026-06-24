@@ -681,19 +681,12 @@ body{
 .hero{
   background:#FFFFFF;
   padding:32px 20px 0;
-  border-bottom:1px solid rgba(25,25,25,0.08);
 }
 .hero-inner{ display:flex;flex-direction:column;gap:12px; }
-.hero-title{ font-size:28px;font-weight:800;color:#191919;line-height:1.2;letter-spacing:0; }
-.hero-desc{ font-size:14px;font-weight:400;color:#666666;line-height:1.6;letter-spacing:0;margin:0; }
-.hero-shows{ display:flex;flex-wrap:wrap;gap:6px;padding-bottom:32px; }
-.hero-show-chip{
-  display:inline-flex;align-items:center;gap:5px;
-  padding:5px 10px;border-radius:20px;
-  background:#F6F6F6;border:1px solid rgba(25,25,25,0.08);
-  font-size:12px;font-weight:500;color:#8C8C8C;letter-spacing:0;
-}
-.hero-show-dot{ width:7px;height:7px;border-radius:50%;flex-shrink:0; }
+.hero-title{ font-size:28px;font-weight:800;color:#191919;line-height:1.2;letter-spacing:0;text-align:center; }
+.hero-desc{ font-size:14px;font-weight:400;color:#666666;line-height:1.6;letter-spacing:0;margin:0;text-align:center; }
+.hero-img-wrap{ padding:0 20px 32px; }
+.hero-img-wrap img{ width:100%;height:auto;display:block; }
 </style>
 </head>
 <body>
@@ -738,14 +731,8 @@ body{
 <div class="hero">
   <div class="hero-inner">
     <h1 class="hero-title">Find rare K-pop gifts,<br><span>straight from the broadcast</span></h1>
-    <p class="hero-desc">Exclusive fan gifts prepared by artists at music show recordings.</p>
-    <div class="hero-shows">
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#8EC8B8"></span>Music Bank</span>
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#E8A898"></span>M Countdown</span>
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#B8A8E0"></span>Inkigayo</span>
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#8FB8E0"></span>Music Core</span>
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#A8C890"></span>Show Champion</span>
-    </div>
+    <p class="hero-desc">Exclusive fan gifts prepared by artists<br>at music show recordings.</p>
+    <div class="hero-img-wrap"><img src="/hero_image.svg" alt="K-pop photocards"></div>
   </div>
 </div>
 
