@@ -78,7 +78,7 @@ body{
   display:flex;align-items:center;justify-content:space-between;
   padding:0 16px 0 8px;height:48px;
   border-bottom:1px solid var(--border);
-  position:sticky;top:56px;z-index:40;background:#FFFFFF;
+  position:sticky;top:52px;z-index:40;background:#FFFFFF;
 }
 .view-l{display:flex;align-items:center;gap:2px}
 .view-title{font-size:17px;font-weight:700;letter-spacing:0;color:var(--txt1);min-width:48px;text-align:center}
@@ -1415,8 +1415,8 @@ function selectDate(ds, opts = {}){
   const _rawArtists = lineup ? parseRawTitleStatic(lineup.rawTitle) : [];
   const _chipCount = _rawArtists.length > 0 ? _rawArtists.length : (lineup ? lineup.groups.length : 0);
   const _lineupUnavailable = !_isCancelled && _expectedShow && (!lineup || lineup.source === 'date_rule' || _chipCount === 0);
-  if (_expectedShow && !_isCancelled && !_lineupUnavailable) {
-    // 공방이 있으면 선택
+  if (_expectedShow && !_isCancelled) {
+    // 공방이 있으면 선택 (TBA/lineupUnavailable 포함 — prevWeekAction 버튼 노출을 위해)
     selectedEventId = `gonbang-${_expectedShow.showName}`;
     // groupFilter 모드에서는 해당 아티스트 칩 자동 선택
     if (groupFilter) {
@@ -1934,9 +1934,19 @@ function enrichGoodsInBackground(area, items) {
     .catch(() => {});
 }
 
+function itemPriceUsd(item) {
+  if (Number.isFinite(Number(item.priceGlobal))) return Number(item.priceGlobal);
+  return (Number(item.price) || 0) / KRW_PER_USD;
+}
 function sortGoodsByWindow(items, anchorDateStr) {
+  // 1순위: 해당 일자 +7일 이내 등록 상품 → 2순위: 최신순 → 3순위: 가격 높은순
+  const cmp = (a, b) => {
+    const dt = (b.updatedAt || 0) - (a.updatedAt || 0);
+    if (dt !== 0) return dt;
+    return itemPriceUsd(b) - itemPriceUsd(a);
+  };
   if (!anchorDateStr) {
-    return items.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    return items.slice().sort(cmp);
   }
   const [y, mo, d] = anchorDateStr.split('-').map(Number);
   const anchorTs = Math.floor(new Date(y, mo - 1, d).getTime() / 1000);
@@ -1947,8 +1957,8 @@ function sortGoodsByWindow(items, anchorDateStr) {
     const t = item.updatedAt || 0;
     (t >= anchorTs && t < windowEndTs ? inWindow : outWindow).push(item);
   }
-  inWindow.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-  outWindow.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  inWindow.sort(cmp);
+  outWindow.sort(cmp);
   return [...inWindow, ...outWindow];
 }
 
