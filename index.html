@@ -93,24 +93,6 @@ body{
   transition:all .2s;letter-spacing:0;
 }
 .toggle-btn.on{background:#FFFFFF;color:var(--txt1);box-shadow:0 1px 6px rgba(0,0,0,0.1)}
-.type-filter{
-  display:flex;gap:6px;overflow-x:auto;
-  padding:8px 16px;
-  background:#FFFFFF;
-  border-bottom:1px solid var(--border);
-  scrollbar-width:none;
-}
-.type-filter::-webkit-scrollbar{display:none}
-.type-chip{
-  flex-shrink:0;height:30px;padding:0 11px 0 8px;border-radius:9999px;
-  border:1px solid var(--border);
-  background:#FFFFFF;color:var(--txt2);
-  font-size:12px;font-weight:700;letter-spacing:0;
-  cursor:pointer;transition:all .16s;
-  display:inline-flex;align-items:center;gap:6px;
-}
-.type-chip.on{background:#F6F6F6;color:var(--txt1);border-color:rgba(25,25,25,0.18)}
-.type-chip:not(.on){opacity:0.55}
 .chip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .nav-btn{
   width:30px;height:30px;border-radius:50%;
@@ -736,9 +718,7 @@ body{
     </div>
   </div>
 </div>
-<div class="type-filter" id="typeFilter">
-  <button class="type-chip on" data-type="gonbang" onclick="toggleEventType('gonbang')"><span class="chip-dot" style="background:#8FB8E0"></span>Music Shows</button>
-</div>
+<div id="typeFilter" style="display:none"></div>
 </div><!-- /hdr-wrap -->
 
 <!-- CALENDAR AREA -->
@@ -1216,6 +1196,13 @@ function buildWeek(area){
       dot.className='evt-dot';
       dot.style.background=color;
       dc.appendChild(dot);
+      const showShort = show ? show.short : lineup.showName;
+      if(showShort){
+        const lbl=document.createElement('div');
+        lbl.style.cssText=`font-size:8px;color:${color};font-weight:700;line-height:1;margin-top:2px;letter-spacing:0;text-align:center;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap`;
+        lbl.textContent=isCancelled ? 'Canceled' : showShort;
+        dc.appendChild(lbl);
+      }
       cell.appendChild(dc);
     }
 
@@ -1274,13 +1261,14 @@ function buildMonth(area){
     if(hasVisibleLineup){
       const show = SHOW_LABELS[mLineup.showName];
       const color = isCancelled ? '#7A7A7A' : (show ? show.color : '#9B6FD8');
-      const dotsEl=document.createElement('div');
-      dotsEl.className='mday-dots';
-      const dot=document.createElement('div');
-      dot.className='mdot';
-      dot.style.background=color;
-      dotsEl.appendChild(dot);
-      cell.appendChild(dotsEl);
+      const evtsEl=document.createElement('div');
+      evtsEl.className='mday-evts';
+      const pill=document.createElement('div');
+      pill.className='mevt-pill';
+      pill.style.cssText=`background:${color}20;color:${color}`;
+      pill.textContent=isCancelled ? 'Canceled' : (show ? show.short : mLineup.showName);
+      evtsEl.appendChild(pill);
+      cell.appendChild(evtsEl);
     }
 
     cell.onclick=()=>{ selectDate(ds, { scrollToDetails: true }); };
@@ -2443,24 +2431,6 @@ function openGroupModal(artistName) {
   // gmodal-body 안에 기존 앱 UI(typeFilter + calArea + dateHeader + bottom)를 복제
   const body = modal.querySelector('#gmodal-body');
 
-  // type filter 복제
-  const tfClone = document.getElementById('typeFilter').cloneNode(true);
-  tfClone.querySelectorAll('[onclick]').forEach(btn => {
-    const type = btn.dataset.type;
-    if (type) {
-      btn.removeAttribute('onclick');
-      btn.addEventListener('click', () => {
-        toggleEventType(type);
-        // 버튼 상태 동기화
-        tfClone.querySelectorAll('.type-chip').forEach(b => {
-          b.classList.toggle('on', activeEventTypes.has(b.dataset.type));
-        });
-        buildGModalCal();
-      });
-      btn.classList.toggle('on', activeEventTypes.has(type));
-    }
-  });
-  body.appendChild(tfClone);
 
   // 캘린더 영역
   const calArea = document.createElement('div');
