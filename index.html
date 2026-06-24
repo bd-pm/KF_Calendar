@@ -1582,11 +1582,10 @@ function renderBottom(){
     row.addEventListener('mouseleave', () => { if (!isSelected) row.style.background = 'transparent'; });
     row.onclick = () => {
       if (isCancelled || lineupUnavailable) return;
-      const toggling = selectedEventId === showEid;
-      selectedEventId = toggling ? null : showEid;
+      selectedEventId = showEid;
       selectedEventType = 'gonbang';
       selectedArtistName = null;
-      allGroupsSelected = !toggling;
+      allGroupsSelected = true;
       const sy = window.scrollY;
       renderBottom();
       requestAnimationFrame(() => window.scrollTo({ top: sy, behavior: 'instant' }));
