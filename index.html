@@ -78,6 +78,7 @@ body{
   display:flex;align-items:center;justify-content:space-between;
   padding:0 16px 0 8px;height:48px;
   border-bottom:1px solid var(--border);
+  position:sticky;top:56px;z-index:40;background:#FFFFFF;
 }
 .view-l{display:flex;align-items:center;gap:2px}
 .view-title{font-size:17px;font-weight:700;letter-spacing:0;color:var(--txt1);min-width:48px;text-align:center}
@@ -718,6 +719,24 @@ body{
 </header>
 
 <!-- VIEW BAR -->
+
+<div id="typeFilter" style="display:none"></div>
+</div><!-- /hdr-wrap -->
+<!-- HERO SECTION -->
+<div class="hero">
+  <div class="hero-inner">
+    <h1 class="hero-title">Find rare K-pop gifts,<br><span>straight from the broadcast</span></h1>
+    <p class="hero-desc">Exclusive fan gifts prepared by artists at music show recordings.</p>
+    <div class="hero-shows">
+      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#4CAF50"></span>Music Bank</span>
+      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#FF4757"></span>M Countdown</span>
+      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#A855C8"></span>Inkigayo</span>
+      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#E8823A"></span>Music Core</span>
+      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#00C4B4"></span>Show Champion</span>
+    </div>
+  </div>
+</div>
+
 <div class="view-bar" id="viewBar">
   <div class="view-l">
     <button class="nav-btn" onclick="navPrev()">
@@ -736,22 +755,7 @@ body{
     </div>
   </div>
 </div>
-<div id="typeFilter" style="display:none"></div>
-</div><!-- /hdr-wrap -->
-<!-- HERO SECTION -->
-<div class="hero">
-  <div class="hero-inner">
-    <h1 class="hero-title">Find rare K-pop gifts,<br><span>straight from the broadcast</span></h1>
-    <p class="hero-desc">Exclusive fan gifts prepared by artists at music show recordings.</p>
-    <div class="hero-shows">
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#4CAF50"></span>Music Bank</span>
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#FF4757"></span>M Countdown</span>
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#A855C8"></span>Inkigayo</span>
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#E8823A"></span>Music Core</span>
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#00C4B4"></span>Show Champion</span>
-    </div>
-  </div>
-</div>
+
 
 <!-- CALENDAR AREA -->
 <div class="cal-area" id="calArea"></div>
