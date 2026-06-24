@@ -2007,9 +2007,8 @@ function openSortSheet(area, allItems, gridLimit, delayStep, triggerEl) {
   backdrop.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.45);';
 
   const sheet = document.createElement('div');
-  sheet.style.cssText = 'position:relative;z-index:1;width:100%;max-width:600px;background:#fff;border-radius:20px 20px 0 0;padding:0 0 env(safe-area-inset-bottom,0);box-shadow:0 -4px 40px rgba(0,0,0,0.18);transform:translateY(100%);transition:transform .32s cubic-bezier(.32,1,.36,1);will-change:transform;';
+  sheet.style.cssText = 'position:relative;z-index:1;width:100%;max-width:600px;background:#fff;border-radius:20px 20px 0 0;padding:0 0 env(safe-area-inset-bottom,16px);box-shadow:0 -4px 40px rgba(0,0,0,0.18);transform:translateY(100%);transition:transform .32s cubic-bezier(.32,1,.36,1);will-change:transform;font-family:\'Pretendard Variable\',Pretendard,-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;';
 
-  // 닫기 함수
   function close() {
     sheet.style.transform = 'translateY(100%)';
     backdrop.style.opacity = '0';
@@ -2018,15 +2017,17 @@ function openSortSheet(area, allItems, gridLimit, delayStep, triggerEl) {
   }
   backdrop.onclick = close;
 
-  // 옵션 렌더
+  // GDS X 아이콘 (circle + cross, feedback modal과 동일)
+  const GDS_X = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="#EBEBEB"/><path d="M8 8L16 16M16 8L8 16" stroke="#8C8C8C" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  // Bunjang 체크 아이콘
+  const CHECK = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
   sheet.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 20px 8px;">
-      <span style="font-size:20px;font-weight:700;color:var(--txt1);letter-spacing:0;">Sort by</span>
-      <button type="button" style="width:32px;height:32px;border:none;background:#EBEBEB;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;-webkit-tap-highlight-color:transparent;" id="sort-sheet-close">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8C8C8C" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </button>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 20px 12px;">
+      <span style="font-size:20px;font-weight:700;color:var(--txt1);letter-spacing:0;font-family:inherit;">Sort by</span>
+      <button type="button" id="sort-sheet-close" style="border:none;background:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;">${GDS_X}</button>
     </div>
-    <div id="sort-sheet-list" style="padding:4px 0 16px;"></div>
+    <div id="sort-sheet-list"></div>
   `;
 
   function buildList() {
@@ -2036,17 +2037,15 @@ function openSortSheet(area, allItems, gridLimit, delayStep, triggerEl) {
       const row = document.createElement('button');
       const isOn = goodsSortOrder === key;
       row.type = 'button';
-      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;width:100%;padding:16px 20px;border:none;background:transparent;font-size:16px;font-weight:' + (isOn ? '700' : '400') + ';color:var(--txt1);letter-spacing:0;cursor:pointer;text-align:left;font-family:inherit;-webkit-tap-highlight-color:transparent;';
-      row.innerHTML = `<span>${label}</span>${isOn ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>` : ''}`;
+      row.style.cssText = `display:flex;align-items:center;justify-content:space-between;width:100%;padding:18px 20px;border:none;background:transparent;font-size:17px;font-weight:${isOn ? '600' : '400'};color:var(--txt1);letter-spacing:0;cursor:pointer;text-align:left;font-family:inherit;-webkit-tap-highlight-color:transparent;`;
+      row.innerHTML = `<span>${label}</span>${isOn ? CHECK : ''}`;
       row.onclick = () => {
         goodsSortOrder = key;
-        // 그리드 재정렬
         const existingGrid = area.querySelector('.goods-grid');
         if (existingGrid) {
           existingGrid.innerHTML = '';
           renderGoodsCards(existingGrid, sortGoodsItems(allItems), gridLimit, delayStep);
         }
-        // 트리거 버튼 텍스트 갱신
         if (triggerEl) triggerEl.querySelector('.sort-trigger-label').textContent = sortLabel();
         close();
       };
@@ -2070,7 +2069,8 @@ function renderSortBar(area, allItems, gridLimit, delayStep) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'sort-trigger';
-  btn.innerHTML = `<span class="sort-trigger-label">${sortLabel()}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg>`;
+  // 트리거: "Newly Listed ↓↑" 스타일 — 아이콘 없이 텍스트 + ↓↑
+  btn.innerHTML = `<span class="sort-trigger-label">${sortLabel()}</span><span style="font-size:11px;letter-spacing:0;"> ↓↑</span>`;
   btn.onclick = () => openSortSheet(area, allItems, gridLimit, delayStep, wrap);
 
   wrap.appendChild(btn);
