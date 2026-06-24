@@ -47,7 +47,7 @@ const SHOWS = [
       return artists.filter(s => s.length > 1);
     },
     parseDate: (title, publishedAt) => {
-      const m = title.match(/(\w+)\s+(\d+)(?:st|nd|rd|th)\s+at/);
+      const m = title.match(/(\w+)\s+(\d+)(?:st|nd|rd|th)?\s+at/);
       if (m) {
         const months = {January:1,February:2,March:3,April:4,May:5,June:6,July:7,August:8,September:9,October:10,November:11,December:12};
         const mo = months[m[1]];
