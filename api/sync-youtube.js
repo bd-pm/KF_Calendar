@@ -246,7 +246,7 @@ async function fetchDescriptions(videoIds) {
   return results;
 }
 
-async function upsertRows(rows) {
+async function upsertRows(rows, { backfill = false } = {}) {
   if (rows.length === 0) return 0;
   const today = new Date(); today.setHours(0,0,0,0);
   const todayKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
@@ -258,8 +258,8 @@ async function upsertRows(rows) {
   };
   let ok = 0;
   for (const row of rows) {
-    // 오늘 이전 날짜는 절대 건드리지 않음
-    if (row.broad_date < todayKey) { ok++; continue; }
+    // 오늘 이전 날짜는 건드리지 않음 — backfill 모드 예외
+    if (!backfill && row.broad_date < todayKey) { ok++; continue; }
     const ex = await fetch(
       `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${row.show_name}&broad_date=eq.${row.broad_date}&select=id,source`,
       { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` },
@@ -268,8 +268,9 @@ async function upsertRows(rows) {
     if (ex.length > 0) {
       // manual 최우선 보호 — 자동 소스가 절대 덮어쓰지 않음
       if (ex[0].source === 'manual') { ok++; continue; }
-      // naver source 보호 — youtube_api가 덮어쓰지 않음
-      if (ex[0].source === 'naver') { ok++; continue; }
+      // inkigayo는 YouTube가 메인 소스 — naver(3개만) 위에 덮어씀
+      // 다른 쇼는 naver 보호 유지
+      if (ex[0].source === 'naver' && row.show_name !== 'inkigayo') { ok++; continue; }
       if (row.source === 'date_rule' && ex[0].source !== 'date_rule') { ok++; continue; }
       await fetch(`${SUPA_URL}/rest/v1/music_show_lineups?id=eq.${ex[0].id}`, {
         method: 'PATCH',
@@ -320,7 +321,7 @@ module.exports = async function handler(req, res) {
         episode_number: null,
         source: 'date_rule',
       }));
-      const skelOk = await upsertRows(skeletonRows);
+      const skelOk = await upsertRows(skeletonRows, { backfill: !!since });
       log.push(`[${show.show_name}] 뼈대 ${skelOk}/${futureDates.length}개`);
 
       // ② YouTube 라인업 영상 수집 및 업데이트
@@ -361,7 +362,7 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      const dataOk = await upsertRows(dataRows);
+      const dataOk = await upsertRows(dataRows, { backfill: !!since });
       log.push(`[${show.show_name}] YouTube 업데이트 ${dataOk}/${dataRows.length}개`);
       totalUpserted += skelOk + dataOk;
     } catch (err) {

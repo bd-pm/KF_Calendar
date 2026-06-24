@@ -13,12 +13,12 @@ const TG_CHAT_ID       = process.env.TG_CHAT_ID || '';
 
 // os: Naver 내부 프로그램 ID (회차정보 탭 URL에서 확인)
 // descFormat: 'dt_dd' = <dt>출연</dt><dd>..., 'span_desc' = <span class="desc _text">...
+// 인기가요는 Naver 회차정보가 3개만 노출 + SBS vod 링크 없어서 enrich 불가 → sync-youtube.js가 메인
 const SHOWS_NAVER = [
   { show_name: 'music_bank',    dayOfWeek: 5, label: '뮤직뱅크',    navOs: '659774', navQuery: '뮤직뱅크' },
   { show_name: 'show_champion', dayOfWeek: 3, label: '쇼챔피언',    navOs: '669613', navQuery: '쇼 챔피언' },
   { show_name: 'music_core',    dayOfWeek: 6, label: '음악중심',    navOs: '658837', navQuery: '음악중심' },
   { show_name: 'mcountdown',    dayOfWeek: 4, label: '엠카운트다운', navOs: '659252', navQuery: '엠카운트다운' },
-  { show_name: 'inkigayo',      dayOfWeek: 0, label: '인기가요',    navOs: '658960', navQuery: '인기가요', descFormat: 'span_desc' },
 ];
 
 const ARTIST_TO_GROUP = {
