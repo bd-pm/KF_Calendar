@@ -728,11 +728,11 @@ body{
     <h1 class="hero-title">Find rare K-pop gifts,<br><span>straight from the broadcast</span></h1>
     <p class="hero-desc">Exclusive fan gifts prepared by artists at music show recordings.</p>
     <div class="hero-shows">
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#4CAF50"></span>Music Bank</span>
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#FF4757"></span>M Countdown</span>
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#A855C8"></span>Inkigayo</span>
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#E8823A"></span>Music Core</span>
-      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#00C4B4"></span>Show Champion</span>
+      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#8EC8B8"></span>Music Bank</span>
+      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#E8A898"></span>M Countdown</span>
+      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#B8A8E0"></span>Inkigayo</span>
+      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#8FB8E0"></span>Music Core</span>
+      <span class="hero-show-chip"><span class="hero-show-dot" style="background:#A8C890"></span>Show Champion</span>
     </div>
   </div>
 </div>
@@ -1629,14 +1629,19 @@ function renderBottom(){
   // ── 날짜 헤더 ──
   const hdr = document.createElement('div');
   hdr.className = 'sel-hdr';
+  const showInfo = expectedShow || (lineup ? SHOW_LABELS[lineup.showName] : null);
+  const showName = showInfo ? (showInfo.short || showInfo.name) : null;
+  const showColor = showInfo ? showInfo.color : '#9B6FD8';
+  const artistCount = chipCount > 0 ? chipCount : (lineup?.groups?.length || 0);
+  const artistLabel = artistCount > 0 ? `${artistCount} Artists` : '';
+
   hdr.innerHTML = `
     <div>
       <div class="sel-date">${dayNames[dateObj.getDay()]}, ${MONTH_NAMES[mo-1]} ${d}</div>
-      <div class="sel-sub" style="margin-top:2px">${
-        totalCount > 0
-          ? `${totalCount} schedule${totalCount > 1 ? 's' : ''} · Tap to browse listings`
-          : 'No schedule'
-      }</div>
+      ${showName ? `<div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+        <span class="show-badge" style="background:${showColor}">${showName}</span>
+        ${artistLabel ? `<span style="font-size:12px;color:var(--txt2);letter-spacing:0;">${artistLabel}</span>` : ''}
+      </div>` : ''}
     </div>
   `;
   dateHeader.appendChild(hdr);
@@ -1668,48 +1673,7 @@ function renderBottom(){
   }
 
   // ── 통합 일정 리스트 ──
-  const scheduleWrap = document.createElement('div');
-  scheduleWrap.style.cssText = 'padding:10px 16px 4px;background:#FFFFFF';
 
-  // 공방 row
-  if (expectedShow) {
-    const showColor = isCancelled ? '#AAAAAA' : expectedShow.color;
-    const showEid = `gonbang-${expectedShow.showName}`;
-    const isSelected = selectedEventId === showEid;
-    const statusText = isCancelled ? 'Canceled'
-      : lineupUnavailable ? 'Lineup TBA'
-      : chipCount > 0 ? `${lineup?.episode ? 'EP '+lineup.episode+' · ' : ''}${chipCount} Artists`
-      : 'Lineup TBA';
-
-    const row = document.createElement('div');
-    row.style.cssText = `display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;cursor:pointer;transition:background .14s;margin-bottom:4px;background:${isSelected ? showColor+'18' : 'transparent'};border:1.5px solid ${isSelected ? showColor+'70' : 'transparent'};-webkit-tap-highlight-color:transparent;`;
-    row.innerHTML = `
-      <div style="width:36px;height:36px;border-radius:10px;background:${showColor}20;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <div style="width:10px;height:10px;border-radius:50%;background:${showColor}"></div>
-      </div>
-      <div style="min-width:0;flex:1">
-        <div style="font-size:10px;font-weight:700;color:${showColor};letter-spacing:0.03em;margin-bottom:2px;text-transform:uppercase">Music Show</div>
-        <div style="font-size:13px;font-weight:700;color:var(--txt1);line-height:1.3">${escHtml(expectedShow.name)}</div>
-        <div style="font-size:11px;color:var(--txt2);margin-top:2px">${escHtml(statusText)}</div>
-      </div>
-      <div style="color:${isSelected ? showColor : 'var(--txt3)'};font-size:15px;font-weight:700;flex-shrink:0">${isSelected ? '✓' : '›'}</div>
-    `;
-    row.addEventListener('mouseenter', () => { if (!isSelected) row.style.background = '#F6F6F6'; });
-    row.addEventListener('mouseleave', () => { if (!isSelected) row.style.background = 'transparent'; });
-    row.onclick = () => {
-      if (isCancelled || lineupUnavailable) return;
-      selectedEventId = showEid;
-      selectedEventType = 'gonbang';
-      selectedArtistName = null;
-      allGroupsSelected = true;
-      const sy = window.scrollY;
-      renderBottom();
-      requestAnimationFrame(() => window.scrollTo({ top: sy, behavior: 'instant' }));
-    };
-    scheduleWrap.appendChild(row);
-  }
-
-  bot.appendChild(scheduleWrap);
 
   const prevWeek = expectedShow ? previousWeekLineupFor(expectedShow.showName, selectedDate) : null;
   const prevWeekAction = prevWeek ? {
