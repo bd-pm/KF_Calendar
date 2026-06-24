@@ -2023,21 +2023,23 @@ function openSortSheet(area, allItems, gridLimit, delayStep, triggerEl) {
     <button type="button" id="sort-sheet-close" style="border:none;background:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;width:24px;height:24px;flex-shrink:0;-webkit-tap-highlight-color:transparent;outline:none;">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="12" cy="12" r="12" fill="#7F7F7F"/>
-        <path d="M8 8L16 16M16 8L8 16" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M16.1988 14.6566C16.6254 15.0833 16.6254 15.7742 16.1988 16.1996C15.9854 16.4129 15.7067 16.5196 15.4267 16.5196C15.1479 16.5196 14.8679 16.4129 14.6558 16.1996L11.9978 13.544L9.34215 16.1996C9.12882 16.4129 8.85005 16.5196 8.57006 16.5196C8.29129 16.5196 8.0113 16.4129 7.79798 16.1996C7.37255 15.7742 7.37255 15.0833 7.79798 14.6566L10.4548 12.001L7.79798 9.34419C7.37255 8.91875 7.37255 8.22667 7.79798 7.80123C8.22463 7.37459 8.9155 7.37459 9.34215 7.80123L11.9978 10.4569L14.6558 7.80123C15.0813 7.37459 15.7721 7.37459 16.1988 7.80123C16.6254 8.22667 16.6254 8.91875 16.1988 9.34419L13.5419 12.001L16.1988 14.6566ZM11.9994 0C5.38276 0 0 5.38397 0 12.0006C0 18.6172 5.38276 24 11.9994 24C18.616 24 24 18.6172 24 12.0006C24 5.38397 18.616 0 11.9994 0Z" fill="#F0F0F0"/>
       </svg>
     </button>`;
 
   // GDS Body: padding 0 20px 30px, gap 20px
   // Title: font-size 20px, weight 700, lineHeight 1.2, color #191919
   // 체크: accent color, polyline
-  const CHECK = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+  const CHECK = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D80C18" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
 
   sheet.innerHTML = `
     <div style="display:flex;align-items:flex-start;justify-content:flex-end;height:48px;padding:16px 20px 8px;box-sizing:border-box;">
       ${GDS_CLOSE}
     </div>
-    <div style="padding:0 20px 30px;display:flex;flex-direction:column;gap:20px;">
-      <div style="font-size:20px;font-weight:700;line-height:1.2;color:#191919;letter-spacing:0;">Sort by</div>
+    <div style="padding:0 20px 20px;">
+      <div style="font-size:20px;font-weight:700;line-height:1.2;color:#191919;letter-spacing:0;font-family:inherit;">Sort By</div>
+    </div>
+    <div style="padding:0 8px 30px;">
       <div id="sort-sheet-list"></div>
     </div>
   `;
@@ -2049,7 +2051,12 @@ function openSortSheet(area, allItems, gridLimit, delayStep, triggerEl) {
       const row = document.createElement('button');
       const isOn = goodsSortOrder === key;
       row.type = 'button';
-      row.style.cssText = `display:flex;align-items:center;justify-content:space-between;width:100%;padding:0;border:none;background:transparent;font-size:17px;font-weight:${isOn ? '600' : '400'};color:#191919;letter-spacing:0;cursor:pointer;text-align:left;font-family:inherit;-webkit-tap-highlight-color:transparent;line-height:1.4;`;
+      row.style.cssText = `display:flex;align-items:center;justify-content:space-between;width:100%;padding:16px 12px;border:none;background:transparent;border-radius:6px;box-sizing:border-box;font-size:16px;font-weight:${isOn ? '700' : '500'};color:#191919;letter-spacing:0;cursor:pointer;text-align:left;font-family:inherit;-webkit-tap-highlight-color:transparent;line-height:1.25;transition:background 0.1s ease;`;
+      row.addEventListener('mousedown', () => row.style.background = '#F6F6F6');
+      row.addEventListener('mouseleave', () => row.style.background = 'transparent');
+      row.addEventListener('mouseup', () => row.style.background = 'transparent');
+      row.addEventListener('touchstart', () => row.style.background = '#F6F6F6', {passive:true});
+      row.addEventListener('touchend', () => row.style.background = 'transparent', {passive:true});
       row.innerHTML = `<span>${label}</span>${isOn ? CHECK : ''}`;
       row.onclick = () => {
         goodsSortOrder = key;
