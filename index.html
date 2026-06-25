@@ -1984,6 +1984,32 @@ function itemPriceUsd(item) {
   return (Number(item.price) || 0) / KRW_PER_USD;
 }
 
+// 공방별 동의어/약어 — 상품명 포함 여부 판단에 사용
+const SHOW_SYNONYMS = {
+  inkigayo:      ['인기가요', 'SBS 인기가요', 'Inkigayo', 'SBS Inkigayo', 'IG', 'Inki', 'The Music Trend'],
+  show_champion: ['쇼챔피언', 'MBC M 쇼챔피언', 'Show Champion', 'Show! Champion', 'ShowChamps', 'SC'],
+  mcountdown:    ['엠카운트다운', 'Mnet 엠카운트다운', 'M Countdown', 'M!Countdown', 'M! Countdown', 'Mnet Countdown', 'MC'],
+  music_bank:    ['뮤직뱅크', 'KBS2 뮤직뱅크', 'Music Bank', 'KBS Music Bank', 'MuBank', 'MB'],
+  music_core:    ['음악중심', 'MBC 쇼! 음악중심', 'Show! Music Core', 'Music Core', 'Show Music Core', 'SMC'],
+};
+
+// 현재 selectedDate의 공방 키(showName) 반환
+function currentShowKey() {
+  const lineup = LINEUP_BY_DATE[selectedDate];
+  if (lineup && lineup.showName) return lineup.showName;
+  const scheduled = scheduledShowForDate(selectedDate);
+  return scheduled ? scheduled.showName : null;
+}
+
+// 상품명에 공방 동의어 중 하나라도 포함되어 있는지 확인
+function itemMatchesShow(item, showKey) {
+  if (!showKey) return false;
+  const synonyms = SHOW_SYNONYMS[showKey];
+  if (!synonyms) return false;
+  const text = (item.name || item.displayName || '').toLowerCase();
+  return synonyms.some(s => text.includes(s.toLowerCase()));
+}
+
 function sortGoodsItems(items) {
   const s = items.slice();
   if (goodsSortOrder === 'price-high') return s.sort((a, b) => itemPriceUsd(b) - itemPriceUsd(a));
@@ -1993,7 +2019,9 @@ function sortGoodsItems(items) {
 }
 
 function sortGoodsByWindow(items, anchorDateStr) {
-  // 1순위: 해당 일자 +7일 이내 등록 상품 → 2순위: 최신순 → 3순위: 가격 높은순
+  // 1순위: 해당 일자 +7일 이내 + 공방명 포함 → (없으면) 그 주에 올라온 상품 최신순
+  // 2순위: 공방명 포함된 상품 최신순 → (없으면) 전체 최신순
+  // 3순위: 가격 높은순
   const cmp = (a, b) => {
     const dt = (b.updatedAt || 0) - (a.updatedAt || 0);
     if (dt !== 0) return dt;
@@ -2002,18 +2030,35 @@ function sortGoodsByWindow(items, anchorDateStr) {
   if (!anchorDateStr) {
     return items.slice().sort(cmp);
   }
+  const showKey = currentShowKey();
   const [y, mo, d] = anchorDateStr.split('-').map(Number);
   const anchorTs = Math.floor(new Date(y, mo - 1, d).getTime() / 1000);
   const windowEndTs = anchorTs + 7 * 24 * 3600;
-  const inWindow = [];
-  const outWindow = [];
+
+  // 윈도우(+7일) 이내 여부와 공방명 포함 여부로 4개 버킷 분류
+  const tier1 = []; // 윈도우 이내 + 공방명 포함
+  const tier1b = []; // 윈도우 이내 + 공방명 미포함
+  const tier2 = []; // 윈도우 밖 + 공방명 포함
+  const tier2b = []; // 윈도우 밖 + 공방명 미포함
   for (const item of items) {
     const t = item.updatedAt || 0;
-    (t >= anchorTs && t < windowEndTs ? inWindow : outWindow).push(item);
+    const inWindow = t >= anchorTs && t < windowEndTs;
+    const hasShow = itemMatchesShow(item, showKey);
+    if (inWindow && hasShow)   tier1.push(item);
+    else if (inWindow)         tier1b.push(item);
+    else if (hasShow)          tier2.push(item);
+    else                       tier2b.push(item);
   }
-  inWindow.sort(cmp);
-  outWindow.sort(cmp);
-  return [...inWindow, ...outWindow];
+  tier1.sort(cmp);
+  tier1b.sort(cmp);
+  tier2.sort(cmp);
+  tier2b.sort(cmp);
+
+  // 1순위: tier1이 있으면 tier1, 없으면 tier1b (그 주 공방 상품 최신순)
+  // 2순위: tier2가 있으면 tier2, 없으면 tier2b
+  const first  = tier1.length  ? tier1  : tier1b;
+  const second = tier2.length  ? tier2  : tier2b;
+  return [...first, ...second];
 }
 
 // ── 정렬 ──
