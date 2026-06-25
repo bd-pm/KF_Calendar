@@ -364,7 +364,8 @@ body{
 }
 
 .goods-empty{
-  padding:24px 20px;font-size:13px;color:var(--txt2);text-align:center;letter-spacing:0;
+  padding:60px 20px 40px;font-size:13px;color:var(--txt2);text-align:center;letter-spacing:0;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
 }
 
 /* sort trigger button */
@@ -2219,10 +2220,9 @@ function renderAllGoods(area, items, showName, artists) {
   area.appendChild(hdr);
 
   if(items.length === 0){
-    hdr.insertAdjacentHTML('beforeend', `<div class="goods-intro-sub">No listings found</div>`);
     const empty = document.createElement('div');
     empty.className = 'goods-empty';
-    empty.textContent = 'No fan goods listings found for today\'s artists.';
+    empty.innerHTML = `<span style="font-size:14px;font-weight:600;color:#191919;">We couldn't load the listings.</span><span style="font-size:13px;color:#8C8C8C;line-height:1.5;">Tap the arrow (>) in the top right<br>to view them on Bunjang Global.</span>`;
     area.appendChild(empty);
     return;
   }
@@ -2301,10 +2301,9 @@ function renderSingleGoods(area, artistName, items, eventType) {
   area.appendChild(hdr);
 
   if(items.length === 0){
-    hdr.insertAdjacentHTML('beforeend', `<div class="goods-intro-sub">No listings found</div>`);
     const empty = document.createElement('div');
     empty.className = 'goods-empty';
-    empty.textContent = `No fan goods listings found for ${displayName}.`;
+    empty.innerHTML = `<span style="font-size:14px;font-weight:600;color:#191919;">We couldn't load the listings.</span><span style="font-size:13px;color:#8C8C8C;line-height:1.5;">Tap the arrow (>) in the top right<br>to view them on Bunjang Global.</span>`;
     area.appendChild(empty);
     return;
   }
@@ -2621,26 +2620,9 @@ function openSearchModal() {
           goodsArea.appendChild(hdr);
 
           if (items.length === 0) {
-            // Global Bunjang 스타일 empty state
-            hdr.insertAdjacentHTML('beforeend', `<div class="goods-intro-sub">No listings found</div>`);
             const empty = document.createElement('div');
-            empty.style.cssText = 'display:flex;flex-direction:column;align-items:center;padding:40px 20px 32px;gap:12px;';
-            empty.innerHTML = `
-              <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="24" cy="24" r="24" fill="#F6F6F6"/>
-                <path d="M15 20h18M15 24h10" stroke="#CCCCCC" stroke-width="2" stroke-linecap="round"/>
-                <circle cx="32" cy="32" r="7" fill="#F6F6F6" stroke="#CCCCCC" stroke-width="1.5"/>
-                <path d="M35 35l3 3" stroke="#CCCCCC" stroke-width="1.5" stroke-linecap="round"/>
-              </svg>
-              <div style="font-size:15px;font-weight:700;color:#191919;letter-spacing:0;text-align:center;">No results found</div>
-              <div style="font-size:13px;font-weight:400;color:#8C8C8C;letter-spacing:0;text-align:center;line-height:1.5;">
-                No fan goods found for <strong style="color:#191919;">${escHtml(displayName)}</strong>.<br>Try searching on Global Bunjang directly.
-              </div>
-              <a href="${chevronUrl}" target="_blank" rel="noopener"
-                style="margin-top:4px;display:inline-flex;align-items:center;gap:6px;padding:11px 20px;border-radius:10px;background:#191919;color:#fff;font-size:14px;font-weight:700;letter-spacing:0;text-decoration:none;">
-                Search on Bunjang
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-              </a>`;
+            empty.className = 'goods-empty';
+            empty.innerHTML = `<span style="font-size:14px;font-weight:600;color:#191919;">We couldn't load the listings.</span><span style="font-size:13px;color:#8C8C8C;line-height:1.5;">Tap the arrow (>) in the top right<br>to view them on Bunjang Global.</span>`;
             goodsArea.appendChild(empty);
           } else {
             const metaRow = document.createElement('div');
@@ -2786,10 +2768,9 @@ function openGroupModal(artistName) {
     `;
     goodsArea.appendChild(hdr);
     if (items.length === 0) {
-      hdr.insertAdjacentHTML('beforeend', `<div class="goods-intro-sub">No listings found</div>`);
       const empty = document.createElement('div');
       empty.className = 'goods-empty';
-      empty.textContent = `No fan goods listings found for ${displayName}.`;
+      empty.innerHTML = `<span style="font-size:14px;font-weight:600;color:#191919;">We couldn't load the listings.</span><span style="font-size:13px;color:#8C8C8C;line-height:1.5;">Tap the arrow (>) in the top right<br>to view them on Bunjang Global.</span>`;
       goodsArea.appendChild(empty);
       return;
     }
