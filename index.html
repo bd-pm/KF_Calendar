@@ -743,6 +743,7 @@ body{
 </header>
 
 <!-- VIEW BAR -->
+</div><!-- /hdr-wrap -->
 
 <div id="typeFilter" style="display:none"></div>
 
@@ -764,7 +765,6 @@ body{
     </div>
   </div>
 </div>
-</div><!-- /hdr-wrap -->
 <!-- HERO SECTION -->
 <div class="hero">
   <div class="hero-inner">
@@ -1274,9 +1274,10 @@ function scrollToTodayGoods(){
   function doScroll(){
     const dateHeader = document.getElementById('dateHeader');
     if(!dateHeader) return;
-    // hdr-wrap이 이제 헤더 + view-bar를 모두 포함 → 그 높이만큼 offset
+    // hdr-wrap(헤더) + view-bar 각각 sticky → 합산 offset
     const hdrWrap = document.querySelector('.hdr-wrap');
-    const offset = hdrWrap ? hdrWrap.offsetHeight : 52;
+    const viewBar = document.getElementById('viewBar');
+    const offset = (hdrWrap ? hdrWrap.offsetHeight : 52) + (viewBar ? viewBar.offsetHeight : 48);
     const top = dateHeader.getBoundingClientRect().top + window.scrollY - offset;
     window.scrollTo({top, behavior:'smooth'});
   }
