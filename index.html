@@ -1271,26 +1271,18 @@ function scrollToTodayGoods(){
   if(selectedDate !== dKey(TODAY)) goToday();
 
   function doScroll(){
-    const target = document.getElementById('dateHeader');
-    if(!target) return;
-    // hdr-wrap에는 헤더 + view bar가 모두 포함돼 있음
+    // view-bar(June + Today/Week/Month 바)가 헤더 바로 밑에 오도록 스크롤
+    const viewBar = document.getElementById('viewBar');
+    if(!viewBar) return;
     const hdrWrap = document.querySelector('.hdr-wrap');
     const offset = hdrWrap ? hdrWrap.offsetHeight : 52;
-    const top = target.getBoundingClientRect().top + window.scrollY - offset;
+    const top = viewBar.getBoundingClientRect().top + window.scrollY - offset;
     window.scrollTo({top, behavior:'smooth'});
   }
 
   // goToday()가 DOM을 재렌더링하므로 rAF 2번 기다린 뒤 scroll
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    if(document.getElementById('dateHeader')){ doScroll(); }
-    else {
-      let tries = 0;
-      const t = setInterval(()=>{
-        tries++;
-        if(document.getElementById('dateHeader')){ clearInterval(t); doScroll(); }
-        else if(tries > 15) clearInterval(t);
-      }, 100);
-    }
+    doScroll();
   }));
 }
 
