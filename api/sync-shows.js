@@ -76,6 +76,35 @@ const ARTIST_TO_GROUP = {
   '(G)I-DLE':'gidle','여자아이들':'gidle',
   'MAMAMOO':'mamamoo','마마무':'mamamoo',
   'Red Velvet':'redvelvet','레드벨벳':'redvelvet',
+  // 추가
+  'IZNA':'izna','izna':'izna','이즈나':'izna',
+  'RIIZE':'riize','라이즈':'riize',
+  'FIFTY FIFTY':'fiftyfifty','피프티피프티':'fiftyfifty','FIFTY FIFTY (피프티피프티)':'fiftyfifty',
+  'ONF':'onf','온앤오프':'onf','온앤오프(ONF)':'onf',
+  'STAYC':'stayc','스테이씨':'stayc',
+  'CrazAngel':'crazangel','크레이즈엔젤':'crazangel','CRAZANGEL':'crazangel',
+  'HEART OF WOMAN':'heartofwoman',
+  'USPEER':'uspeer','유스피어':'uspeer',
+  'Rothy':'rothy','로시':'rothy',
+  'UmYull':'umyull','음율':'umyull',
+  'MEOVV':'meovv','미어브':'meovv',
+  'TREASURE':'treasure','트레저':'treasure',
+  'EVERGLOW':'everglow','에버글로우':'everglow',
+  'OH MY GIRL':'ohmygirl','오마이걸':'ohmygirl',
+  'fromis_9':'fromis9','프로미스나인':'fromis9',
+  'WJSN':'wjsn','우주소녀':'wjsn',
+  'Kep1er':'kep1er','케플러':'kep1er',
+  'OMEGA X':'omegax','오메가엑스':'omegax',
+  'H1-KEY':'h1key','하이키':'h1key',
+  'Billlie':'billlie','빌리':'billlie',
+  'P1Harmony':'p1harmony','피원하모니':'p1harmony',
+  'YOUNG POSSE':'youngposse','영파씨':'youngposse',
+  'BOYNEXTDOOR':'boynextdoor',
+  'CSR':'csr','씨에스알':'csr',
+  'EPEX':'epex','이펙스':'epex',
+  'CLASS:y':'classy','클라씨':'classy',
+  'tripleS':'triples','트리플에스':'triples',
+  'AB6IX':'ab6ix','에이비식스':'ab6ix',
 };
 
 function mapArtists(names) {
@@ -146,17 +175,64 @@ function parseMusicCore(ep) {
   return { raw, artists: cleaned };
 }
 
-// 쇼챔피언 파싱: "Show Champion (쇼 챔피언) - CRAVITY, TWS (투어스), ..."
-// 또는 " -CRAVITY" (대시 뒤 공백 없는 경우도 처리)
+// 쇼챔피언 파싱
+// iMBC ContentTitle 예시:
+//   "601회 2026.06.24. (수)\n출연\n크레이즈엔젤, EPEX, ...\nCrazAngel / EPEX(이펙스) / ...\n독보적인 ... 'izna'. ... 'RIIZE'. ..."
+// 전략:
+//   1) " - " 뒤 쉼표 구분 (구형 포맷)
+//   2) 줄바꿈 포함된 신형 포맷: "출연" 다음 줄 or 영문명 줄 or 마지막 홍보문구 속 작은따옴표 이름 추출
 function parseShowChampion(ep) {
   const raw = ep.ContentTitle || ep.contentTitle || '';
-  const m = raw.match(/ -\s*/);
-  if (!m) return { raw, artists: [] };
-  const artists = raw.slice(m.index + m[0].length)
-    .replace(/\s+등\s*$/, '')
-    .split(',')
-    .map(s => s.replace(/\s*\([^)]*\)/g,'').trim())
-    .filter(Boolean);
+
+  // ── 구형 포맷: " - 아티스트, 아티스트, ..."
+  const dashM = raw.match(/ -\s*/);
+  if (dashM) {
+    const artists = raw.slice(dashM.index + dashM[0].length)
+      .replace(/\s+등\s*$/, '')
+      .split(',')
+      .map(s => s.replace(/\s*\([^)]*\)/g, '').trim())
+      .filter(Boolean);
+    if (artists.length > 0) return { raw, artists };
+  }
+
+  // ── 신형 포맷: 줄바꿈 기반 파싱
+  const lines = raw.split(/\n|\r\n|\r/).map(l => l.trim()).filter(Boolean);
+  const collected = new Set();
+
+  for (const line of lines) {
+    // "출연" 레이블 자체는 스킵
+    if (/^출연$/.test(line)) continue;
+    // 회차·날짜 줄 스킵: "601회 2026.06.24. (수)"
+    if (/^\d+회\s+\d{4}/.test(line)) continue;
+
+    // 쉼표로 구분된 한국어/영문 혼합 줄: "크레이즈엔젤, EPEX, HEART OF WOMAN, 유스피어, ..."
+    if (line.includes(',')) {
+      line.split(',')
+        .map(s => s.replace(/\s*\([^)]*\)/g, '').trim())
+        .filter(Boolean)
+        .forEach(s => collected.add(s));
+      continue;
+    }
+
+    // 슬래시로 구분된 영문명 줄: "CrazAngel / EPEX(이펙스) / HEART OF WOMAN / ..."
+    if (line.includes('/')) {
+      line.split('/')
+        .map(s => s.replace(/\s*\([^)]*\)/g, '').replace(/\s*\[[^\]]*\]/g, '').trim())
+        .filter(Boolean)
+        .forEach(s => collected.add(s));
+      continue;
+    }
+
+    // 홍보 문구 속 작은따옴표로 감싸인 이름: '이름' or 'ONF'
+    // 예: "독보적인 템포로 완성한 파워 몽환 'izna'. 도파민 터지는 이모셔널 팝 'RIIZE'."
+    const quoted = [...line.matchAll(/[''"'"]([^''""'"\n]{1,40})[''"'"]/g)].map(m => m[1].trim());
+    quoted.filter(Boolean).forEach(s => collected.add(s));
+  }
+
+  const artists = [...collected]
+    .map(s => s.replace(/\s*\([^)]*\)/g, '').replace(/\.$/, '').trim())
+    .filter(s => s.length > 0 && !/^\d+회$/.test(s));
+
   return { raw, artists };
 }
 
