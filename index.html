@@ -684,28 +684,11 @@ body{
 /* ── HERO ── */
 .hero{
   background:#FFFFFF;
-  padding:32px 20px 0;
+  padding:16px 20px;
   text-align:center;
 }
-.hero-inner{ display:flex;flex-direction:column;gap:12px;align-items:center; }
 .hero-title{ font-size:28px;font-weight:800;color:#191919;line-height:1.2;letter-spacing:0;text-align:center; }
-.hero-desc{ font-size:14px;font-weight:400;color:#666666;line-height:1.6;letter-spacing:0;margin:0;text-align:center; }
-.hero-img-wrap{ padding:0 20px 24px; }
-.hero-img-wrap img{ width:100%;height:auto;display:block; }
-.hero-cta{
-  display:inline-flex;align-items:center;gap:8px;
-  margin:0 auto 32px;
-  padding:12px 24px;border-radius:12px;
-  background:#191919;color:#FFFFFF;
-  border:none;
-  font-size:14px;font-weight:700;letter-spacing:0;line-height:1;
-  cursor:pointer;
-  -webkit-tap-highlight-color:transparent;outline:none;
-  font-family:inherit;
-  transition:background .15s,transform .1s;
-}
-.hero-cta:hover{ background:#333333; }
-.hero-cta:active{ background:#333333;transform:scale(0.97); }
+.hero-desc{ font-size:14px;font-weight:400;color:#666666;line-height:1.6;letter-spacing:0;margin:4px 0 0;text-align:center; }
 </style>
 </head>
 <body>
@@ -750,15 +733,8 @@ body{
 
 <!-- HERO SECTION -->
 <div class="hero">
-  <div class="hero-inner">
-    <h1 class="hero-title">Find rare K-pop gifts,<br><span>straight from the broadcast</span></h1>
-    <p class="hero-desc">Exclusive fan gifts prepared by artists<br>at K-pop music show recordings.</p>
-    <div class="hero-img-wrap"><img src="/hero_image.svg" alt="K-pop photocards"></div>
-  </div>
-  <button class="hero-cta" onclick="scrollToTodayGoods()">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-    Shop today's goods
-  </button>
+  <h1 class="hero-title">Find rare K-pop gifts,<br><span>straight from the broadcast</span></h1>
+  <p class="hero-desc">Exclusive fan gifts prepared by artists<br>at K-pop music show recordings.</p>
 </div>
 
 <div style="height:10px;background:#F4F4F4;"></div>
