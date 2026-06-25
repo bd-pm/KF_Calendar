@@ -53,10 +53,11 @@ const EN_TO_KR = {
   'SEVENTEEN': '세븐틴',
   'ATEEZ': '에이티즈',
   'Stray Kids': '스트레이키즈',
-  'TXT': '투모로우바이투게더',
+  'TXT': ['투모로우바이투게더', '투모로우 바이 투게더'],
+  'TOMORROW X TOGETHER': ['투모로우바이투게더', '투모로우 바이 투게더', 'TXT'],
   'PLAVE': '플레이브',
-  'ZEROBASEONE': '제로베이스원',
-  'BOYNEXTDOOR': '보이넥스트도어',
+  'ZEROBASEONE': ['제로베이스원', 'ZB1'],
+  'BOYNEXTDOOR': ['보이넥스트도어', 'BND'],
   'TWS': '투어스',
   'ILLIT': '아일릿',
   'BABYMONSTER': '베이비몬스터',
@@ -216,14 +217,23 @@ function canonicalArtistKey(artist) {
 
 function getSearchAliases(artist) {
   const variants = artistVariants(artist);
+
+  // EN_TO_KR에서 매핑된 alias를 한 단계 더 재귀 조회 (TXT → 투모로우바이투게더 체인 등)
+  function expandMapped(v) {
+    const mapped = EN_TO_KR[v] || EN_TO_KR[canonicalArtistKey(v)];
+    const direct = Array.isArray(mapped) ? mapped : mapped ? [mapped] : [];
+    const extra = direct.flatMap(m => {
+      const m2 = EN_TO_KR[m];
+      return m2 ? (Array.isArray(m2) ? m2 : [m2]) : [];
+    });
+    return [...direct, ...extra];
+  }
+
   const aliases = [
     ...variants,
     ...variants.map(v => v.toLowerCase()),
     ...variants.map(compactLatinName),
-    ...variants.flatMap(v => {
-      const mapped = EN_TO_KR[v] || EN_TO_KR[canonicalArtistKey(v)];
-      return Array.isArray(mapped) ? mapped : mapped ? [mapped] : [];
-    }),
+    ...variants.flatMap(expandMapped),
   ].filter(Boolean);
 
   return [...new Set(aliases.flatMap(alias => {
