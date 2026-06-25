@@ -176,62 +176,54 @@ function parseMusicCore(ep) {
 }
 
 // 쇼챔피언 파싱
-// iMBC ContentTitle 예시:
-//   "601회 2026.06.24. (수)\n출연\n크레이즈엔젤, EPEX, ...\nCrazAngel / EPEX(이펙스) / ...\n독보적인 ... 'izna'. ... 'RIIZE'. ..."
-// 전략:
-//   1) " - " 뒤 쉼표 구분 (구형 포맷)
-//   2) 줄바꿈 포함된 신형 포맷: "출연" 다음 줄 or 영문명 줄 or 마지막 홍보문구 속 작은따옴표 이름 추출
+// Preview 필드 우선: "<COMEBACK> RIIZE, izna, 온앤오프(ONF), EPEX(이펙스), 음율 (UmYull)"
+// ContentTitle 보조: "Show Champion (쇼 챔피언) - 601회 RIIZE, izna, ..."
 function parseShowChampion(ep) {
-  const raw = ep.ContentTitle || ep.contentTitle || '';
+  const rawTitle = ep.ContentTitle || ep.contentTitle || '';
+  const preview  = ep.Preview     || ep.preview     || '';
+  const raw = rawTitle;
 
-  // ── 구형 포맷: " - 아티스트, 아티스트, ..."
-  const dashM = raw.match(/ -\s*/);
-  if (dashM) {
-    const artists = raw.slice(dashM.index + dashM[0].length)
-      .replace(/\s+등\s*$/, '')
-      .split(',')
-      .map(s => s.replace(/\s*\([^)]*\)/g, '').trim())
-      .filter(Boolean);
-    if (artists.length > 0) return { raw, artists };
-  }
-
-  // ── 신형 포맷: 줄바꿈 기반 파싱
-  const lines = raw.split(/\n|\r\n|\r/).map(l => l.trim()).filter(Boolean);
   const collected = new Set();
 
-  for (const line of lines) {
-    // "출연" 레이블 자체는 스킵
-    if (/^출연$/.test(line)) continue;
-    // 회차·날짜 줄 스킵: "601회 2026.06.24. (수)"
-    if (/^\d+회\s+\d{4}/.test(line)) continue;
-
-    // 쉼표로 구분된 한국어/영문 혼합 줄: "크레이즈엔젤, EPEX, HEART OF WOMAN, 유스피어, ..."
-    if (line.includes(',')) {
-      line.split(',')
-        .map(s => s.replace(/\s*\([^)]*\)/g, '').trim())
-        .filter(Boolean)
-        .forEach(s => collected.add(s));
-      continue;
-    }
-
-    // 슬래시로 구분된 영문명 줄: "CrazAngel / EPEX(이펙스) / HEART OF WOMAN / ..."
-    if (line.includes('/')) {
-      line.split('/')
-        .map(s => s.replace(/\s*\([^)]*\)/g, '').replace(/\s*\[[^\]]*\]/g, '').trim())
-        .filter(Boolean)
-        .forEach(s => collected.add(s));
-      continue;
-    }
-
-    // 홍보 문구 속 작은따옴표로 감싸인 이름: '이름' or 'ONF'
-    // 예: "독보적인 템포로 완성한 파워 몽환 'izna'. 도파민 터지는 이모셔널 팝 'RIIZE'."
-    const quoted = [...line.matchAll(/[''"'"]([^''""'"\n]{1,40})[''"'"]/g)].map(m => m[1].trim());
-    quoted.filter(Boolean).forEach(s => collected.add(s));
+  function addArtists(text) {
+    text.split(',')
+      .map(s => s.replace(/\s*[\(（][^)）]*[\)）]/g, '').replace(/\.$/, '').trim())
+      .filter(s => s.length > 1)
+      .forEach(s => collected.add(s));
   }
 
+  // ── 1) Preview 우선 파싱
+  if (preview.trim()) {
+    // 날짜/홍보 꼬리 제거 ("1월 28일 수요일 오후 5시 ..." 이후)
+    const previewClean = preview
+      .replace(/\d+월\s*\d+일.*$/s, '')
+      .replace(/<SHOW CHAMPION>.*$/si, '')
+      .replace(/\r\n|\r|\n/g, ' ');
+
+    // <TAG> 또는 KEYWORD 를 구분자로 치환 후 쉼표 분리
+    const segments = previewClean
+      .replace(/<[^>]+>/g, '|')
+      .replace(/\b(COMEBACK|HOT DEBUT|SPECIAL STAGE|STAGE\s*:\s*ON|최초 공개|하이라이트)\b/gi, '|')
+      .split('|');
+
+    for (const seg of segments) {
+      if (seg.trim()) addArtists(seg);
+    }
+  }
+
+  // ── 2) ContentTitle 보조 (" - " 뒤, 회차번호 제거)
+  const dashM = rawTitle.match(/ -\s*/);
+  if (dashM) {
+    const after = rawTitle.slice(dashM.index + dashM[0].length)
+      .replace(/^\d+회\s*/, '')
+      .replace(/\s+등\s*$/, '');
+    addArtists(after);
+  }
+
+  const SKIP = /^(쇼\s*챔피언|Show Champion|하이라이트|쇼챔마블|쇼챔피언 하반기.*)$/i;
   const artists = [...collected]
-    .map(s => s.replace(/\s*\([^)]*\)/g, '').replace(/\.$/, '').trim())
-    .filter(s => s.length > 0 && !/^\d+회$/.test(s));
+    .map(s => s.trim())
+    .filter(s => s.length > 1 && !SKIP.test(s));
 
   return { raw, artists };
 }
@@ -255,8 +247,8 @@ async function getNaverProtectedDates(showName) {
 }
 
 // 우선순위: manual > naver > imbc/date_rule
-// 오늘 이전 날짜는 절대 건드리지 않음
-async function upsertRows(rows) {
+// backfill=true 일 때는 과거 날짜도 imbc 소스로 업데이트 (manual/naver 보호는 유지)
+async function upsertRows(rows, { backfill = false } = {}) {
   const today = new Date(); today.setHours(0,0,0,0);
   const todayKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   const hdrs = {
@@ -267,8 +259,8 @@ async function upsertRows(rows) {
   };
   let ok = 0;
   for (const row of rows) {
-    // 오늘 이전 날짜는 source 불문 절대 건드리지 않음
-    if (row.broad_date < todayKey) { ok++; continue; }
+    // 오늘 이전 날짜: backfill 모드가 아니면 건드리지 않음
+    if (!backfill && row.broad_date < todayKey) { ok++; continue; }
     const existing = await fetch(
       `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${row.show_name}&broad_date=eq.${row.broad_date}&select=id,groups,source`,
       { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` },
@@ -311,13 +303,14 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
-  const since = req.query.since || null; // 백필용: ?since=2026-05-08
+  const since = req.query.since || null;           // 백필용: ?since=2026-03-01
+  const backfill = req.query.backfill === 'true';   // ?backfill=true 시 과거 날짜도 업데이트
 
   const log = [];
   let totalUpserted = 0;
 
   for (const show of SHOWS_IMBC) {
-    // ① since~다음달말 범위의 날짜 뼈대 채우기 (기본: 30일 전부터)
+    // ① since~다음달말 범위의 날짜 뼈대 채우기
     const futureDates = datesForDay(show.dayOfWeek, since);
     const skeletonRows = futureDates.map(d => ({
       show_name: show.show_name,
@@ -327,7 +320,7 @@ module.exports = async function handler(req, res) {
       episode_number: null,
       source: 'date_rule',
     }));
-    const skelOk = await upsertRows(skeletonRows);
+    const skelOk = await upsertRows(skeletonRows, { backfill });
     log.push(`[${show.show_name}] 뼈대 ${skelOk}/${futureDates.length}개`);
 
     // ② iMBC에서 최근 에피소드 가져와서 groups 업데이트 (naver 데이터 보호)
@@ -352,7 +345,7 @@ module.exports = async function handler(req, res) {
         source: 'imbc',
       });
     }
-    const dataOk = await upsertRows(dataRows);
+    const dataOk = await upsertRows(dataRows, { backfill });
     log.push(`[${show.show_name}] iMBC 업데이트 ${dataOk}/${dataRows.length}개`);
     totalUpserted += skelOk + dataOk;
   }
