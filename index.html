@@ -2580,6 +2580,86 @@ function openSearchModal() {
     if (!list) return;
     list.innerHTML = '';
 
+    if (filtered.length === 0 && q) {
+      // 목록에 없는 그룹 → 검색어로 직접 상품 조회
+      list.innerHTML = '';
+      const searchName = searchQuery.trim();
+      const displayName = searchName;
+      const searchQ = encodeURIComponent(displayName + ' 공방');
+      const chevronUrl = `https://globalbunjang.com/search?q=${searchQ}&order=date&utm_source=kf-calendar&utm_medium=social&utm_campaign=kpop-groups`;
+
+      // 스켈레톤
+      const goodsArea = document.createElement('div');
+      goodsArea.style.cssText = 'padding:20px 0 0;';
+      goodsArea.innerHTML = `<div class="goods-intro" style="padding:0 20px 16px;">
+        <div class="goods-intro-title-row">
+          <div class="goods-intro-title">${escHtml(displayName)} Fan Goods &amp; Postcards</div>
+          <a href="${chevronUrl}" target="_blank" rel="noopener" class="goods-intro-chevron">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </a>
+        </div>
+      </div>
+      <div class="goods-grid">${Array.from({length:6}).map(()=>`<div class="skel-card"><div class="skel-img"></div><div class="skel-body"><div class="skel-base skel-price"></div><div class="skel-base skel-name1"></div><div class="skel-base skel-name2"></div></div></div>`).join('')}</div>`;
+      list.appendChild(goodsArea);
+
+      fetchGoodsCached(searchName, 60, 'gonbang')
+        .then(r => r.ok ? r.json() : { items: [] })
+        .then(data => {
+          const items = data.items || [];
+          goodsArea.innerHTML = '';
+
+          const hdr = document.createElement('div');
+          hdr.className = 'goods-intro';
+          hdr.innerHTML = `
+            <div class="goods-intro-title-row">
+              <div class="goods-intro-title">${escHtml(displayName)} Fan Goods &amp; Postcards</div>
+              <a href="${chevronUrl}" target="_blank" rel="noopener" class="goods-intro-chevron">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+              </a>
+            </div>
+          `;
+          goodsArea.appendChild(hdr);
+
+          if (items.length === 0) {
+            // Global Bunjang 스타일 empty state
+            hdr.insertAdjacentHTML('beforeend', `<div class="goods-intro-sub">No listings found</div>`);
+            const empty = document.createElement('div');
+            empty.style.cssText = 'display:flex;flex-direction:column;align-items:center;padding:40px 20px 32px;gap:12px;';
+            empty.innerHTML = `
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="24" cy="24" r="24" fill="#F6F6F6"/>
+                <path d="M15 20h18M15 24h10" stroke="#CCCCCC" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="32" cy="32" r="7" fill="#F6F6F6" stroke="#CCCCCC" stroke-width="1.5"/>
+                <path d="M35 35l3 3" stroke="#CCCCCC" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              <div style="font-size:15px;font-weight:700;color:#191919;letter-spacing:0;text-align:center;">No results found</div>
+              <div style="font-size:13px;font-weight:400;color:#8C8C8C;letter-spacing:0;text-align:center;line-height:1.5;">
+                No fan goods found for <strong style="color:#191919;">${escHtml(displayName)}</strong>.<br>Try searching on Global Bunjang directly.
+              </div>
+              <a href="${chevronUrl}" target="_blank" rel="noopener"
+                style="margin-top:4px;display:inline-flex;align-items:center;gap:6px;padding:11px 20px;border-radius:10px;background:#191919;color:#fff;font-size:14px;font-weight:700;letter-spacing:0;text-decoration:none;">
+                Search on Bunjang
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </a>`;
+            goodsArea.appendChild(empty);
+          } else {
+            const metaRow = document.createElement('div');
+            metaRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;padding:0 20px;';
+            metaRow.innerHTML = `<div class="goods-intro-sub">${items.length} listings</div>`;
+            metaRow.appendChild(renderSortBar(goodsArea, items, 60, 15));
+            hdr.appendChild(metaRow);
+            const grid = document.createElement('div');
+            grid.className = 'goods-grid';
+            renderGoodsCards(grid, sortGoodsItems(items), 60, 15);
+            goodsArea.appendChild(grid);
+            enrichGoodsInBackground(goodsArea, items);
+          }
+        })
+        .catch(() => {
+          goodsArea.innerHTML = `<div class="goods-empty">Failed to load listings.</div>`;
+        });
+      return;
+    }
     if (filtered.length === 0) {
       list.innerHTML = `<div style="text-align:center;color:var(--txt2);font-size:14px;padding:40px 0;">No results</div>`;
       return;
