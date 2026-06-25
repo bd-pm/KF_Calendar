@@ -402,95 +402,111 @@ function isShowChampionIntroArtistName(name) {
 async function fetchShowChampionOfficialRows({ cutoffDate, backfill }) {
   const [cy, cm, cd] = cutoffDate.split('-').map(Number);
   const recentCutoff = dKey(addDays(new Date(cy, cm - 1, cd), -7));
-  const listUrl = 'https://www.mbcplus.com/web/program/contentList.do?searchCondition=001005&programMenuSeq=220&programInfoSeq=67';
-  const res = await fetch(listUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-      'Accept': 'text/html,application/xhtml+xml',
-    },
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!res.ok) throw new Error(`MBC PLUS HTTP ${res.status}`);
-  const html = await res.text();
+  const baseUrl = 'https://www.mbcplus.com/web/program/contentList.do?searchCondition=001005&programMenuSeq=220&programInfoSeq=67';
   const rows = [];
   const rowRe = /fnGetForm\('220','001005',\s*'(\d+)'\)[\s\S]*?>(쇼챔피언[^<]+)<[\s\S]*?<td>(\d{4}-\d{2}-\d{2})<\/td>/g;
-  let match;
-  while ((match = rowRe.exec(html))) {
-    const seq = match[1];
-    const title = stripHtmlText(match[2]);
-    const postedAt = match[3];
-    const md = title.match(/\((\d{2})(\d{2})\)/);
-    const year = Number(postedAt.slice(0, 4));
-    const broadDate = md ? `${year}-${md[1]}-${md[2]}` : postedAt;
-    if (!backfill && broadDate < recentCutoff) continue;
 
-    if (/결방|휴방/i.test(title)) {
-      rows.push({
-        show_name: 'show_champion',
-        broad_date: broadDate,
-        groups: [],
-        raw_title: title,
-        episode_number: Number((title.match(/(\d+)회/) || [])[1]) || null,
-        source: 'cancelled',
-      });
-      continue;
-    }
+  // backfill 모드에서 페이지네이션으로 cutoffDate까지 전부 수집
+  const maxPages = backfill ? 10 : 1;
+  let done = false;
 
-    if (!/생방송\s*출연진/.test(title)) continue;
-
-    const iframeUrl = `https://www.mbcplus.com/web/program/iframeContent.do?seq=${seq}&programMenuSeq=220`;
-    const detailRes = await fetch(iframeUrl, {
+  for (let pageIndex = 1; pageIndex <= maxPages && !done; pageIndex++) {
+    const listUrl = pageIndex === 1 ? baseUrl : `${baseUrl}&pageIndex=${pageIndex}`;
+    const res = await fetch(listUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         'Accept': 'text/html,application/xhtml+xml',
       },
       signal: AbortSignal.timeout(20000),
     });
-    if (!detailRes.ok) continue;
-    const text = stripHtmlText(await detailRes.text())
-      .replace(/[<>]+/g, '\n')
-      .replace(/\s*\n\s*/g, '\n');
+    if (!res.ok) throw new Error(`MBC PLUS HTTP ${res.status}`);
+    const html = await res.text();
+    rowRe.lastIndex = 0;
+    let foundAny = false;
+    let match;
+    while ((match = rowRe.exec(html))) {
+      foundAny = true;
+      const seq = match[1];
+      const title = stripHtmlText(match[2]);
+      const postedAt = match[3];
+      const md = title.match(/\((\d{2})(\d{2})\)/);
+      const year = Number(postedAt.slice(0, 4));
+      const broadDate = md ? `${year}-${md[1]}-${md[2]}` : postedAt;
+      if (!backfill && broadDate < recentCutoff) continue;
 
-    // 출연진 섹션 찾기: "& 출연진 &" 또는 단독 "출연" 줄 모두 처리
-    const lineupMatch =
-      text.match(/&\s*출연진\s*&\s*([\s\S]*?)(?:\n\s*\n|$)/) ||
-      text.match(/(?:^|\n)\s*출연\s*\n([\s\S]*?)(?:\n\s*\n|$)/);
-    if (!lineupMatch) continue;
+      if (/결방|휴방/i.test(title)) {
+        rows.push({
+          show_name: 'show_champion',
+          broad_date: broadDate,
+          groups: [],
+          raw_title: title,
+          episode_number: Number((title.match(/(\d+)회/) || [])[1]) || null,
+          source: 'cancelled',
+        });
+        continue;
+      }
 
-    const introText = text.slice(0, lineupMatch.index);
-    const introPerformers = extractShowChampionQuotedSegments(introText)
-      .flatMap(splitShowChampionArtistNames)
-      .filter(isShowChampionIntroArtistName);
+      if (!/생방송\s*출연진/.test(title)) continue;
 
-    // 출연진 블록에서 라인 추출
-    const lineupBlock = lineupMatch[1];
-    const lines = lineupBlock.split('\n').map(l => l.trim()).filter(Boolean);
+      const iframeUrl = `https://www.mbcplus.com/web/program/iframeContent.do?seq=${seq}&programMenuSeq=220`;
+      const detailRes = await fetch(iframeUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          'Accept': 'text/html,application/xhtml+xml',
+        },
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!detailRes.ok) continue;
+      const text = stripHtmlText(await detailRes.text())
+        .replace(/[<>]+/g, '\n')
+        .replace(/\s*\n\s*/g, '\n');
 
-    // Preview 라인(영문명 포함, / 구분)이 있으면 우선 사용; 없으면 쉼표·슬래시 혼용 파싱
-    const previewLine = lines.find(l => l.includes('/') && /[A-Za-z]/.test(l));
-    const listedPerformers = previewLine
-      ? previewLine.split('/').flatMap(splitShowChampionArtistNames)
-          .filter(name => name.length > 1 && name.length < 80)
-      : lines.flatMap(l => l.split(/[,\/]/).flatMap(splitShowChampionArtistNames))
-          .filter(name => name.length > 1 && name.length < 80);
-    const seenPerformers = new Set();
-    const performers = [...introPerformers, ...listedPerformers].filter(name => {
-      const key = name.toLowerCase();
-      if (seenPerformers.has(key)) return false;
-      seenPerformers.add(key);
-      return true;
-    });
-    if (performers.length === 0) continue;
-    rows.push({
-      show_name: 'show_champion',
-      broad_date: broadDate,
-      groups: mapArtists(performers),
-      raw_title: `show_champion - ${performers.join(', ')}`,
-      episode_number: Number((title.match(/(\d+)회/) || [])[1]) || null,
-      source: 'mbcplus',
-    });
+      // 출연진 섹션 찾기: "& 출연진 &" 또는 단독 "출연" 줄 모두 처리
+      const lineupMatch =
+        text.match(/&\s*출연진\s*&\s*([\s\S]*?)(?:\n\s*\n|$)/) ||
+        text.match(/(?:^|\n)\s*출연\s*\n([\s\S]*?)(?:\n\s*\n|$)/);
+      if (!lineupMatch) continue;
+
+      const introText = text.slice(0, lineupMatch.index);
+      const introPerformers = extractShowChampionQuotedSegments(introText)
+        .flatMap(splitShowChampionArtistNames)
+        .filter(isShowChampionIntroArtistName);
+
+      // 출연진 블록에서 라인 추출
+      const lineupBlock = lineupMatch[1];
+      const lines = lineupBlock.split('\n').map(l => l.trim()).filter(Boolean);
+
+      // Preview 라인(영문명 포함, / 구분)이 있으면 우선 사용; 없으면 쉼표·슬래시 혼용 파싱
+      const previewLine = lines.find(l => l.includes('/') && /[A-Za-z]/.test(l));
+      const listedPerformers = previewLine
+        ? previewLine.split('/').flatMap(splitShowChampionArtistNames)
+            .filter(name => name.length > 1 && name.length < 80)
+        : lines.flatMap(l => l.split(/[,\/]/).flatMap(splitShowChampionArtistNames))
+            .filter(name => name.length > 1 && name.length < 80);
+      const seenPerformers = new Set();
+      const performers = [...introPerformers, ...listedPerformers].filter(name => {
+        const key = name.toLowerCase();
+        if (seenPerformers.has(key)) return false;
+        seenPerformers.add(key);
+        return true;
+      });
+      if (performers.length === 0) continue;
+      rows.push({
+        show_name: 'show_champion',
+        broad_date: broadDate,
+        groups: mapArtists(performers),
+        raw_title: `show_champion - ${performers.join(', ')}`,
+        episode_number: Number((title.match(/(\d+)회/) || [])[1]) || null,
+        source: 'mbcplus',
+      });
+    }
+    // 이 페이지에 매칭 row가 없으면 더 이상 페이지 없음
+    if (!foundAny) break;
+    // 이 페이지에서 수집한 마지막 row가 cutoffDate보다 이전이면 중단
+    const lastInPage = rows[rows.length - 1];
+    if (lastInPage && lastInPage.broad_date < cutoffDate) done = true;
   }
-  return rows;
+  return rows.filter(r => r.broad_date >= cutoffDate);
 }
 
 function extractSbsVodId(section) {
