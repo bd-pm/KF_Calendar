@@ -912,7 +912,7 @@ module.exports = async function handler(req, res) {
   // backfill 모드: since부터 과거 포함 전체 처리
   // 일반 모드: 오늘 이후만 처리
   const cutoffDate = backfill && since ? since : todayKstKey();
-  const log = [];
+  const log = [`[debug] backfill=${backfill} since=${since} cutoffDate=${cutoffDate} method=${req.method}`];
   const crawledRows = [];
   let totalUpserted = 0;
 
