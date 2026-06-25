@@ -744,21 +744,6 @@ body{
 <!-- VIEW BAR -->
 
 <div id="typeFilter" style="display:none"></div>
-</div><!-- /hdr-wrap -->
-<!-- HERO SECTION -->
-<div class="hero">
-  <div class="hero-inner">
-    <h1 class="hero-title">Find rare K-pop gifts,<br><span>straight from the broadcast</span></h1>
-    <p class="hero-desc">Exclusive fan gifts prepared by artists<br>at K-pop music show recordings.</p>
-    <div class="hero-img-wrap"><img src="/hero_image.svg" alt="K-pop photocards"></div>
-  </div>
-  <button class="hero-cta" onclick="scrollToTodayGoods()">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-    Shop today's goods
-  </button>
-</div>
-
-<div style="height:10px;background:#F4F4F4;"></div>
 
 <div class="view-bar" id="viewBar">
   <div class="view-l">
@@ -778,6 +763,21 @@ body{
     </div>
   </div>
 </div>
+</div><!-- /hdr-wrap -->
+<!-- HERO SECTION -->
+<div class="hero">
+  <div class="hero-inner">
+    <h1 class="hero-title">Find rare K-pop gifts,<br><span>straight from the broadcast</span></h1>
+    <p class="hero-desc">Exclusive fan gifts prepared by artists<br>at K-pop music show recordings.</p>
+    <div class="hero-img-wrap"><img src="/hero_image.svg" alt="K-pop photocards"></div>
+  </div>
+  <button class="hero-cta" onclick="scrollToTodayGoods()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+    Shop today's goods
+  </button>
+</div>
+
+<div style="height:10px;background:#F4F4F4;"></div>
 
 
 <!-- CALENDAR AREA -->
@@ -1271,12 +1271,12 @@ function scrollToTodayGoods(){
   if(selectedDate !== dKey(TODAY)) goToday();
 
   function doScroll(){
-    // view-bar(June + Today/Week/Month 바)가 헤더 바로 밑에 오도록 스크롤
-    const viewBar = document.getElementById('viewBar');
-    if(!viewBar) return;
+    const dateHeader = document.getElementById('dateHeader');
+    if(!dateHeader) return;
+    // hdr-wrap이 이제 헤더 + view-bar를 모두 포함 → 그 높이만큼 offset
     const hdrWrap = document.querySelector('.hdr-wrap');
     const offset = hdrWrap ? hdrWrap.offsetHeight : 52;
-    const top = viewBar.getBoundingClientRect().top + window.scrollY - offset;
+    const top = dateHeader.getBoundingClientRect().top + window.scrollY - offset;
     window.scrollTo({top, behavior:'smooth'});
   }
 
