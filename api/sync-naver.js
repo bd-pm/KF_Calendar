@@ -450,17 +450,29 @@ async function fetchShowChampionOfficialRows({ cutoffDate, backfill }) {
     const text = stripHtmlText(await detailRes.text())
       .replace(/[<>]+/g, '\n')
       .replace(/\s*\n\s*/g, '\n');
-    const lineupMatch = text.match(/&\s*출연진\s*&\s*([\s\S]*?)(?:\n\s*\n|$)/);
+
+    // 출연진 섹션 찾기: "& 출연진 &" 또는 단독 "출연" 줄 모두 처리
+    const lineupMatch =
+      text.match(/&\s*출연진\s*&\s*([\s\S]*?)(?:\n\s*\n|$)/) ||
+      text.match(/(?:^|\n)\s*출연\s*\n([\s\S]*?)(?:\n\s*\n|$)/);
     if (!lineupMatch) continue;
 
     const introText = text.slice(0, lineupMatch.index);
     const introPerformers = extractShowChampionQuotedSegments(introText)
       .flatMap(splitShowChampionArtistNames)
       .filter(isShowChampionIntroArtistName);
-    const listedPerformers = lineupMatch[1]
-      .split('/')
-      .flatMap(splitShowChampionArtistNames)
-      .filter(name => name.length > 1 && name.length < 80);
+
+    // 출연진 블록에서 라인 추출
+    const lineupBlock = lineupMatch[1];
+    const lines = lineupBlock.split('\n').map(l => l.trim()).filter(Boolean);
+
+    // Preview 라인(영문명 포함, / 구분)이 있으면 우선 사용; 없으면 쉼표·슬래시 혼용 파싱
+    const previewLine = lines.find(l => l.includes('/') && /[A-Za-z]/.test(l));
+    const listedPerformers = previewLine
+      ? previewLine.split('/').flatMap(splitShowChampionArtistNames)
+          .filter(name => name.length > 1 && name.length < 80)
+      : lines.flatMap(l => l.split(/[,\/]/).flatMap(splitShowChampionArtistNames))
+          .filter(name => name.length > 1 && name.length < 80);
     const seenPerformers = new Set();
     const performers = [...introPerformers, ...listedPerformers].filter(name => {
       const key = name.toLowerCase();
