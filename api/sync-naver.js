@@ -906,8 +906,9 @@ module.exports = async function handler(req, res) {
   }
   if (!SUPA_SERVICE_KEY) return res.status(500).json({ error: 'SUPA_SERVICE_KEY 없음' });
 
-  const since = req.query.since || null;
-  const backfill = req.query.backfill === '1';
+  const body = req.method === 'POST' ? (req.body || {}) : {};
+  const since = req.query.since || body.since || null;
+  const backfill = req.query.backfill === '1' || body.backfill === true || body.backfill === '1';
   // backfill 모드: since부터 과거 포함 전체 처리
   // 일반 모드: 오늘 이후만 처리
   const cutoffDate = backfill && since ? since : todayKstKey();
