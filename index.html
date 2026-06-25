@@ -2517,13 +2517,25 @@ function closeMyGroups(sheetEl) {
 
 // 전체 그룹 목록 수집 (현재 LINEUP_BY_DATE 기준)
 function getAllArtistsFromLineups() {
-  const set = new Set();
+  // displayName 기준으로 dedup: 한국어/영어 표기가 달라도 같은 그룹이면 하나만
+  const displaySeen = new Set();
+  const rawByDisplay = {}; // displayName → raw name (영문 우선)
+
   for (const lineup of Object.values(LINEUP_BY_DATE)) {
     const artists = parseRawTitleStatic(lineup.rawTitle);
     const list = artists.length > 0 ? artists : lineup.groups;
-    list.forEach(a => set.add(a));
+    list.forEach(a => {
+      const display = artistDisplayName(a);
+      // 한국어가 그대로 display로 나오는 경우 스킵 (영문 매핑 없는 한글명)
+      if (/[\uAC00-\uD7A3]/.test(display)) return;
+      if (!displaySeen.has(display)) {
+        displaySeen.add(display);
+        rawByDisplay[display] = a;
+      }
+    });
   }
-  return [...set].sort((a, b) => {
+
+  return Object.values(rawByDisplay).sort((a, b) => {
     const ga = ARTIST_TO_GROUP_FRONT[a], gb = ARTIST_TO_GROUP_FRONT[b];
     const ra = ga ? (GROUP_RANK[ga] ?? 999) : 999;
     const rb = gb ? (GROUP_RANK[gb] ?? 999) : 999;
