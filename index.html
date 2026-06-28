@@ -2248,7 +2248,8 @@ function renderAllGoods(area, items, showName, artists) {
   if (!area) return;
   area.innerHTML = '';
 
-  const firstArtist = (artists && artists.length > 0) ? artistDisplayName(artists[0]) : null;
+  const isSingleArtist = artists && artists.length === 1;
+  const firstArtist = isSingleArtist ? artistDisplayName(artists[0]) : null;
   const chevronQ = encodeURIComponent((firstArtist || '') + ' 공방');
   const chevronUrl = `https://globalbunjang.com/search?q=${chevronQ}&order=date&utm_source=kf-calendar&utm_medium=social&utm_campaign=fan-goods-postcards`;
 
@@ -2257,9 +2258,9 @@ function renderAllGoods(area, items, showName, artists) {
   hdr.innerHTML = `
     <div class="goods-intro-title-row">
       <div class="goods-intro-title">K-pop photocards & goods,<br>fresh from ${showName ? escHtml(showName) : 'today\'s show'}</div>
-      <a href="${chevronUrl}" target="_blank" rel="noopener" class="goods-intro-chevron">
+      ${isSingleArtist ? `<a href="${chevronUrl}" target="_blank" rel="noopener" class="goods-intro-chevron">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      </a>
+      </a>` : ''}
     </div>
   `;
   area.appendChild(hdr);
