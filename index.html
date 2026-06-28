@@ -71,13 +71,13 @@ body{
   flex-shrink:0;
 }
 .logo-text{
-  font-size:13px;font-weight:700;letter-spacing:-0.2px;color:#191919;
+  font-size:15px;font-weight:700;letter-spacing:-0.3px;color:#191919;
   white-space:nowrap;line-height:1;
 }
 .hdr-r{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex:1;min-width:0;margin-left:12px;}
 .hdr-search{
   display:flex;align-items:center;gap:6px;
-  width:160px;flex-shrink:0;
+  width:320px;flex-shrink:1;max-width:60vw;
   height:34px;padding:0 10px;
   background:#F4F4F4;border-radius:8px;
   cursor:pointer;-webkit-tap-highlight-color:transparent;
@@ -701,14 +701,16 @@ body{
 /* ── HERO ── */
 .hero{
   background:#FFFFFF;
-  padding:32px 20px 0;
-  text-align:center;
+  padding:16px 20px;
 }
-.hero-inner{ display:flex;flex-direction:column;gap:12px;align-items:center; }
-.hero-title{ font-size:28px;font-weight:800;color:#191919;line-height:1.2;letter-spacing:0;text-align:center; }
-.hero-desc{ font-size:14px;font-weight:400;color:#666666;line-height:1.6;letter-spacing:0;margin:0;text-align:center; }
-.hero-img-wrap{ padding:0 20px 24px; }
-.hero-img-wrap img{ width:80%;max-width:320px;height:auto;display:block;margin:0 auto; }
+.hero-inner{
+  display:flex;flex-direction:row;align-items:center;gap:16px;
+}
+.hero-text{ flex:1;min-width:0; }
+.hero-title{ font-size:18px;font-weight:800;color:#191919;line-height:1.25;letter-spacing:-0.2px;margin:0 0 6px; }
+.hero-desc{ font-size:12px;font-weight:400;color:#666666;line-height:1.55;letter-spacing:0;margin:0; }
+.hero-img-wrap{ flex-shrink:0;width:90px; }
+.hero-img-wrap img{ width:100%;height:auto;display:block; }
 .hero-cta{
   display:inline-flex;align-items:center;gap:8px;
   margin:0 auto 32px;
@@ -752,8 +754,10 @@ body{
 <!-- HERO SECTION -->
 <div class="hero">
   <div class="hero-inner">
-    <h1 class="hero-title">Find rare K-pop gifts,<br><span>straight from the broadcast</span></h1>
-    <p class="hero-desc">Track and discover highly sought-after Broadcast Pocas (Gongbang) and exclusive fan gifts from every K-pop music show schedule.</p>
+    <div class="hero-text">
+      <h1 class="hero-title">Find rare K-pop gifts,<br>straight from the broadcast</h1>
+      <p class="hero-desc">Track and discover highly sought-after Broadcast Pocas (Gongbang) and exclusive fan gifts from every K-pop music show schedule.</p>
+    </div>
     <div class="hero-img-wrap"><img src="/hero_image.svg" alt="K-pop photocards"></div>
   </div>
 </div>
