@@ -210,6 +210,11 @@ const EN_TO_KR = {
   'unchild': 'UNCHILD',
   'cortis': 'CORTIS',
   'kiiras': 'KIIRAS',
+  // 콜라보 유닛
+  '크리스티나 X YJP': '크리스티나',
+  '크리스티나 X 유재필(YJP)': '크리스티나',
+  'Cristina X YJP': '크리스티나',
+  'YJP': '유재필',
 };
 
 const RESULT_EXCLUDES = {
