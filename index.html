@@ -62,14 +62,28 @@ body{
   background:#FFFFFF;
 }
 .hdr{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:0 16px;height:52px;
+  display:flex;flex-direction:column;
+  padding:0 16px;
   border-bottom:1px solid var(--border);
+}
+.hdr-top{
+  display:flex;align-items:center;justify-content:space-between;
+  height:52px;
 }
 .logo{
   display:flex;align-items:center;
 }
-.hdr-r{display:flex;align-items:center;gap:12px}
+.hdr-search-bar{
+  display:flex;align-items:center;gap:8px;
+  background:#F6F6F6;border-radius:10px;
+  padding:10px 14px;margin-bottom:10px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  border:none;width:100%;text-align:left;
+}
+.hdr-search-bar span{
+  font-size:15px;font-weight:400;color:var(--txt3);
+  font-family:inherit;letter-spacing:0;
+}
 
 /* ════════════════════════════════════════
    VIEW TOGGLE (week / month)
@@ -78,7 +92,7 @@ body{
   display:flex;align-items:center;justify-content:space-between;
   padding:0 16px 0 8px;height:48px;
   border-bottom:1px solid var(--border);
-  position:sticky;top:52px;z-index:40;background:#FFFFFF;
+  position:sticky;top:112px;z-index:40;background:#FFFFFF;
 }
 .view-l{display:flex;align-items:center;gap:2px}
 .view-title{font-size:17px;font-weight:700;letter-spacing:0;color:var(--txt1);min-width:48px;text-align:center}
@@ -708,6 +722,7 @@ body{
 <!-- HEADER + VIEW BAR sticky wrapper -->
 <div class="hdr-wrap">
 <header class="hdr">
+  <div class="hdr-top">
   <div class="logo" style="display:flex;align-items:center;gap:4px">
     <svg height="20" viewBox="0 0 828 161" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M84.0504 22.5567C87.5499 18.424 94.2651 21.6114 93.2584 26.9376L86.2213 64.4855L124.853 63.295C129.423 63.1569 131.993 68.496 129.038 71.9825L75.8483 134.779C72.3456 138.912 65.6297 135.725 66.6363 130.399L73.6744 92.8507L35.0484 94.0372C30.4781 94.1753 27.9113 88.8362 30.8639 85.3497L84.0504 22.5567Z" fill="#191919"/>
@@ -727,13 +742,13 @@ body{
       letter-spacing:0;
     ">Beta</span>
   </div>
-  <div class="hdr-r">
-    <button id="myGroupsBtn" class="myg-btn" onclick="openSearchModal()" title="Search Groups" style="outline:none;-webkit-tap-highlight-color:transparent;">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-      </svg>
-    </button>
-  </div>
+  </div><!-- /hdr-top -->
+  <button class="hdr-search-bar" onclick="openSearchModal()" id="myGroupsBtn">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8C8C8C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+    </svg>
+    <span>Search by group name…</span>
+  </button>
 </header>
 
 <!-- VIEW BAR -->
