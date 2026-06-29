@@ -483,8 +483,15 @@ async function fetchShowChampionOfficialRows({ cutoffDate, backfill }) {
             .filter(name => name.length > 1 && name.length < 80)
         : lines.flatMap(l => l.split(/[,\/]/).flatMap(splitShowChampionArtistNames))
             .filter(name => name.length > 1 && name.length < 80);
+
+      // 홍보문구 줄(lineupBlock 전체)의 작은따옴표 안 아티스트명도 추출
+      // 예: '독보적인... 'izna'. ... 'RIIZE'. ... 'FIFTY FIFTY (피프티피프티)'. ... '온앤오프(ONF)'
+      const promoPerformers = extractShowChampionQuotedSegments(lineupBlock)
+        .flatMap(splitShowChampionArtistNames)
+        .filter(isShowChampionIntroArtistName);
+
       const seenPerformers = new Set();
-      const performers = [...introPerformers, ...listedPerformers].filter(name => {
+      const performers = [...introPerformers, ...listedPerformers, ...promoPerformers].filter(name => {
         const key = name.toLowerCase();
         if (seenPerformers.has(key)) return false;
         seenPerformers.add(key);
