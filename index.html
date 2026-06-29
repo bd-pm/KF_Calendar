@@ -2320,7 +2320,7 @@ async function fetchAllGroupGoods(artists, showName, _areaOverride) {
       )
     );
 
-    if (!allGroupsSelected || requestId !== goodsRequestSeq) return;
+    if (requestId !== goodsRequestSeq) return;
 
     const items = mergeGoodsResults(results);
     writeGoodsCache(comboKey, { items });
