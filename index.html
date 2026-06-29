@@ -1938,6 +1938,87 @@ function goodsApiUrl(artistName, n, eventType) {
   return `/api/goods?artist=${encodeURIComponent(artistName)}&n=${n}&type=${encodeURIComponent(t)}`;
 }
 
+// ── 클라이언트 사이드 Bunjang 직접 검색 (Vercel 서버 IP 차단 우회) ──
+// Bunjang API는 우리 도메인에 CORS를 허용하므로 브라우저에서 직접 호출 가능
+const BUNJANG_SEARCH_URL = 'https://api.bunjang.co.kr/api/1/find_v2.json';
+const EN_TO_KR_CLIENT = {
+  'TREASURE':'트레저','BOYNEXTDOOR':'보이넥스트도어','RIIZE':'라이즈',
+  'ATEEZ':'에이티즈','STAYC':'스테이씨','MEOVV':'미어브',
+  'aespa':'에스파','IVE':'아이브','LE SSERAFIM':'르세라핌',
+  'NewJeans':'뉴진스','TWICE':'트와이스','BLACKPINK':'블랙핑크',
+  'ENHYPEN':'엔하이픈','SEVENTEEN':'세븐틴','Stray Kids':'스트레이키즈',
+  'TOMORROW X TOGETHER':'투모로우바이투게더','PLAVE':'플레이브',
+  'ZEROBASEONE':'제로베이스원','BOYNEXTDOOR':'보이넥스트도어',
+  'TWS':'투어스','ILLIT':'아일릿','BABYMONSTER':'베이비몬스터',
+  'CRAVITY':'크래비티','XIKERS':'자이커스','THE BOYZ':'더보이즈',
+  'ONEUS':'원어스','MAMAMOO':'마마무','Red Velvet':'레드벨벳',
+  'ITZY':'있지','NMIXX':'NMIXX','EVNNE':'이븐','NEXZ':'넥스지',
+  'Kep1er':'케플러','AMPERS&ONE':'앰퍼샌드원','BTS':'방탄소년단',
+  'IZNA':'이즈나','EPEX':'이펙스','USPEER':'유스피어',
+  'NCT 127':'엔시티127','NCT DREAM':'엔시티드림','NCT WISH':'엔시티위시',
+  // slug 형태
+  'riize':'라이즈','treasure':'트레저','boynextdoor':'보이넥스트도어',
+  'ateez':'에이티즈','stayc':'스테이씨','meovv':'미어브',
+  'bts':'방탄소년단','izna':'이즈나','epex':'이펙스','uspeer':'유스피어',
+};
+const GONBANG_KW_RE = /공방포|역조공|공방|사녹/;
+
+function clientMatchesArtist(name, krAlias, enAlias) {
+  const t = name.toLowerCase();
+  const checkAlias = (a) => {
+    const al = a.toLowerCase();
+    const idx = t.indexOf(al);
+    if (idx < 0) return false;
+    const before = idx === 0 ? '' : t[idx - 1];
+    if (/[가-힣]/.test(al)) return !/[가-힣]/.test(before);
+    return !/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(t[idx + al.length] || '');
+  };
+  return (krAlias && checkAlias(krAlias)) || (enAlias && checkAlias(enAlias));
+}
+
+async function fetchGoodsClientSide(artistName, n) {
+  const kr = EN_TO_KR_CLIENT[artistName] || (hasKorean(artistName) ? artistName : null);
+  const en = hasKorean(artistName) ? null : artistName;
+  const queries = [];
+  if (kr) queries.push(`${kr} 공방`, `${kr} 역조공`, `${kr} 사녹`);
+  if (en && en !== kr) queries.push(`${en} 공방`);
+
+  const seen = new Set();
+  const items = [];
+  await Promise.all(queries.map(q =>
+    fetch(`${BUNJANG_SEARCH_URL}?q=${encodeURIComponent(q)}&order=date&n=100&page=0`)
+      .then(r => r.ok ? r.json() : { list: [] })
+      .catch(() => ({ list: [] }))
+      .then(data => {
+        for (const p of (data.list || [])) {
+          if (seen.has(p.pid)) continue;
+          if (p.status !== '0' && p.status !== 0) continue;
+          const name = p.name || '';
+          if (!GONBANG_KW_RE.test(name)) continue;
+          if (!clientMatchesArtist(name, kr, en)) continue;
+          if (/구함|구해요|구합니다/.test(name)) continue;
+          seen.add(p.pid);
+          const price = parseInt(p.price, 10) || 0;
+          const priceGlobal = Math.round((price / 1300) * 100) / 100;
+          items.push({
+            id: p.pid,
+            name,
+            displayName: name,
+            price,
+            priceGlobal,
+            displayPrice: priceGlobal ? `$${priceGlobal.toFixed(2)}` : null,
+            currency: 'USD',
+            imageUrl: p.product_image ? p.product_image.replace('{res}', '360') : '',
+            updatedAt: p.update_time || 0,
+            status: p.status,
+          });
+        }
+      })
+  ));
+  items.sort((a, b) => b.updatedAt - a.updatedAt);
+  return { artist: artistName, items: items.slice(0, n) };
+}
+
 const GOODS_CACHE_TTL_MS = 1000 * 60 * 120; // 2시간
 const GOODS_CACHE_PREFIX = 'kf_goods_cache_v9:';
 const goodsMemoryCache = new Map();
@@ -2010,9 +2091,16 @@ function fetchGoodsCached(artistName, n, eventType) {
 
   const request = fetch(goodsApiUrl(artistName, n, eventType))
     .then(async res => {
-      if (!res.ok) return res;
+      if (!res.ok) return cachedJsonResponse({ items: [] });
       const data = await res.json();
-      // 빈 결과는 캐시 저장 안 함 (API 오류나 일시적 문제로 빈 배열이 캐싱되면 계속 0개가 나옴)
+      // 서버가 빈 결과 반환 시 클라이언트에서 Bunjang 직접 호출 (Vercel IP 차단 우회)
+      if ((data.items || []).length === 0 && (eventType || 'gonbang') === 'gonbang') {
+        const clientData = await fetchGoodsClientSide(artistName, n).catch(() => ({ items: [] }));
+        if ((clientData.items || []).length > 0) {
+          writeGoodsCache(key, clientData);
+          return cachedJsonResponse(clientData);
+        }
+      }
       if ((data.items || []).length > 0) writeGoodsCache(key, data);
       return cachedJsonResponse(data);
     })
