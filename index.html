@@ -258,9 +258,12 @@ body{
   background:#FFFFFF;
 }
 
-/* chip bar — bottom 안에서 일정 리스트 아래 위치 */
+/* chip bar — 그룹칩: 헤더 바로 밑 sticky */
 #chipBar{
   background:#FFFFFF;
+  position:sticky;
+  top:0; /* JS가 hdr-wrap 높이로 덮어씀 */
+  z-index:45;
 }
 #chipBar:not(:empty){
   border-bottom:1px solid var(--border);
@@ -734,7 +737,7 @@ body{
 <body>
 <div class="app">
 
-<!-- HEADER + VIEW BAR sticky wrapper -->
+<!-- HEADER sticky wrapper -->
 <div class="hdr-wrap">
 <header class="hdr">
   <div class="hdr-top">
@@ -749,8 +752,22 @@ body{
     <span class="hdr-search-placeholder">Search by group name...</span>
   </button>
 </header>
+</div><!-- /hdr-wrap -->
 
-<!-- VIEW BAR (hdr-wrap 안 — sticky 하나로 묶음) -->
+<div id="typeFilter" style="display:none"></div>
+
+<!-- HERO SECTION -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-text">
+      <h1 class="hero-title">Rare Broadcast Pocas,<br>Straight from the Stage</h1>
+      <p class="hero-desc">Exclusive fan gifts from Inkigayo, M Countdown, Music Bank, Music Core, Show Champion</p>
+    </div>
+    <div class="hero-img-wrap"><img src="/broadcast.png" alt="K-pop music shows"></div>
+  </div>
+</div>
+
+<!-- VIEW BAR (일반 흐름 — 스크롤과 함께 올라감) -->
 <div class="view-bar" id="viewBar">
   <div class="view-l">
     <button class="nav-btn" onclick="navPrev()">
@@ -767,20 +784,6 @@ body{
       <button class="toggle-btn on" id="btnWeek" onclick="setView('week')">Week</button>
       <button class="toggle-btn" id="btnMonth" onclick="setView('month')">Month</button>
     </div>
-  </div>
-</div>
-</div><!-- /hdr-wrap -->
-
-<div id="typeFilter" style="display:none"></div>
-
-<!-- HERO SECTION -->
-<div class="hero">
-  <div class="hero-inner">
-    <div class="hero-text">
-      <h1 class="hero-title">Rare Broadcast Pocas,<br>Straight from the Stage</h1>
-      <p class="hero-desc">Exclusive fan gifts from Inkigayo, M Countdown, Music Bank, Music Core, Show Champion</p>
-    </div>
-    <div class="hero-img-wrap"><img src="/broadcast.png" alt="K-pop music shows"></div>
   </div>
 </div>
 
@@ -1292,9 +1295,10 @@ function scrollToTodayGoods(){
   function doScroll(){
     const dateHeader = document.getElementById('dateHeader');
     if(!dateHeader) return;
-    // sticky 헤더 높이만큼 offset
+    // sticky 헤더 + chipBar 높이만큼 offset
     const hdrWrap = document.querySelector('.hdr-wrap');
-    const offset = hdrWrap ? hdrWrap.offsetHeight : 52;
+    const chipBarEl = document.getElementById('chipBar');
+    const offset = (hdrWrap ? hdrWrap.offsetHeight : 52) + (chipBarEl ? chipBarEl.offsetHeight : 0);
     const top = dateHeader.getBoundingClientRect().top + window.scrollY - offset;
     window.scrollTo({top, behavior:'smooth'});
   }
@@ -1655,7 +1659,9 @@ async function sortedArtists(artists) {
 function scrollToBottom(){
   const target=document.getElementById('dateHeader')||document.getElementById('bottom');
   if(!target) return;
-  const stickyH = 108 + 8; // GNB 56 + view-bar 52 + 8px margin
+  const hdrWrapEl2 = document.querySelector('.hdr-wrap');
+  const chipBarEl2 = document.getElementById('chipBar');
+  const stickyH = (hdrWrapEl2 ? hdrWrapEl2.offsetHeight : 97) + (chipBarEl2 ? chipBarEl2.offsetHeight : 0) + 8;
   const top = target.getBoundingClientRect().top + window.scrollY - stickyH;
   window.scrollTo({top, behavior:'smooth'});
 }
@@ -1671,6 +1677,9 @@ function renderBottom(){
   // chipBar는 bot 안에 동적으로 생성 (일정 리스트 아래, 매물 위)
   const chipBar = document.createElement('div');
   chipBar.id = 'chipBar';
+  // sticky top = hdr-wrap 높이 (동적 계산)
+  const hdrWrapEl = document.querySelector('.hdr-wrap');
+  if (hdrWrapEl) chipBar.style.top = hdrWrapEl.offsetHeight + 'px';
 
   const [y,mo,d]=selectedDate.split('-').map(Number);
   const dateObj=new Date(y,mo-1,d);
