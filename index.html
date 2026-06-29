@@ -60,11 +60,11 @@ body{
 .hdr-wrap{
   position:sticky;top:0;z-index:50;
   background:#FFFFFF;
+  border-bottom:1px solid var(--border);
 }
 .hdr{
   display:flex;flex-direction:column;
   padding:0 16px;
-  border-bottom:1px solid var(--border);
 }
 .hdr-top{
   display:flex;align-items:center;justify-content:space-between;
@@ -262,7 +262,8 @@ body{
 #chipBar{
   background:#FFFFFF;
   position:sticky;
-  z-index:45;
+  z-index:51;
+  margin-top:-1px; /* hdr-wrap border 위에 1px 겹쳐서 틈 완전 제거 */
 }
 #chipBar:not(:empty){
   border-bottom:1px solid var(--border);
@@ -1683,7 +1684,7 @@ function renderBottom(){
   const chipBar = document.getElementById('chipBar');
   chipBar.innerHTML = '';
   const hdrWrapEl = document.querySelector('.hdr-wrap');
-  chipBar.style.top = (hdrWrapEl ? hdrWrapEl.offsetHeight : 97) + 'px';
+  chipBar.style.top = (hdrWrapEl ? hdrWrapEl.offsetHeight - 1 : 96) + 'px';
 
   const [y,mo,d]=selectedDate.split('-').map(Number);
   const dateObj=new Date(y,mo-1,d);
