@@ -99,7 +99,7 @@ body{
   display:flex;align-items:center;justify-content:space-between;
   padding:0 16px 0 8px;height:48px;
   border-bottom:1px solid var(--border);
-  position:sticky;top:100px;z-index:40;background:#FFFFFF;
+  background:#FFFFFF;
 }
 .view-l{display:flex;align-items:center;gap:2px}
 .view-title{font-size:17px;font-weight:700;letter-spacing:0;color:var(--txt1);min-width:48px;text-align:center}
@@ -750,24 +750,7 @@ body{
   </button>
 </header>
 
-<!-- VIEW BAR -->
-</div><!-- /hdr-wrap -->
-
-<div id="typeFilter" style="display:none"></div>
-
-<!-- HERO SECTION -->
-<div class="hero">
-  <div class="hero-inner">
-    <div class="hero-text">
-      <h1 class="hero-title">Rare Broadcast Pocas,<br>Straight from the Stage</h1>
-      <p class="hero-desc">Exclusive fan gifts from Inkigayo, M Countdown, Music Bank, Music Core, Show Champion</p>
-    </div>
-    <div class="hero-img-wrap"><img src="/broadcast.png" alt="K-pop music shows"></div>
-  </div>
-</div>
-
-<div style="height:10px;background:#F4F4F4;"></div>
-
+<!-- VIEW BAR (hdr-wrap 안 — sticky 하나로 묶음) -->
 <div class="view-bar" id="viewBar">
   <div class="view-l">
     <button class="nav-btn" onclick="navPrev()">
@@ -784,6 +767,20 @@ body{
       <button class="toggle-btn on" id="btnWeek" onclick="setView('week')">Week</button>
       <button class="toggle-btn" id="btnMonth" onclick="setView('month')">Month</button>
     </div>
+  </div>
+</div>
+</div><!-- /hdr-wrap -->
+
+<div id="typeFilter" style="display:none"></div>
+
+<!-- HERO SECTION -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-text">
+      <h1 class="hero-title">Rare Broadcast Pocas,<br>Straight from the Stage</h1>
+      <p class="hero-desc">Exclusive fan gifts from Inkigayo, M Countdown, Music Bank, Music Core, Show Champion</p>
+    </div>
+    <div class="hero-img-wrap"><img src="/broadcast.png" alt="K-pop music shows"></div>
   </div>
 </div>
 
