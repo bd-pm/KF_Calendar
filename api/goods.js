@@ -292,36 +292,49 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(loadStaticGoods());
   }
 
-  const n = Math.min(parseInt(req.query.n || '50', 10), 100);
+  const n = Math.min(parseInt(req.query.n || '50', 10), 200);
   const eventType = (req.query.type || 'gonbang').trim();
   const keywords = KEYWORDS_BY_TYPE[eventType] || KEYWORDS_BY_TYPE.gonbang;
 
   try {
     const aliases = getSearchAliases(artist);
-    const queries = [];
+    // 쿼리 → 해당 키워드 매핑 (결과 필터링에 사용)
+    const queryList = []; // { q, kw }
     for (const kw of keywords) {
-      for (const alias of aliases) queries.push(`${alias} ${kw}`);
+      for (const alias of aliases) queryList.push({ q: `${alias} ${kw}`, kw });
     }
-    // 중복 쿼리 제거
-    const uniqueQueries = [...new Set(queries)];
+    // 중복 쿼리 제거 (q 기준)
+    const uniqueQueryList = [];
+    const seenQ = new Set();
+    for (const item of queryList) {
+      if (!seenQ.has(item.q)) { seenQ.add(item.q); uniqueQueryList.push(item); }
+    }
 
+    // 각 쿼리당 100개씩 fetch — 번장이 이미 쿼리로 필터링하므로 충분히 가져옴
+    const FETCH_N = 100;
     const results = await Promise.allSettled(
-      uniqueQueries.map(q => {
-        const url = `${BUNJANG_API}?q=${encodeURIComponent(q)}&order=date&n=${n}&page=0`;
+      uniqueQueryList.map(({ q, kw }) => {
+        const url = `${BUNJANG_API}?q=${encodeURIComponent(q)}&order=date&n=${FETCH_N}&page=0`;
         return fetch(url, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
           signal: AbortSignal.timeout(10000),
-        }).then(r => r.ok ? r.json() : { list: [] });
+        }).then(r => r.ok ? r.json() : { list: [] }).then(data => ({ data, kw }));
       })
     );
 
-    // 중복 제거 (pid 기준), 최신순 정렬
+    // 중복 제거 (pid 기준): 쿼리 키워드가 상품명에 있거나, alias가 매칭되면 통과
     const seen = new Set();
     const items = [];
     for (const r of results) {
       if (r.status !== 'fulfilled') continue;
-      for (const p of (r.value.list || [])) {
+      const { data, kw } = r.value;
+      for (const p of (data.list || [])) {
         if (seen.has(p.pid)) continue;
+        const name = (p.name || '').toLowerCase();
+        // 번장이 쿼리로 이미 필터링했으므로: 키워드가 상품명에 있거나 alias가 있으면 통과
+        const kwMatch = name.includes(kw.toLowerCase());
+        const aliasMatch = matchesArtist({ name: p.name }, aliases);
+        if (!kwMatch && !aliasMatch) continue;
         seen.add(p.pid);
         items.push({
           id:         p.pid,
@@ -331,20 +344,18 @@ module.exports = async function handler(req, res) {
             ? p.product_image.replace('{res}', '360')
             : '',
           updatedAt:  p.update_time || 0,
-          status:     p.status, // '0'=판매중
+          status:     p.status,
         });
       }
     }
 
-    // 판매중 + 아티스트명 포함 + 제외 규칙 통과
-    // status: 번장 API는 '0'(문자열) 또는 0(숫자) 모두 판매중으로 올 수 있음
     const isConcertNoise = item => {
       const n = item.name || '';
       return /티켓/.test(n) || /\d+열/.test(n) || /구역/.test(n);
     };
     const isWanted = item => /구함|구해요|구합니다/.test(item.name || '');
     const live = items
-      .filter(i => (i.status === '0' || i.status === 0) && matchesArtist(i, aliases) && !isExcludedResult(i, artist) && !isWanted(i) && !(eventType === 'concert' && isConcertNoise(i)))
+      .filter(i => (i.status === '0' || i.status === 0) && !isExcludedResult(i, artist) && !isWanted(i) && !(eventType === 'concert' && isConcertNoise(i)))
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
     const itemsOut = live.slice(0, n).map(item => ({
