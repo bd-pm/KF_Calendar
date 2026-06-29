@@ -362,41 +362,60 @@ module.exports = async function handler(req, res) {
   try {
     const aliases = getSearchAliases(artist);
     // 쿼리 → 해당 키워드 매핑 (결과 필터링에 사용)
+    // 번장은 대소문자 구분 없이 검색 → 소문자 중복 alias 제거해 쿼리 수 절감
+    const hasKorean = s => /[가-힣]/.test(s);
+    const effectiveAliases = aliases.filter(a => {
+      // 한국어 alias는 항상 포함
+      if (hasKorean(a)) return true;
+      // 영문 alias: 소문자 버전이 이미 있으면 (=원본이 이미 소문자이거나 대소문자 다른 버전이 먼저 등록), 중복 제거
+      const lower = a.toLowerCase();
+      return a === lower || !aliases.includes(lower);
+    });
+
     const queryList = []; // { q, kw }
     for (const kw of keywords) {
-      for (const alias of aliases) queryList.push({ q: `${alias} ${kw}`, kw });
+      for (const alias of effectiveAliases) queryList.push({ q: `${alias} ${kw}`, kw });
     }
-    // 중복 쿼리 제거 (q 기준)
+    // 중복 쿼리 제거 (소문자 정규화 기준 — 번장 대소문자 무관)
     const uniqueQueryList = [];
     const seenQ = new Set();
     for (const item of queryList) {
-      if (!seenQ.has(item.q)) { seenQ.add(item.q); uniqueQueryList.push(item); }
+      const normalized = item.q.toLowerCase();
+      if (!seenQ.has(normalized)) { seenQ.add(normalized); uniqueQueryList.push(item); }
     }
 
-    // 각 쿼리당 100개씩 fetch — 번장이 이미 쿼리로 필터링하므로 충분히 가져옴
+    // 번장 동시 요청 과다 시 차단됨 → 최대 4개씩 배치 처리
     const FETCH_N = 100;
-    const results = await Promise.allSettled(
-      uniqueQueryList.map(({ q, kw }) => {
-        const url = `${BUNJANG_API}?q=${encodeURIComponent(q)}&order=date&n=${FETCH_N}&page=0`;
-        return fetch(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
-            'Referer': 'https://bunjang.co.kr/',
-            'Origin': 'https://bunjang.co.kr',
-          },
-          signal: AbortSignal.timeout(10000),
-        }).then(r => r.ok ? r.json() : { list: [] }).then(data => ({ data, kw }));
-      })
-    );
+    const BATCH = 4;
+    const fetchOne = ({ q, kw }) => {
+      const url = `${BUNJANG_API}?q=${encodeURIComponent(q)}&order=date&n=${FETCH_N}&page=0`;
+      return fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
+          'Referer': 'https://bunjang.co.kr/',
+          'Origin': 'https://bunjang.co.kr',
+        },
+        signal: AbortSignal.timeout(10000),
+      }).then(r => r.ok ? r.json() : { list: [] }).then(data => ({ data, kw })).catch(() => ({ data: { list: [] }, kw }));
+    };
+    const allSettledBatched = async (list, batchSize) => {
+      const out = [];
+      for (let i = 0; i < list.length; i += batchSize) {
+        const batch = list.slice(i, i + batchSize);
+        const batchResults = await Promise.all(batch.map(fetchOne));
+        out.push(...batchResults);
+      }
+      return out;
+    };
+    const results = await allSettledBatched(uniqueQueryList, BATCH);
 
     // 중복 제거 (pid 기준): alias가 상품명에 정확히 매칭되어야 통과
     const seen = new Set();
     const items = [];
     for (const r of results) {
-      if (r.status !== 'fulfilled') continue;
-      const { data, kw } = r.value;
+      const { data, kw } = r;
       for (const p of (data.list || [])) {
         if (seen.has(p.pid)) continue;
           // alias가 상품명에 정확히 매칭되어야 통과 (단어 경계 + 한글 경계 포함)
@@ -429,7 +448,7 @@ module.exports = async function handler(req, res) {
       displayName: item.name || '',
     }));
 
-    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=120');
+    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=600');
     return res.status(200).json({ artist, items: itemsOut });
   } catch (err) {
     return res.status(502).json({ error: err.message });

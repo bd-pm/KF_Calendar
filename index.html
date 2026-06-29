@@ -1939,7 +1939,7 @@ function goodsApiUrl(artistName, n, eventType) {
 }
 
 const GOODS_CACHE_TTL_MS = 1000 * 60 * 120; // 2시간
-const GOODS_CACHE_PREFIX = 'kf_goods_cache_v8:';
+const GOODS_CACHE_PREFIX = 'kf_goods_cache_v9:';
 const goodsMemoryCache = new Map();
 const goodsInflight = new Map();
 let goodsRequestSeq = 0;
@@ -2308,7 +2308,7 @@ async function fetchAllGroupGoods(artists, showName, _areaOverride) {
   const allIndividualCached = individualCaches.every(c => c !== null);
   if (allIndividualCached) {
     const items = mergeGoodsResults(individualCaches.map(c => c.items || []));
-    writeGoodsCache(comboKey, { items });
+    if (items.length > 0) writeGoodsCache(comboKey, { items });
     renderAllGoods(area, items, showName, artists);
     enrichGoodsInBackground(null, items);
     return;
@@ -2334,7 +2334,7 @@ async function fetchAllGroupGoods(artists, showName, _areaOverride) {
     if (requestId !== goodsRequestSeq) return;
 
     const items = mergeGoodsResults(results);
-    writeGoodsCache(comboKey, { items });
+    if (items.length > 0) writeGoodsCache(comboKey, { items });
 
     // 즉시 렌더 후 백그라운드 enrich
     renderAllGoods(area, items, showName, artists);
