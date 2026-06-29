@@ -2414,18 +2414,29 @@ async function fetchAllGroupGoods(artists, showName, _areaOverride) {
   }
 
   try {
-    const results = await Promise.all(
-      artists.map(a =>
-        fetchGoodsCached(a, 60)
-          .then(r => r.ok ? r.json() : { items: [] })
-          .then(d => d.items || [])
-          .catch(() => [])
-      )
-    );
+    // 아티스트별 순차 처리 — 브라우저에서 Bunjang 직접 호출 시 동시 64개 요청 방지
+    // 결과가 들어올 때마다 즉시 렌더해서 빈 화면 시간 최소화
+    const allItems = [];
+    const seenPids = new Set();
+    for (const a of artists) {
+      if (requestId !== goodsRequestSeq) return;
+      const artistItems = await fetchGoodsCached(a, 60)
+        .then(r => r.ok ? r.json() : { items: [] })
+        .then(d => d.items || [])
+        .catch(() => []);
+      let added = 0;
+      for (const item of artistItems) {
+        if (!seenPids.has(item.id)) { seenPids.add(item.id); allItems.push(item); added++; }
+      }
+      // 새 아이템이 추가됐으면 즉시 렌더 (점진적 업데이트)
+      if (added > 0 && requestId === goodsRequestSeq) {
+        renderAllGoods(area, sortGoodsByWindow(allItems, selectedDate), showName, artists);
+      }
+    }
 
     if (requestId !== goodsRequestSeq) return;
 
-    const items = mergeGoodsResults(results);
+    const items = sortGoodsByWindow(allItems, selectedDate);
     if (items.length > 0) writeGoodsCache(comboKey, { items });
 
     // 즉시 렌더 후 백그라운드 enrich
