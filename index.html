@@ -794,7 +794,10 @@ body{
 <!-- DATE HEADER: .app 직속 (스크롤과 함께 올라감) -->
 <div id="dateHeader"></div>
 
-<!-- BOTTOM: schedule list + chip bar + goods -->
+<!-- CHIP BAR: dateHeader 바로 아래, #bottom 밖에서 sticky -->
+<div id="chipBar"></div>
+
+<!-- BOTTOM: schedule list + goods -->
 <div class="bottom" id="bottom">
   <!-- rendered by JS -->
 </div>
@@ -1676,9 +1679,9 @@ function renderBottom(){
   bot.innerHTML='';
   const dateHeader = document.getElementById('dateHeader');
   dateHeader.innerHTML='';
-  // chipBar: #bottom 안에 동적 생성, 스크롤 시 헤더 밑에 sticky
-  const chipBar = document.createElement('div');
-  chipBar.id = 'chipBar';
+  // chipBar: DOM 고정 위치(dateHeader 바로 아래), 내용만 초기화 후 재사용
+  const chipBar = document.getElementById('chipBar');
+  chipBar.innerHTML = '';
   const hdrWrapEl = document.querySelector('.hdr-wrap');
   chipBar.style.top = (hdrWrapEl ? hdrWrapEl.offsetHeight : 97) + 'px';
 
@@ -1824,7 +1827,6 @@ function renderBottom(){
       });
       chipBar.appendChild(strip);
     }
-    bot.appendChild(chipBar);
 
     const div = document.createElement('div');
     div.className = 'divider';
