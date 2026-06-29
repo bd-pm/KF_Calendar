@@ -53,10 +53,11 @@ const EN_TO_KR = {
   'SEVENTEEN': '세븐틴',
   'ATEEZ': '에이티즈',
   'Stray Kids': '스트레이키즈',
-  'TXT': '투모로우바이투게더',
+  'TXT': ['투모로우바이투게더', '투모로우 바이 투게더', '투바투'],
+  'TOMORROW X TOGETHER': ['투모로우바이투게더', '투모로우 바이 투게더', '투바투', 'TXT'],
   'PLAVE': '플레이브',
-  'ZEROBASEONE': '제로베이스원',
-  'BOYNEXTDOOR': '보이넥스트도어',
+  'ZEROBASEONE': ['제로베이스원', 'ZB1'],
+  'BOYNEXTDOOR': ['보이넥스트도어', 'BND'],
   'TWS': '투어스',
   'ILLIT': '아일릿',
   'BABYMONSTER': '베이비몬스터',
@@ -88,6 +89,50 @@ const EN_TO_KR = {
   'YOUNG POSSE': '영파씨',
   'KATSEYE': '케이씨아이',
   'Queenz Eye': ['퀸즈아이', 'Queenzeye'],
+  'EVERGLOW': '에버글로우',
+  'OH MY GIRL': ['오마이걸', 'OMG'],
+  'fromis_9': ['프로미스나인', 'fromis9'],
+  'WJSN': '우주소녀',
+  'APINK': '에이핑크',
+  'LOONA': '이달의 소녀',
+  'GFRIEND': '여자친구',
+  'CLASS:y': '클라씨',
+  'LIGHTSUM': '라잇썸',
+  'PURPLE KISS': '퍼플키스',
+  'SECRET NUMBER': '시크릿넘버',
+  'Kep1er': '케플러',
+  'STAYC': '스테이씨',
+  'KISS OF LIFE': '키스오브라이프',
+  'tripleS': '트리플에스',
+  'OMEGA X': '오메가엑스',
+  'KiiiKiii': '키키키',
+  'AB6IX': '에이비식스',
+  'DRIPPIN': '드리핀',
+  'VERIVERY': '베리베리',
+  'DAY6': '데이식스',
+  'GOT7': '갓세븐',
+  'WayV': '웨이션브이',
+  'ASTRO': '아스트로',
+  'PENTAGON': '펜타곤',
+  'CHUU': '츄',
+  'WONHO': '원호',
+  'HWASA': '화사',
+  'SUNMI': '선미',
+  'WHEEIN': '휘인',
+  'CHUNG HA': '청하',
+  'TREASURE': '트레저',
+  'BTOB': '비투비',
+  'INFINITE': '인피니트',
+  'NCT 127': '엔시티127',
+  'NCT DREAM': '엔시티드림',
+  'NCT WISH': '엔시티위시',
+  'BOYNEXTDOOR': '보이넥스트도어',
+  'NEXZ': '넥스지',
+  'AMPERS&ONE': '앰퍼샌드원',
+  'MEOVV': '미어브',
+  'IZNA': '이즈나',
+  'TWS': '투어스',
+  'CSR': '씨에스알',
 };
 
 const RESULT_EXCLUDES = {
@@ -172,14 +217,23 @@ function canonicalArtistKey(artist) {
 
 function getSearchAliases(artist) {
   const variants = artistVariants(artist);
+
+  // EN_TO_KR에서 매핑된 alias를 한 단계 더 재귀 조회 (TXT → 투모로우바이투게더 체인 등)
+  function expandMapped(v) {
+    const mapped = EN_TO_KR[v] || EN_TO_KR[canonicalArtistKey(v)];
+    const direct = Array.isArray(mapped) ? mapped : mapped ? [mapped] : [];
+    const extra = direct.flatMap(m => {
+      const m2 = EN_TO_KR[m];
+      return m2 ? (Array.isArray(m2) ? m2 : [m2]) : [];
+    });
+    return [...direct, ...extra];
+  }
+
   const aliases = [
     ...variants,
     ...variants.map(v => v.toLowerCase()),
     ...variants.map(compactLatinName),
-    ...variants.flatMap(v => {
-      const mapped = EN_TO_KR[v] || EN_TO_KR[canonicalArtistKey(v)];
-      return Array.isArray(mapped) ? mapped : mapped ? [mapped] : [];
-    }),
+    ...variants.flatMap(expandMapped),
   ].filter(Boolean);
 
   return [...new Set(aliases.flatMap(alias => {
@@ -267,13 +321,14 @@ module.exports = async function handler(req, res) {
     }
 
     // 판매중 + 아티스트명 포함 + 제외 규칙 통과
+    // status: 번장 API는 '0'(문자열) 또는 0(숫자) 모두 판매중으로 올 수 있음
     const isConcertNoise = item => {
       const n = item.name || '';
       return /티켓/.test(n) || /\d+열/.test(n) || /구역/.test(n);
     };
     const isWanted = item => /구함|구해요|구합니다/.test(item.name || '');
     const live = items
-      .filter(i => i.status === '0' && matchesArtist(i, aliases) && !isExcludedResult(i, artist) && !isWanted(i) && !(eventType === 'concert' && isConcertNoise(i)))
+      .filter(i => (i.status === '0' || i.status === 0) && matchesArtist(i, aliases) && !isExcludedResult(i, artist) && !isWanted(i) && !(eventType === 'concert' && isConcertNoise(i)))
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
     const itemsOut = live.slice(0, n).map(item => ({

@@ -76,6 +76,35 @@ const ARTIST_TO_GROUP = {
   '(G)I-DLE':'gidle','여자아이들':'gidle',
   'MAMAMOO':'mamamoo','마마무':'mamamoo',
   'Red Velvet':'redvelvet','레드벨벳':'redvelvet',
+  // 추가
+  'IZNA':'izna','izna':'izna','이즈나':'izna',
+  'RIIZE':'riize','라이즈':'riize',
+  'FIFTY FIFTY':'fiftyfifty','피프티피프티':'fiftyfifty','FIFTY FIFTY (피프티피프티)':'fiftyfifty',
+  'ONF':'onf','온앤오프':'onf','온앤오프(ONF)':'onf',
+  'STAYC':'stayc','스테이씨':'stayc',
+  'CrazAngel':'crazangel','크레이즈엔젤':'crazangel','CRAZANGEL':'crazangel',
+  'HEART OF WOMAN':'heartofwoman',
+  'USPEER':'uspeer','유스피어':'uspeer',
+  'Rothy':'rothy','로시':'rothy',
+  'UmYull':'umyull','음율':'umyull',
+  'MEOVV':'meovv','미어브':'meovv',
+  'TREASURE':'treasure','트레저':'treasure',
+  'EVERGLOW':'everglow','에버글로우':'everglow',
+  'OH MY GIRL':'ohmygirl','오마이걸':'ohmygirl',
+  'fromis_9':'fromis9','프로미스나인':'fromis9',
+  'WJSN':'wjsn','우주소녀':'wjsn',
+  'Kep1er':'kep1er','케플러':'kep1er',
+  'OMEGA X':'omegax','오메가엑스':'omegax',
+  'H1-KEY':'h1key','하이키':'h1key',
+  'Billlie':'billlie','빌리':'billlie',
+  'P1Harmony':'p1harmony','피원하모니':'p1harmony',
+  'YOUNG POSSE':'youngposse','영파씨':'youngposse',
+  'BOYNEXTDOOR':'boynextdoor',
+  'CSR':'csr','씨에스알':'csr',
+  'EPEX':'epex','이펙스':'epex',
+  'CLASS:y':'classy','클라씨':'classy',
+  'tripleS':'triples','트리플에스':'triples',
+  'AB6IX':'ab6ix','에이비식스':'ab6ix',
 };
 
 function mapArtists(names) {
@@ -146,17 +175,56 @@ function parseMusicCore(ep) {
   return { raw, artists: cleaned };
 }
 
-// 쇼챔피언 파싱: "Show Champion (쇼 챔피언) - CRAVITY, TWS (투어스), ..."
-// 또는 " -CRAVITY" (대시 뒤 공백 없는 경우도 처리)
+// 쇼챔피언 파싱
+// Preview 필드 우선: "<COMEBACK> RIIZE, izna, 온앤오프(ONF), EPEX(이펙스), 음율 (UmYull)"
+// ContentTitle 보조: "Show Champion (쇼 챔피언) - 601회 RIIZE, izna, ..."
 function parseShowChampion(ep) {
-  const raw = ep.ContentTitle || ep.contentTitle || '';
-  const m = raw.match(/ -\s*/);
-  if (!m) return { raw, artists: [] };
-  const artists = raw.slice(m.index + m[0].length)
-    .replace(/\s+등\s*$/, '')
-    .split(',')
-    .map(s => s.replace(/\s*\([^)]*\)/g,'').trim())
-    .filter(Boolean);
+  const rawTitle = ep.ContentTitle || ep.contentTitle || '';
+  const preview  = ep.Preview     || ep.preview     || '';
+  const raw = rawTitle;
+
+  const collected = new Set();
+
+  function addArtists(text) {
+    text.split(',')
+      .map(s => s.replace(/\s*[\(（][^)）]*[\)）]/g, '').replace(/\.$/, '').trim())
+      .filter(s => s.length > 1)
+      .forEach(s => collected.add(s));
+  }
+
+  // ── 1) Preview 우선 파싱
+  if (preview.trim()) {
+    // 날짜/홍보 꼬리 제거 ("1월 28일 수요일 오후 5시 ..." 이후)
+    const previewClean = preview
+      .replace(/\d+월\s*\d+일.*$/s, '')
+      .replace(/<SHOW CHAMPION>.*$/si, '')
+      .replace(/\r\n|\r|\n/g, ' ');
+
+    // <TAG> 또는 KEYWORD 를 구분자로 치환 후 쉼표 분리
+    const segments = previewClean
+      .replace(/<[^>]+>/g, '|')
+      .replace(/\b(COMEBACK|HOT DEBUT|SPECIAL STAGE|STAGE\s*:\s*ON|최초 공개|하이라이트)\b/gi, '|')
+      .split('|');
+
+    for (const seg of segments) {
+      if (seg.trim()) addArtists(seg);
+    }
+  }
+
+  // ── 2) ContentTitle 보조 (" - " 뒤, 회차번호 제거)
+  const dashM = rawTitle.match(/ -\s*/);
+  if (dashM) {
+    const after = rawTitle.slice(dashM.index + dashM[0].length)
+      .replace(/^\d+회\s*/, '')
+      .replace(/\s+등\s*$/, '');
+    addArtists(after);
+  }
+
+  const SKIP = /^(쇼\s*챔피언|Show Champion|하이라이트|쇼챔마블|쇼챔피언 하반기.*)$/i;
+  const artists = [...collected]
+    .map(s => s.trim())
+    .filter(s => s.length > 1 && !SKIP.test(s));
+
   return { raw, artists };
 }
 
@@ -179,8 +247,8 @@ async function getNaverProtectedDates(showName) {
 }
 
 // 우선순위: manual > naver > imbc/date_rule
-// 오늘 이전 날짜는 절대 건드리지 않음
-async function upsertRows(rows) {
+// backfill=true 일 때는 과거 날짜도 imbc 소스로 업데이트 (manual/naver 보호는 유지)
+async function upsertRows(rows, { backfill = false } = {}) {
   const today = new Date(); today.setHours(0,0,0,0);
   const todayKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   const hdrs = {
@@ -191,8 +259,8 @@ async function upsertRows(rows) {
   };
   let ok = 0;
   for (const row of rows) {
-    // 오늘 이전 날짜는 source 불문 절대 건드리지 않음
-    if (row.broad_date < todayKey) { ok++; continue; }
+    // 오늘 이전 날짜: backfill 모드가 아니면 건드리지 않음
+    if (!backfill && row.broad_date < todayKey) { ok++; continue; }
     const existing = await fetch(
       `${SUPA_URL}/rest/v1/music_show_lineups?show_name=eq.${row.show_name}&broad_date=eq.${row.broad_date}&select=id,groups,source`,
       { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` },
@@ -235,13 +303,14 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
-  const since = req.query.since || null; // 백필용: ?since=2026-05-08
+  const since = req.query.since || null;           // 백필용: ?since=2026-03-01
+  const backfill = req.query.backfill === 'true';   // ?backfill=true 시 과거 날짜도 업데이트
 
   const log = [];
   let totalUpserted = 0;
 
   for (const show of SHOWS_IMBC) {
-    // ① since~다음달말 범위의 날짜 뼈대 채우기 (기본: 30일 전부터)
+    // ① since~다음달말 범위의 날짜 뼈대 채우기
     const futureDates = datesForDay(show.dayOfWeek, since);
     const skeletonRows = futureDates.map(d => ({
       show_name: show.show_name,
@@ -251,7 +320,7 @@ module.exports = async function handler(req, res) {
       episode_number: null,
       source: 'date_rule',
     }));
-    const skelOk = await upsertRows(skeletonRows);
+    const skelOk = await upsertRows(skeletonRows, { backfill });
     log.push(`[${show.show_name}] 뼈대 ${skelOk}/${futureDates.length}개`);
 
     // ② iMBC에서 최근 에피소드 가져와서 groups 업데이트 (naver 데이터 보호)
@@ -276,7 +345,7 @@ module.exports = async function handler(req, res) {
         source: 'imbc',
       });
     }
-    const dataOk = await upsertRows(dataRows);
+    const dataOk = await upsertRows(dataRows, { backfill });
     log.push(`[${show.show_name}] iMBC 업데이트 ${dataOk}/${dataRows.length}개`);
     totalUpserted += skelOk + dataOk;
   }
