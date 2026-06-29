@@ -141,9 +141,6 @@ select option{background:#0d0d14}
         <input id="group-search" type="text" placeholder="Search groups (e.g. bts, ive...)"
           style="padding:4px 10px;border-radius:16px;font-size:12px;background:#1a1a28;border:1.5px solid #2a2a40;color:#e0e0f0;width:180px;outline:none"
           oninput="filterGroupInput(this.value)">
-        <div style="width:1px;background:#333;margin:0 2px"></div>
-        <div class="fchip crawl on"  onclick="toggleFilter('src','naver')">Crawled</div>
-        <div class="fchip manual on" onclick="toggleFilter('src','manual')">Direct input</div>
       </div>
     </div>
 
@@ -519,11 +516,10 @@ async function loadAllEvents() {
   const statsEl = document.getElementById('topbar-stats');
   try {
     statsEl.textContent = 'Loading...';
-    // 1년 전 ~ 2년 후 범위만 가져와 1000행 limit 문제 회피
-    const from = new Date(); from.setFullYear(from.getFullYear() - 1);
-    const to   = new Date(); to.setFullYear(to.getFullYear() + 2);
-    const fromStr = from.toISOString().slice(0,10);
-    const toStr   = to.toISOString().slice(0,10);
+    // 2026-03-01 고정 시작 ~ 3개월 후 (index.html과 동일 범위)
+    const fromStr = '2026-03-01';
+    const to = new Date(); to.setMonth(to.getMonth() + 3);
+    const toStr = to.toISOString().slice(0, 10);
     const res = await fetch(
       `${SUPA_URL}/rest/v1/music_show_lineups?select=*&broad_date=gte.${fromStr}&broad_date=lte.${toStr}&order=broad_date.asc&limit=2000`,
       { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`, 'Accept': 'application/json' } }
@@ -534,8 +530,24 @@ async function loadAllEvents() {
       allEvents = []; return;
     }
     const data = JSON.parse(text);
-    // manual_event = 비-공방 이벤트 (콘서트 등) — 더 이상 사용하지 않으므로 제외
-    allEvents = Array.isArray(data) ? data.filter(e => e.source !== 'cancelled' && e.source !== 'manual_event' && !String(e.show_name||'').startsWith('event_')) : [];
+    const rows = Array.isArray(data) ? data : [];
+
+    // index.html과 동일하게: cancelled·manual_event·event_ 제외 후
+    // 같은 날짜에 여러 row가 있으면 manual > naver > imbc/youtube > date_rule 우선순위로 1개만 선택
+    const PRIORITY = { manual: 5, mbcplus: 4, naver: 3, imbc_api: 1, youtube_api: 1, imbc: 1, date_rule: 0 };
+    const byDate = {};
+    for (const r of rows) {
+      if (r.source === 'cancelled') continue;
+      if (r.source === 'manual_event') continue;
+      if (String(r.show_name || '').startsWith('event_')) continue;
+      const dk = (r.broad_date || '').slice(0, 10);
+      if (!dk) continue;
+      const existing = byDate[dk];
+      const rPri = PRIORITY[r.source] ?? 0;
+      const ePri = existing ? (PRIORITY[existing.source] ?? 0) : -1;
+      if (!existing || rPri >= ePri) byDate[dk] = r;
+    }
+    allEvents = Object.values(byDate);
   } catch(e) {
     document.getElementById('topbar-stats').textContent = `Fetch error: ${e.message}`;
     allEvents = [];
@@ -543,11 +555,8 @@ async function loadAllEvents() {
 }
 
 function updateTopbar() {
-  const crawled = allEvents.filter(e=>!isManualSource(e)).length;
-  const manual  = allEvents.filter(e=>isManualSource(e)).length;
-  const visible = visibleEvents().length;
   document.getElementById('topbar-stats').textContent =
-    `Total ${allEvents.length} (Crawled ${crawled} · Direct input ${manual}) · Visible ${visible}`;
+    `Total ${allEvents.length} lineups`;
 }
 
 // ── CALENDAR ──
@@ -570,12 +579,8 @@ function toggleFilter(type, val) {
 
 function visibleEvents() {
   const q = filterGroup.toLowerCase();
+  if (!q) return allEvents;
   return allEvents.filter(e => {
-    // 'manual' = admin input, everything else ('naver','date_rule','imbc_api', etc.) = Crawled bucket
-    const isCrawled = !isManualSource(e);
-    const srcMatch = isCrawled ? filterSrc.has('naver') : filterSrc.has('manual');
-    if (!srcMatch) return false;
-    if (!q) return true;
     const inGroups = (e.groups||[]).some(g => g.toLowerCase().includes(q));
     const inRaw = (e.raw_title||'').toLowerCase().includes(q);
     return inGroups || inRaw;
