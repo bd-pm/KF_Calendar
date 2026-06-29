@@ -1390,7 +1390,10 @@ function buildWeek(area){
       cell.appendChild(dc);
     }
 
-    cell.onclick=()=>{ selectDate(ds); };
+    cell.onclick=()=>{
+      gtag('event', 'date_click', { date: ds, view: 'week' });
+      selectDate(ds);
+    };
     grid.appendChild(cell);
   }
   area.appendChild(grid);
@@ -1455,7 +1458,10 @@ function buildMonth(area){
       cell.appendChild(evtsEl);
     }
 
-    cell.onclick=()=>{ selectDate(ds, { scrollToDetails: true }); };
+    cell.onclick=()=>{
+      gtag('event', 'date_click', { date: ds, view: 'month' });
+      selectDate(ds, { scrollToDetails: true });
+    };
     grid.appendChild(cell);
   });
   area.appendChild(grid);
@@ -1861,6 +1867,10 @@ function renderBottom(){
         chip.dataset.artist = artistName;
         if (isActive) chip.dataset.active = 'true';
         chip.onclick = () => {
+          gtag('event', 'chip_click', {
+            artist_name: artistDisplayName(artistName),
+            date: selectedDate,
+          });
           const toggling = !allGroupsSelected && selectedArtistName === artistName;
           selectedArtistName = toggling ? null : artistName;
           allGroupsSelected = false;
@@ -1965,10 +1975,22 @@ const EN_TO_KR_CLIENT = {
   'Cristina X YJP':'크리스티나','크리스티나 X YJP':'크리스티나',
   '크리스티나 X 유재필(YJP)':'크리스티나','크리스티나 X 유재필':'크리스티나',
   'Cristina':'크리스티나','YJP':'유재필',
+  // 영어 이름 아티스트
+  'Hearts2Hearts':'하츠투하츠','hearts2hearts':'하츠투하츠',
+  'CLASSy':'클라씨','classy':'클라씨',
+  'dodree':'도드리',
 };
-const GONBANG_KW_RE = /공방포|역조공|공방|사녹/;
+const GONBANG_KW_RE = /공방포|역조공|공방|사녹|broadcast|pre.?record|reverse.?tribute/i;
 
-function clientMatchesArtist(name, krAlias, enAlias) {
+// 한국어 추가 alias — 팬덤 줄임말 등 여러 표기로 검색/매칭
+const KR_EXTRA_ALIASES = {
+  '하츠투하츠': ['하투하', 'H2H', 'Hearts2Hearts'],
+  '스트레이키즈': ['스키즈'],
+  '투모로우바이투게더': ['투바투'],
+  '보이넥스트도어': ['BOYNEXTDOOR'],
+};
+
+function clientMatchesArtist(name, krAlias, enAlias, extraAliases) {
   const t = name.toLowerCase();
   const checkAlias = (a) => {
     const al = a.toLowerCase();
@@ -1978,7 +2000,11 @@ function clientMatchesArtist(name, krAlias, enAlias) {
     if (/[가-힣]/.test(al)) return !/[가-힣]/.test(before);
     return !/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(t[idx + al.length] || '');
   };
-  return (krAlias && checkAlias(krAlias)) || (enAlias && checkAlias(enAlias));
+  if ((krAlias && checkAlias(krAlias)) || (enAlias && checkAlias(enAlias))) return true;
+  if (extraAliases) {
+    for (const a of extraAliases) { if (checkAlias(a)) return true; }
+  }
+  return false;
 }
 
 async function fetchGoodsClientSide(artistName, n) {
@@ -1993,9 +2019,14 @@ async function fetchGoodsClientSide(artistName, n) {
       return null;
     })();
   const en = hasKorean(artistName) ? null : artistName;
+  const extraAliases = kr ? (KR_EXTRA_ALIASES[kr] || []) : [];
   const queries = [];
   if (kr) queries.push(`${kr} 공방`, `${kr} 역조공`, `${kr} 사녹`);
-  if (en && en !== kr) queries.push(`${en} 공방`);
+  // 추가 alias 중 한국어인 것도 검색
+  for (const a of extraAliases) {
+    if (hasKorean(a)) queries.push(`${a} 공방`);
+  }
+  if (en && en !== kr) queries.push(`${en} 공방`, `${en} broadcast`);
 
   const seen = new Set();
   const items = [];
@@ -2008,7 +2039,7 @@ async function fetchGoodsClientSide(artistName, n) {
       if (p.status !== '0' && p.status !== 0) continue;
       const name = p.name || '';
       if (!GONBANG_KW_RE.test(name)) continue;
-      if (!clientMatchesArtist(name, kr, en)) continue;
+      if (!clientMatchesArtist(name, kr, en, extraAliases)) continue;
       if (/구함|구해요|구합니다/.test(name)) continue;
       seen.add(p.pid);
       const price = parseInt(p.price, 10) || 0;
@@ -2027,7 +2058,7 @@ async function fetchGoodsClientSide(artistName, n) {
 }
 
 const GOODS_CACHE_TTL_MS = 1000 * 60 * 120; // 2시간
-const GOODS_CACHE_PREFIX = 'kf_goods_cache_v11:';
+const GOODS_CACHE_PREFIX = 'kf_goods_cache_v12:';
 const goodsMemoryCache = new Map();
 const goodsInflight = new Map();
 let goodsRequestSeq = 0;
@@ -2135,7 +2166,14 @@ function renderGoodsCards(grid, items, limit, delayStep) {
         <div class="gcard-name">${escHtml(itemName)}</div>
       </div>
     `;
-    card.onclick = () => window.open(productUrl, '_blank');
+    card.onclick = () => {
+      gtag('event', 'goods_click', {
+        artist_name: item.artist || item.displayName || '',
+        item_id: String(item.id),
+        campaign: 'pdp-direct',
+      });
+      window.open(productUrl, '_blank');
+    };
     grid.appendChild(card);
   });
 }
@@ -2905,6 +2943,9 @@ function openSearchModal() {
         </span>
       `;
       row.onclick = () => {
+        gtag('event', 'group_search', {
+          artist_name: artistDisplayName(artistName),
+        });
         openGroupModal(artistName);
       };
       list.appendChild(row);
@@ -3126,6 +3167,7 @@ updateMyGroupsBtn();
 // ─────────────────────────────────────────
 function openFeedbackModal() {
   if(document.getElementById('fb-modal')) return;
+  gtag('event', 'feedback_click');
   _fbRating = 0;
 
   const overlay = document.createElement('div');
