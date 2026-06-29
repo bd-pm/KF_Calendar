@@ -2022,7 +2022,7 @@ async function fetchGoodsClientSide(artistName, n) {
 }
 
 const GOODS_CACHE_TTL_MS = 1000 * 60 * 120; // 2시간
-const GOODS_CACHE_PREFIX = 'kf_goods_cache_v10:';
+const GOODS_CACHE_PREFIX = 'kf_goods_cache_v11:';
 const goodsMemoryCache = new Map();
 const goodsInflight = new Map();
 let goodsRequestSeq = 0;
