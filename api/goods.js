@@ -361,33 +361,40 @@ module.exports = async function handler(req, res) {
 
   try {
     const aliases = getSearchAliases(artist);
-    // 쿼리 → 해당 키워드 매핑 (결과 필터링에 사용)
-    // 번장은 대소문자 구분 없이 검색 → 소문자 중복 alias 제거해 쿼리 수 절감
     const hasKorean = s => /[가-힣]/.test(s);
-    const effectiveAliases = aliases.filter(a => {
-      // 한국어 alias는 항상 포함
-      if (hasKorean(a)) return true;
-      // 영문 alias: 소문자 버전이 이미 있으면 (=원본이 이미 소문자이거나 대소문자 다른 버전이 먼저 등록), 중복 제거
-      const lower = a.toLowerCase();
-      return a === lower || !aliases.includes(lower);
-    });
 
-    const queryList = []; // { q, kw }
-    for (const kw of keywords) {
-      for (const alias of effectiveAliases) queryList.push({ q: `${alias} ${kw}`, kw });
-    }
-    // 중복 쿼리 제거 (소문자 정규화 기준 — 번장 대소문자 무관)
+    // 번장 서버에서 과도한 동시 요청 시 IP 차단됨.
+    // 전략: alias당 "가장 포괄적인 키워드" 1개짜리 쿼리만 날리고,
+    // 결과에서 모든 키워드 매칭 여부를 서버 없이 직접 필터링.
+    // gonbang의 경우 '공방'이 '공방포'·'역조공'·'사녹'을 상위 포함함.
+    const SEARCH_KW_BY_TYPE = {
+      gonbang:    ['공방', '역조공', '사녹'],   // 공방이 공방포 포함
+      concert:    ['콘서트', '콘포카', '투어'],
+      fanmeeting: ['팬미팅', '팬콘', '팬사'],
+    };
+    const searchKws = SEARCH_KW_BY_TYPE[eventType] || SEARCH_KW_BY_TYPE.gonbang;
+
+    // alias 중 한국어 우선, 없으면 영문 대표 1개
+    const krAliases  = aliases.filter(hasKorean);
+    const enAliases  = aliases.filter(a => !hasKorean(a) && a === a.toUpperCase() && a.length > 1);
+    // 쿼리 alias: 한국어 전체 + 영문 대표 1개 (소문자 중복 제거)
+    const queryAliases = [...krAliases];
+    if (enAliases.length) queryAliases.push(enAliases[0]);
+    else if (!krAliases.length) queryAliases.push(...aliases.slice(0, 1));
+
+    // alias × searchKw 조합 (최소화)
+    const seen_q = new Set();
     const uniqueQueryList = [];
-    const seenQ = new Set();
-    for (const item of queryList) {
-      const normalized = item.q.toLowerCase();
-      if (!seenQ.has(normalized)) { seenQ.add(normalized); uniqueQueryList.push(item); }
+    for (const kw of searchKws) {
+      for (const alias of queryAliases) {
+        const q = `${alias} ${kw}`;
+        const norm = q.toLowerCase();
+        if (!seen_q.has(norm)) { seen_q.add(norm); uniqueQueryList.push(q); }
+      }
     }
 
-    // 번장 동시 요청 과다 시 차단됨 → 최대 4개씩 배치 처리
     const FETCH_N = 100;
-    const BATCH = 4;
-    const fetchOne = ({ q, kw }) => {
+    const doFetch = q => {
       const url = `${BUNJANG_API}?q=${encodeURIComponent(q)}&order=date&n=${FETCH_N}&page=0`;
       return fetch(url, {
         headers: {
@@ -398,32 +405,33 @@ module.exports = async function handler(req, res) {
           'Origin': 'https://bunjang.co.kr',
         },
         signal: AbortSignal.timeout(10000),
-      }).then(r => r.ok ? r.json() : { list: [] }).then(data => ({ data, kw })).catch(() => ({ data: { list: [] }, kw }));
+      }).then(r => r.ok ? r.json() : { list: [] }).catch(() => ({ list: [] }));
     };
-    const allSettledBatched = async (list, batchSize) => {
-      const out = [];
-      for (let i = 0; i < list.length; i += batchSize) {
-        const batch = list.slice(i, i + batchSize);
-        const batchResults = await Promise.all(batch.map(fetchOne));
-        out.push(...batchResults);
-      }
-      return out;
-    };
-    const results = await allSettledBatched(uniqueQueryList, BATCH);
+    const rawResults = await Promise.all(uniqueQueryList.map(doFetch));
 
     // 중복 제거 (pid 기준): alias가 상품명에 정확히 매칭되어야 통과
+    // 추가로 타입 키워드 중 하나가 상품명에 포함되어야 함 (gonbang → 공방|역조공|사녹|공방포)
+    const kwFilterRe = {
+      gonbang:    /공방포|역조공|공방|사녹/,
+      concert:    /콘서트|콘포카|콘굿|투어|럭키드로우|Lucky Draw/i,
+      fanmeeting: /팬미팅|팬콘|팬사|팬싸|팬이벤트|쇼케이스/,
+    };
+    const kwRe = kwFilterRe[eventType] || kwFilterRe.gonbang;
+
     const seen = new Set();
     const items = [];
-    for (const r of results) {
-      const { data, kw } = r;
+    for (const data of rawResults) {
       for (const p of (data.list || [])) {
         if (seen.has(p.pid)) continue;
-          // alias가 상품명에 정확히 매칭되어야 통과 (단어 경계 + 한글 경계 포함)
-        if (!matchesArtist({ name: p.name }, aliases)) continue;
+        const name = p.name || '';
+        // 아티스트명 단어 경계 매칭
+        if (!matchesArtist({ name }, aliases)) continue;
+        // 이벤트 타입 키워드 포함 여부 확인
+        if (!kwRe.test(name)) continue;
         seen.add(p.pid);
         items.push({
           id:         p.pid,
-          name:       p.name,
+          name,
           price:      parseInt(p.price, 10) || 0,
           imageUrl:   p.product_image
             ? p.product_image.replace('{res}', '360')
