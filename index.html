@@ -2240,11 +2240,8 @@ function sortGoodsByWindow(items, anchorDateStr) {
   tier2.sort(cmp);
   tier2b.sort(cmp);
 
-  // 1순위: tier1이 있으면 tier1, 없으면 tier1b (그 주 공방 상품 최신순)
-  // 2순위: tier2가 있으면 tier2, 없으면 tier2b
-  const first  = tier1.length  ? tier1  : tier1b;
-  const second = tier2.length  ? tier2  : tier2b;
-  return [...first, ...second];
+  // 정렬 우선순위: 윈도우+공방명 > 윈도우 > 공방명 > 나머지 (모두 포함)
+  return [...tier1, ...tier1b, ...tier2, ...tier2b];
 }
 
 // ── 정렬 ──
