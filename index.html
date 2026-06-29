@@ -1646,6 +1646,9 @@ const ARTIST_DISPLAY_NAME = {
   '므오브':'MEOVV','미어브':'MEOVV',
   '이젤(EJel)':'EJel','온앤오프(ONF)':'ONF',
   'EVNNE(이븐)':'EVNNE',
+  '사무엘':'Samuel','박지현':'Park Jihyun','신장미':'Shin Jangmi','하지원':'Ha Jiwon',
+  '유재필':'YJP','크리스티나':'Cristina',
+  '크리스티나 X 유재필(YJP)':'Cristina X YJP','크리스티나 X 유재필':'Cristina X YJP',
 };
 const ARTIST_DISPLAY_CACHE = {};
 function artistDisplayName(name) {
@@ -1904,7 +1907,11 @@ function renderBottom(){
         fetchAndShowLiveGoods(selectedArtistName, 'gonbang');
       } else if ((allGroupsSelected || _gonbangSelected) && lineup) {
         const ra = parseRawTitleStatic(lineup.rawTitle);
-        fetchAllGroupGoods(ra.length > 0 ? ra : lineup.groups, show ? show.short : null);
+        // groups slug를 우선 사용 (EN_TO_KR로 확장됨), 없으면 raw_title 파싱 이름 사용
+        const goodsArtists = (lineup.groups && lineup.groups.length > 0)
+          ? lineup.groups
+          : (ra.length > 0 ? ra : []);
+        fetchAllGroupGoods(goodsArtists, show ? show.short : null);
       } else if (_gonbangSelected && !lineup) {
         // lineup 데이터 없는 날 — 빈 상태 안내
         liveGoodsArea.innerHTML = '<div style="padding:32px 20px;text-align:center;color:var(--txt2);font-size:13px;">Lineup not yet announced</div>';
@@ -1929,7 +1936,7 @@ function goodsApiUrl(artistName, n, eventType) {
 }
 
 const GOODS_CACHE_TTL_MS = 1000 * 60 * 120; // 2시간
-const GOODS_CACHE_PREFIX = 'kf_goods_cache_v7:';
+const GOODS_CACHE_PREFIX = 'kf_goods_cache_v8:';
 const goodsMemoryCache = new Map();
 const goodsInflight = new Map();
 let goodsRequestSeq = 0;
