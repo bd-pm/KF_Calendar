@@ -1907,11 +1907,14 @@ function renderBottom(){
         fetchAndShowLiveGoods(selectedArtistName, 'gonbang');
       } else if ((allGroupsSelected || _gonbangSelected) && lineup) {
         const ra = parseRawTitleStatic(lineup.rawTitle);
-        // groups slug를 우선 사용 (EN_TO_KR로 확장됨), 없으면 raw_title 파싱 이름 사용
-        const goodsArtists = (lineup.groups && lineup.groups.length > 0)
-          ? lineup.groups
-          : (ra.length > 0 ? ra : []);
-        fetchAllGroupGoods(goodsArtists, show ? show.short : null);
+        // raw_title 파싱 이름 + groups slug 모두 합산 → 더 많은 아티스트 커버
+        const merged = [...new Set([...ra, ...(lineup.groups || [])])].filter(Boolean);
+        if (merged.length === 0) {
+          // date_rule 등 아직 라인업 없는 날
+          liveGoodsArea.innerHTML = '<div style="padding:32px 20px;text-align:center;color:var(--txt2);font-size:13px;">Lineup not yet announced</div>';
+        } else {
+          fetchAllGroupGoods(merged, show ? show.short : null);
+        }
       } else if (_gonbangSelected && !lineup) {
         // lineup 데이터 없는 날 — 빈 상태 안내
         liveGoodsArea.innerHTML = '<div style="padding:32px 20px;text-align:center;color:var(--txt2);font-size:13px;">Lineup not yet announced</div>';
@@ -2009,7 +2012,8 @@ function fetchGoodsCached(artistName, n, eventType) {
     .then(async res => {
       if (!res.ok) return res;
       const data = await res.json();
-      writeGoodsCache(key, data);
+      // 빈 결과는 캐시 저장 안 함 (API 오류나 일시적 문제로 빈 배열이 캐싱되면 계속 0개가 나옴)
+      if ((data.items || []).length > 0) writeGoodsCache(key, data);
       return cachedJsonResponse(data);
     })
     .finally(() => goodsInflight.delete(key));
