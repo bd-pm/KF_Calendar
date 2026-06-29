@@ -271,11 +271,14 @@ function matchesArtist(item, aliases) {
     const alias = a.toLowerCase();
     const idx = text.indexOf(alias);
     if (idx < 0) return false;
-    // 한국어 alias는 단어 경계 불필요
-    if (/[가-힣]/.test(alias)) return true;
-    // 영문/숫자 alias는 앞뒤가 알파벳/숫자가 아닌지 확인 (단어 경계)
     const before = idx === 0 ? '' : text[idx - 1];
     const after = text[idx + alias.length] || '';
+    if (/[가-힣]/.test(alias)) {
+      // 한국어 alias: 앞뒤에 한글이 붙어있으면 부분매칭이므로 제외
+      // 예) '라이즈' → '문라이즈', '썬라이즈' 제외
+      return !/[가-힣]/.test(before) && !/[가-힣]/.test(after);
+    }
+    // 영문/숫자 alias: 앞뒤가 알파벳/숫자가 아닌지 확인 (단어 경계)
     return !/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after);
   });
 }
@@ -330,11 +333,8 @@ module.exports = async function handler(req, res) {
       const { data, kw } = r.value;
       for (const p of (data.list || [])) {
         if (seen.has(p.pid)) continue;
-        const name = (p.name || '').toLowerCase();
-        // 번장이 쿼리로 이미 필터링했으므로: 키워드가 상품명에 있거나 alias가 있으면 통과
-        const kwMatch = name.includes(kw.toLowerCase());
-        const aliasMatch = matchesArtist({ name: p.name }, aliases);
-        if (!kwMatch && !aliasMatch) continue;
+          // alias가 상품명에 정확히 매칭되어야 통과 (단어 경계 + 한글 경계 포함)
+        if (!matchesArtist({ name: p.name }, aliases)) continue;
         seen.add(p.pid);
         items.push({
           id:         p.pid,
