@@ -391,11 +391,22 @@ function extractShowChampionQuotedSegments(text) {
   return segments;
 }
 
+// HTML 쓰레기 값 패턴 — 페이지 JS/CSS 코드에서 비롯된 false-positive 필터링
+const HTML_GARBAGE_RE = /^(dark-mode|Y|html|img|#wrap|max-width|data-dark|true|false|null|undefined|\d+)$/i;
+
 function isShowChampionIntroArtistName(name) {
   if (!name || name.length < 2 || name.length > 80) return false;
+  // ARTIST_TO_GROUP에 매핑된 이름은 무조건 통과 (izna 등 소문자 아티스트명 포함)
   if (ARTIST_TO_GROUP[name]) return true;
+  // HTML 속성/JS 리터럴 쓰레기 제외
+  if (HTML_GARBAGE_RE.test(name.trim())) return false;
+  // CSS 속성처럼 생긴 것 제외 (하이픈 포함, 영문 소문자만, 공백 없음)
+  if (/^[a-z][-a-z0-9]+$/.test(name)) return false;
+  // # 으로 시작하는 CSS 선택자 제외
+  if (name.startsWith('#')) return false;
   if (/[가-힣]/.test(name)) return true;
-  if (/[A-Z]/.test(name)) return true;
+  // 영문 대문자가 있고 길이 2 이상이면 아티스트명으로 인정
+  if (/[A-Z]/.test(name) && name.length >= 2) return true;
   return false;
 }
 
@@ -484,9 +495,10 @@ async function fetchShowChampionOfficialRows({ cutoffDate, backfill }) {
         : lines.flatMap(l => l.split(/[,\/]/).flatMap(splitShowChampionArtistNames))
             .filter(name => name.length > 1 && name.length < 80);
 
-      // 홍보문구 줄(lineupBlock 전체)의 작은따옴표 안 아티스트명도 추출
-      // 예: '독보적인... 'izna'. ... 'RIIZE'. ... 'FIFTY FIFTY (피프티피프티)'. ... '온앤오프(ONF)'
-      const promoPerformers = extractShowChampionQuotedSegments(lineupBlock)
+      // 홍보문구(출연진 블록 이전)의 작은따옴표 안 아티스트명 추출
+      // 예: 'izna', 'RIIZE', 'FIFTY FIFTY (피프티피프티)', '온앤오프(ONF)'
+      // 이 홍보문구는 &출연진& 섹션 *이전* introText에 위치
+      const promoPerformers = extractShowChampionQuotedSegments(introText)
         .flatMap(splitShowChampionArtistNames)
         .filter(isShowChampionIntroArtistName);
 
