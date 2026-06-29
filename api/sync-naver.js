@@ -489,10 +489,11 @@ async function fetchShowChampionOfficialRows({ cutoffDate, backfill }) {
       const lineupBlock = lineupMatch[1];
       const lines = lineupBlock.split('\n').map(l => l.trim()).filter(Boolean);
 
-      // Preview 라인(영문명 포함, / 구분)이 있으면 우선 사용; 없으면 쉼표·슬래시 혼용 파싱
-      const previewLine = lines.find(l => l.includes('/') && /[A-Za-z]/.test(l));
-      const listedPerformers = previewLine
-        ? previewLine.split('/').flatMap(splitShowChampionArtistNames)
+      // / 구분 라인이 있으면 전체 블록을 / 로 분리 파싱 (여러 줄에 걸쳐 있어도 모두 합산)
+      // 쉼표만 있으면 쉼표 분리 파싱
+      const hasSlash = lines.some(l => l.includes('/'));
+      const listedPerformers = hasSlash
+        ? lines.join(' / ').split('/').flatMap(splitShowChampionArtistNames)
             .filter(name => name.length > 1 && name.length < 80)
         : lines.flatMap(l => l.split(/[,\/]/).flatMap(splitShowChampionArtistNames))
             .filter(name => name.length > 1 && name.length < 80);
