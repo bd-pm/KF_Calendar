@@ -468,7 +468,9 @@ async function fetchShowChampionOfficialRows({ cutoffDate, backfill }) {
         signal: AbortSignal.timeout(20000),
       });
       if (!detailRes.ok) continue;
-      const text = stripHtmlText(await detailRes.text())
+      // <script> 블록 제거 후 stripHtmlText — JS 코드 내 작은따옴표가 홍보문구 파싱을 오염시키지 않도록
+      const rawHtml = (await detailRes.text()).replace(/<script[\s\S]*?<\/script>/gi, '');
+      const text = stripHtmlText(rawHtml)
         .replace(/[<>]+/g, '\n')
         .replace(/\s*\n\s*/g, '\n');
 
