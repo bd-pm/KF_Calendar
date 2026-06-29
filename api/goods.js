@@ -331,17 +331,7 @@ module.exports = async function handler(req, res) {
       })
     );
 
-    // 중복 제거 (pid 기준): 쿼리 키워드가 상품명에 있거나, alias가 매칭되면 통과
-    const debugInfo = req.query._debug === '1' ? {
-      aliases,
-      queries: uniqueQueryList.map(q => q.q),
-      rawCounts: results.map((r, i) => ({
-        q: uniqueQueryList[i]?.q,
-        status: r.status,
-        count: r.status === 'fulfilled' ? (r.value?.data?.list?.length ?? -1) : -1,
-        firstItem: r.status === 'fulfilled' ? (r.value?.data?.list?.[0]?.name ?? null) : null,
-      })),
-    } : null;
+    // 중복 제거 (pid 기준): alias가 상품명에 정확히 매칭되어야 통과
     const seen = new Set();
     const items = [];
     for (const r of results) {
@@ -379,8 +369,8 @@ module.exports = async function handler(req, res) {
       displayName: item.name || '',
     }));
 
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).json({ artist, items: itemsOut, ...(debugInfo ? { _debug: debugInfo } : {}), _v: 'icn1-v1' });
+    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=120');
+    return res.status(200).json({ artist, items: itemsOut });
   } catch (err) {
     return res.status(502).json({ error: err.message });
   }
