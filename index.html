@@ -1576,7 +1576,7 @@ function parseRawTitleStatic(raw) {
 const ARTIST_DISPLAY_NAME = {
   // BTS & solos
   '방탄소년단':'BTS','진':'Jin','슈가':'SUGA','지민':'Jimin','뷔':'V','정국':'Jung Kook',
-  // groups
+  // 4세대 이상 그룹
   '세븐틴':'SEVENTEEN','엔하이픈':'ENHYPEN','트와이스':'TWICE','블랙핑크':'BLACKPINK',
   '슈퍼주니어':'SUPER JUNIOR','샤이니':'SHINee','에이티즈':'ATEEZ',
   '투모로우바이투게더':'TOMORROW X TOGETHER','있지':'ITZY','플레이브':'PLAVE',
@@ -1584,17 +1584,76 @@ const ARTIST_DISPLAY_NAME = {
   '82메이저':'82MAJOR','엔시티 위시':'NCT WISH','엔시티 드림':'NCT DREAM',
   '엔시티 127':'NCT 127','엔시티':'NCT','츄':'CHUU','원호':'WONHO',
   '화사':'HWASA','선미':'SUNMI','수진':'SOOJIN','청하':'CHUNG HA',
-  '이채연':'LEE CHAEYEON','휘인':'WHEEIN','박지훈':'PARK JIHOON',
+  '이채연':'Lee Chae-yeon','휘인':'WHEEIN','박지훈':'Park Ji-hoon',
   '키노':'KINO','펜타곤':'PENTAGON','여자아이들':'(G)I-DLE','마마무':'MAMAMOO',
   '레드벨벳':'Red Velvet','자이커스':'XIKERS',
   '아이오아이':'I.O.I','IOI':'I.O.I','I.O.I':'I.O.I',
   '씨야':'Seeya','유성은':'Yoo Sung Eun','김희재':'Kim Hee Jae','미완소년':'Miwan Boys',
   '마이티마우스':'Mighty Mouth','마이티 마우스':'Mighty Mouth','전유진':'Jeon Yujin',
+  // 추가 (sync-naver ARTIST_TO_GROUP 한국어 alias 전체 커버)
+  '에스파':'aespa','아이브':'IVE','르세라핌':'LE SSERAFIM','뉴진스':'NewJeans',
+  '스트레이키즈':'Stray Kids','제로베이스원':'ZEROBASEONE','보이넥스트도어':'BOYNEXTDOOR',
+  '투어스':'TWS','베이비몬스터':'BABYMONSTER','앤팀':'&TEAM',
+  '크래비티':'CRAVITY','싸이커스':'XIKERS','더보이즈':'THE BOYZ',
+  '케플러':'Kep1er','앰퍼샌드원':'AMPERS&ONE','영파씨':'YOUNG POSSE',
+  '빌리':'Billlie','하이키':'H1-KEY','엑스디너리히어로즈':'Xdinary Heroes',
+  '에버글로우':'EVERGLOW','오메가엑스':'OMEGA X','에이비식스':'AB6IX',
+  '크레이즈엔젤':'CrazAngel','플레어 유':'FLARE U','하입프린세스':'H//PE Princess',
+  '언차일드':'UNCHILD','앳하트':'AtHeart','오르빗':'ORβIT',
+  '비비':'BIBI','이채연':'Lee Chae-yeon','박지훈':'Park Ji-hoon',
+  '퀸즈아이':'Queenz Eye','소디엑':'XODIAC','아이딧':'IDID',
+  '모디세이':'MODYSSEY','킥플립':'KickFlip','이젤':'EJel',
+  '라이즈':'RIIZE','피프티피프티':'FIFTY FIFTY','온앤오프':'ONF',
+  '로시':'Rothy','음율':'UmYull','안신애':'Ansinae','신인류':'Shin Inryu',
+  '비보이즈':'B.BOYS','러브원':'LOVEONE','유어즈':'YUHZ',
+  '오션':'O3ean','따따블':'DDADDABLE','가비엔제이':'Gavy NJ',
+  '우디':'Woody','나우즈':'NOWZ','네이즈':'NAZE',
+  '이즈나':'IZNA','스테이씨':'STAYC','유스피어':'USPEER','이펙스':'EPEX',
+  '나우즈':'NOWZ','제이창':'Jay Chang','리센느':'RESCENE',
+  '코스모시':'COSMOSY','아이칠린':'ICHILLIN','엔젤노이즈':'Angel Noise',
+  '보이프렌드':'BOYFRIEND','태양':'TAEYANG','태용':'TAEYONG',
+  '최예나':'YENA','조승연':'WOODZ','박지훈':'Park Ji-hoon',
+  '이채연':'Lee Chae-yeon','클라씨':'CLASS:y','라잇썸':'LIGHTSUM',
+  '퍼플키스':'PURPLE KISS','시크릿넘버':'SECRET NUMBER',
+  '프로미스나인':'fromis_9','우주소녀':'WJSN','오마이걸':'OH MY GIRL',
+  '에이핑크':'APINK','씨스타':'SISTAR','이달의 소녀':'LOONA','여자친구':'GFRIEND',
+  '솔라':'Solar','문별':'Moonbyul','원위':'ONEWE','이준호':'Lee Junho',
+  '트레저':'TREASURE','수진':'SOOJIN','원어스':'ONEUS',
+  '비투비':'BTOB','인피니트':'INFINITE','갓세븐':'GOT7','데이식스':'DAY6',
+  '몬스타엑스':'MONSTA X','에버글로우':'EVERGLOW',
+  '드리핀':'DRIPPIN','베리베리':'VERIVERY',
+  '플레이브':'PLAVE','이브나':'EVNNE','원어스':'ONEUS',
+  '오르빗':'ORβIT','넥스지':'NEXZ','자이커스':'XIKERS',
+  '유나이트':'YOUNITE','자두':'Jadu','차동협':'Cha Dong-hyup',
+  '윤산하':'Yoon San-ha','박현규':'Park Hyun-kyu',
+  '조혜련':'Cho Hye-ryun','천도':'Cheon Do','최은빈':'Choi Eun Bin',
+  '홍승민':'Hong Seung Min','포레스텔라':'Forestella',
+  '앳하트':'AtHeart','레드 오파츠':'RED OOPARTS','아이린':'IRENE',
+  '강민':'KANGMIN','서이브':'SEO EVE','장한음':'Jang Han Eum',
+  '에스투잇':'S2IT','엠비오':'MBIO','슬레이':'S.LAY',
+  '민지운':'Min Ji Woon','나태주':'Na Tae Joo','박재정':'Parc Jae Jung',
+  '이지민':'Lee Jimin','김하온':'HAON','이지훈':'Lee Ji-hoon',
+  '동해':'DONGHAE','다영':'DAYOUNG','김재환':'Kim Jae-hwan',
+  '연준':'YEONJUN','유나':'YUNA','한해':'HANHAE',
+  '올아워즈':'ALL(H)OURS','오르빗':'ORβIT','유주':'YUJU','소유':'SOYOU',
+  '박혜경':'Park Hye-kyung','이예준':'Lee Ye-jun','박재범':'Jay Park',
+  '셔누':'SHOWNU','형원':'HYUNGWON',
+  '셔누X형원':'SHOWNU X HYUNGWON','셔누x형원':'SHOWNU X HYUNGWON',
+  '비보이즈':'B.BOYS','크레이즈엔젤':'CrazAngel',
+  '엔젤노이즈':'Angel Noise','빌리':'Billlie',
+  '하츠웨이브':'hrtz.wav','하입프린세스':'H//PE Princess',
+  '른':'RN','키라스':'KIIRAS',
+  '므오브':'MEOVV','미어브':'MEOVV',
+  '이젤(EJel)':'EJel','온앤오프(ONF)':'ONF',
+  'EVNNE(이븐)':'EVNNE',
 };
 const ARTIST_DISPLAY_CACHE = {};
 function artistDisplayName(name) {
-  return ARTIST_DISPLAY_CACHE[name] || ARTIST_DISPLAY_NAME[name] || name;
+  const resolved = ARTIST_DISPLAY_CACHE[name] || ARTIST_DISPLAY_NAME[name] || name;
+  // 한국어가 남아있으면 비동기 resolve 예약 후 원본 반환 (칩 업데이트는 resolveArtistDisplayNames 후 이뤄짐)
+  return resolved;
 }
+function hasKorean(str) { return /[가-힣]/.test(str); }
 
 async function resolveArtistDisplayNames(names) {
   const need = [...new Set((names || []).filter(name => name && !ARTIST_DISPLAY_CACHE[name]))];
@@ -1870,7 +1929,7 @@ function goodsApiUrl(artistName, n, eventType) {
 }
 
 const GOODS_CACHE_TTL_MS = 1000 * 60 * 120; // 2시간
-const GOODS_CACHE_PREFIX = 'kf_goods_cache_v6:';
+const GOODS_CACHE_PREFIX = 'kf_goods_cache_v7:';
 const goodsMemoryCache = new Map();
 const goodsInflight = new Map();
 let goodsRequestSeq = 0;
@@ -2234,7 +2293,7 @@ async function fetchAllGroupGoods(artists, showName, _areaOverride) {
   }
 
   // 2) 개별 아티스트 캐시 확인 → 있는 것만 즉시 렌더 (부분 캐시)
-  const individualCaches = artists.map(a => readGoodsCache(goodsCacheKey(a, 12)));
+  const individualCaches = artists.map(a => readGoodsCache(goodsCacheKey(a, 60)));
   const allIndividualCached = individualCaches.every(c => c !== null);
   if (allIndividualCached) {
     const items = mergeGoodsResults(individualCaches.map(c => c.items || []));
@@ -2254,7 +2313,7 @@ async function fetchAllGroupGoods(artists, showName, _areaOverride) {
   try {
     const results = await Promise.all(
       artists.map(a =>
-        fetchGoodsCached(a, 12)
+        fetchGoodsCached(a, 60)
           .then(r => r.ok ? r.json() : { items: [] })
           .then(d => d.items || [])
           .catch(() => [])
@@ -2988,7 +3047,7 @@ function openFeedbackModal() {
       <!-- Title: H4_Bold_20 + Subtitle: P2_Regular_15, gap 6px, margin-bottom 20px -->
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:30px;">
         <div style="font-size:20px;font-weight:700;letter-spacing:0;color:#191919;line-height:1.2;">Share Feedback</div>
-        <div style="font-size:15px;font-weight:400;letter-spacing:0;color:#4C4C4C;line-height:1.4;">How was your experience with Bunjang Global?</div>
+        <div style="font-size:15px;font-weight:400;letter-spacing:0;color:#4C4C4C;line-height:1.4;">How was your experience with Broadcast Poca Archive?</div>
       </div>
 
       <!-- Star rating: 박스 밖, 메인 액션 -->

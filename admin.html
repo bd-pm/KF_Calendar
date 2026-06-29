@@ -146,9 +146,46 @@ select option{background:#0d0d14}
 
     <!-- event detail panel (click pill to open) -->
     <div class="detail-panel" id="detail-panel">
-      <div class="detail-title" id="dp-name"></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div class="detail-title" id="dp-name"></div>
+        <button id="dp-close-btn" onclick="document.getElementById('detail-panel').classList.remove('open')" style="background:none;border:none;color:#666;font-size:18px;cursor:pointer;padding:0 4px;line-height:1">×</button>
+      </div>
       <div class="detail-meta" id="dp-meta"></div>
-      <div class="detail-actions" id="dp-actions"></div>
+      <!-- 인라인 편집 폼 -->
+      <div id="dp-edit" style="margin-top:14px;border-top:1px solid #2a2a40;padding-top:14px">
+        <div style="font-size:11px;color:#777;margin-bottom:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em" id="dp-form-title">Edit Lineup</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+          <div>
+            <label style="font-size:10px;color:#666;display:block;margin-bottom:3px">Show</label>
+            <select id="dp-show" style="width:100%;background:#1e1e30;border:1px solid #2a2a40;color:#e0e0f0;padding:6px 8px;border-radius:6px;font-size:12px">
+              <option value="inkigayo">Inkigayo</option>
+              <option value="music_bank">Music Bank</option>
+              <option value="mcountdown">M Countdown</option>
+              <option value="show_champion">Show Champion</option>
+              <option value="the_show">The Show</option>
+              <option value="music_core">Music Core</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:10px;color:#666;display:block;margin-bottom:3px">Air Date</label>
+            <input id="dp-date" type="date" style="width:100%;background:#1e1e30;border:1px solid #2a2a40;color:#e0e0f0;padding:6px 8px;border-radius:6px;font-size:12px">
+          </div>
+          <div>
+            <label style="font-size:10px;color:#666;display:block;margin-bottom:3px">Episode</label>
+            <input id="dp-episode" type="text" placeholder="optional" style="width:100%;background:#1e1e30;border:1px solid #2a2a40;color:#e0e0f0;padding:6px 8px;border-radius:6px;font-size:12px">
+          </div>
+        </div>
+        <div style="margin-bottom:10px">
+          <label style="font-size:10px;color:#666;display:block;margin-bottom:3px">Artists (one per line or comma-separated)</label>
+          <textarea id="dp-artists" rows="4" style="width:100%;background:#1e1e30;border:1px solid #2a2a40;color:#e0e0f0;padding:8px;border-radius:6px;font-size:12px;resize:vertical;line-height:1.5"></textarea>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onclick="submitDetailForm()" style="background:#9040d0;border:none;color:#fff;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer" id="dp-save-btn">Save</button>
+          <button onclick="document.getElementById('detail-panel').classList.remove('open')" style="background:#222;border:none;color:#888;padding:7px 14px;border-radius:7px;font-size:12px;cursor:pointer">Cancel</button>
+          <button id="dp-delete-btn" onclick="deleteDetailEvent()" style="background:#3a1010;border:1px solid #6a2020;color:#f08080;padding:7px 14px;border-radius:7px;font-size:12px;cursor:pointer;margin-left:auto;display:none">Delete</button>
+          <span id="dp-msg" style="font-size:12px;color:#888"></span>
+        </div>
+      </div>
     </div>
 
     <div class="cal-grid-wrap">
@@ -293,6 +330,49 @@ const SHOW_COLORS_ADMIN = {
   music_core:'#E8823A', inkigayo:'#A855C8', music_bank:'#4CAF50',
   mcountdown:'#FF4757', show_champion:'#00C4B4', the_show:'#6B94D6',
 };
+// index.html SHOW_LABELS와 동일하게 요일 스케줄 정의 (skeleton 생성용)
+const SHOW_SCHEDULE = {
+  music_core:    { day: 6 }, // SAT
+  inkigayo:      { day: 0 }, // SUN
+  music_bank:    { day: 5 }, // FRI
+  mcountdown:    { day: 4 }, // THU
+  show_champion: { day: 3 }, // WED
+};
+
+function scheduledShowForDateAdmin(dateStr) {
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const dow = new Date(y, mo - 1, d).getDay();
+  const entry = Object.entries(SHOW_SCHEDULE).find(([, s]) => s.day === dow);
+  if (!entry) return null;
+  return entry[0]; // showName
+}
+
+function ensureFixedShowSkeletonsAdmin() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const byDate = {};
+  allEvents.forEach(e => { byDate[e.broad_date] = true; });
+  // today ~ 2 weeks ahead
+  const end = new Date(today); end.setDate(end.getDate() + 14);
+  const cur = new Date(today);
+  while (cur <= end) {
+    const ds = cur.toISOString().slice(0, 10);
+    if (!byDate[ds]) {
+      const showName = scheduledShowForDateAdmin(ds);
+      if (showName) {
+        allEvents.push({
+          id: null,
+          show_name: showName,
+          broad_date: ds,
+          episode_number: null,
+          groups: [],
+          raw_title: '',
+          source: 'date_rule',
+        });
+      }
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+}
 
 async function loadLineups(onDone) {
   const el = document.getElementById('lineup-list');
@@ -548,6 +628,8 @@ async function loadAllEvents() {
       if (!existing || rPri >= ePri) byDate[dk] = r;
     }
     allEvents = Object.values(byDate);
+    ensureFixedShowSkeletonsAdmin();
+    allEvents.sort((a, b) => a.broad_date < b.broad_date ? -1 : a.broad_date > b.broad_date ? 1 : 0);
   } catch(e) {
     document.getElementById('topbar-stats').textContent = `Fetch error: ${e.message}`;
     allEvents = [];
@@ -631,20 +713,24 @@ function renderCal() {
     const MAX_PILLS = 3;
     dayEvts.slice(0, MAX_PILLS).forEach(e => {
       const pill = document.createElement('div');
-      const isCrawled = !isManualSource(e);
-      pill.className = `cal-pill ${isCrawled ? 'src-crawl' : 'src-manual'}`;
+      const isSkeleton = e.source === 'date_rule' && !e.id;
+      const isCrawled = !isSkeleton && !isManualSource(e);
+      if (isSkeleton) {
+        pill.className = 'cal-pill src-pending';
+      } else {
+        pill.className = `cal-pill ${isCrawled ? 'src-crawl' : 'src-manual'}`;
+      }
       const showColor = SHOW_COLORS_ADMIN[e.show_name];
-      if(showColor) pill.style.cssText += `;border-left:3px solid ${showColor}`;
-      // Shorten show label: 'MBC Music Core' → 'Music Core'
+      if (showColor) pill.style.borderLeft = `3px solid ${showColor}`;
       const fullLabel = displayNameForEvent(e);
-      const shortName = fullLabel.replace(/🎵 /,'').replace(/^[A-Za-z]+ M? /,'').replace(/^[A-Za-z]+ /,'');
+      const shortName = fullLabel.replace(/🎵 /, '').replace(/^Show!\s*/, '').replace(/^SBS\s*/, '');
       const artistCount = (e.groups||[]).length;
-      pill.textContent = artistCount ? `${shortName} (${artistCount})` : shortName;
+      pill.textContent = isSkeleton ? shortName : (artistCount ? `${shortName} (${artistCount})` : shortName);
       const titleArtists = e.raw_title
-        ? e.raw_title.replace(/^[^-]+-\s*/,'').slice(0,80)
-        : (e.groups||[]).join(', ').slice(0,80);
-      const srcLabel = isCrawled ? 'Crawled' : 'Direct input';
-      pill.title = `[${srcLabel}] ${fullLabel}\n${titleArtists}`;
+        ? e.raw_title.replace(/^[^-]+-\s*/, '').slice(0, 80)
+        : (e.groups||[]).join(', ').slice(0, 80);
+      const srcLabel = isSkeleton ? 'TBA' : isCrawled ? 'Crawled' : 'Direct input';
+      pill.title = `[${srcLabel}] ${fullLabel}\n${titleArtists || '라인업 미정'}`;
       pill.onclick = () => openDetail(e);
       cell.appendChild(pill);
     });
@@ -675,13 +761,14 @@ function openDetail(e) {
   detailEvent = e;
   const panel = document.getElementById('detail-panel');
   panel.classList.add('open');
-  document.getElementById('dp-edit').style.display='none';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
   const showLabel = SHOW_LABELS_ADMIN[e.show_name] || e.show_name;
   const showColor = SHOW_COLORS_ADMIN[e.show_name] || '#9B6FD8';
-  const isCrawled = !isManualSource(e);
-  const srcText   = isCrawled ? 'Crawled' : 'Direct input';
-  const srcClass  = isCrawled ? 'badge-crawl' : 'badge-manual';
+  const isSkeleton = e.source === 'date_rule' && !e.id;
+  const isCrawled = !isSkeleton && !isManualSource(e);
+  const srcText = isSkeleton ? 'TBA (예정)' : isCrawled ? 'Crawled' : 'Direct input';
+  const srcClass = isSkeleton ? 'badge-pending' : isCrawled ? 'badge-crawl' : 'badge-manual';
 
   // Artists: parse raw_title first, fallback to groups[]
   const rawParts = e.raw_title
@@ -695,34 +782,113 @@ function openDetail(e) {
     return `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${c}22;color:${c};border:1px solid ${c}55;margin:2px">${g.toUpperCase()}</span>`;
   }).join('');
 
-  document.getElementById('dp-name').innerHTML =
-    `<span style="color:${showColor}">${showLabel}</span>`;
+  document.getElementById('dp-name').innerHTML = `<span style="color:${showColor}">${showLabel}</span>`;
   document.getElementById('dp-meta').innerHTML = `
     <span class="badge ${srcClass}">${srcText}</span>
     &nbsp;📅 ${e.broad_date}${e.episode_number ? ` &nbsp;·&nbsp; EP ${e.episode_number}` : ''}<br><br>
-    ${groupBadges || '<span style="color:#555;font-size:12px">No group mapping</span>'}
+    ${groupBadges || '<span style="color:#555;font-size:12px">아직 라인업 없음</span>'}
     ${artistList.length ? `<div style="margin-top:8px;font-size:11px;color:#777;line-height:1.8">${artistList.join(' · ')}</div>` : ''}
   `;
 
-  const actions = document.getElementById('dp-actions');
-  actions.innerHTML='';
-  const btnGoLineups = document.createElement('button');
-  btnGoLineups.className='btn-edit btn-sm';
-  btnGoLineups.textContent = 'Edit lineup';
-  btnGoLineups.onclick = () => {
-    panel.classList.remove('open');
-    TABS.forEach(t => {
-      document.getElementById(`tab-${t}`).style.display = t==='lineups' ? 'block' : 'none';
-      document.querySelectorAll('.tab')[TABS.indexOf(t)].classList.toggle('on', t==='lineups');
-    });
-    loadLineups(() => {
-      editLineup(e.id, e.show_name, e.broad_date, e.episode_number, e.raw_title || '');
-    });
+  // 인라인 편집 폼 채우기
+  document.getElementById('dp-form-title').textContent = isSkeleton ? '라인업 등록' : '라인업 수정';
+  document.getElementById('dp-show').value = e.show_name || 'inkigayo';
+  document.getElementById('dp-date').value = e.broad_date || '';
+  document.getElementById('dp-episode').value = e.episode_number || '';
+
+  // artists 텍스트: raw_title에서 추출
+  const existingArtists = rawParts.length ? rawParts : [];
+  document.getElementById('dp-artists').value = existingArtists.join('\n');
+
+  document.getElementById('dp-msg').textContent = '';
+  document.getElementById('dp-save-btn').textContent = isSkeleton ? 'Save' : 'Save changes';
+  // Delete 버튼: 기존 DB row일 때만 표시
+  document.getElementById('dp-delete-btn').style.display = (e.id && !isSkeleton) ? 'inline-block' : 'none';
+}
+
+async function deleteDetailEvent() {
+  if (!detailEvent || !detailEvent.id) return;
+  if (!confirm('이 라인업을 삭제하시겠습니까?')) return;
+  const btn = document.getElementById('dp-delete-btn');
+  btn.textContent = '...'; btn.disabled = true;
+  try {
+    const res = await fetch(`/api/lineup-upsert?id=${detailEvent.id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    document.getElementById('detail-panel').classList.remove('open');
+    await loadAllEvents();
+    renderCal();
+    updateTopbar();
+  } catch(e) {
+    alert('Delete failed: ' + e.message);
+    btn.textContent = 'Delete'; btn.disabled = false;
+  }
+}
+
+async function submitDetailForm() {
+  const show    = document.getElementById('dp-show').value;
+  const date    = document.getElementById('dp-date').value;
+  const episode = document.getElementById('dp-episode').value.trim();
+  const raw     = document.getElementById('dp-artists').value;
+  const msg     = document.getElementById('dp-msg');
+  if (!show || !date) { msg.style.color='#f08080'; msg.textContent='Show and date required.'; return; }
+
+  function protectDotted(v) {
+    return String(v||'').replace(/\bI\s*\.\s*O\s*\.\s*I\b/gi,'I{{DOT}}O{{DOT}}I').replace(/\bIOI\b/gi,'I{{DOT}}O{{DOT}}I');
+  }
+  function normalizeName(v) {
+    const r = String(v||'').replace(/\{\{DOT\}\}/g,'.').trim();
+    return /^(?:I\.O\.I|IOI)$/i.test(r) ? 'I.O.I' : r;
+  }
+  const artists = protectDotted(raw).split(/[\n,]+/).map(normalizeName).filter(s=>s.length>0);
+  if (!artists.length) { msg.style.color='#f08080'; msg.textContent='아티스트를 입력해주세요.'; return; }
+
+  const ARTIST_MAP = {
+    'BTS':'bts','방탄소년단':'bts','SEVENTEEN':'seventeen','세븐틴':'seventeen',
+    'ENHYPEN':'enhypen','엔하이픈':'enhypen','aespa':'aespa','IVE':'ive',
+    'LE SSERAFIM':'lesserafim','NewJeans':'newjeans','TWICE':'twice','트와이스':'twice',
+    'BLACKPINK':'blackpink','EXO':'exo','NCT 127':'nct127','NCT DREAM':'nctdream',
+    'NCT WISH':'nctwish','ATEEZ':'ateez','에이티즈':'ateez',
+    'Stray Kids':'straykids','STRAY KIDS':'straykids',
+    'TXT':'txt','투모로우바이투게더':'txt','ITZY':'itzy','NMIXX':'nmixx',
+    'PLAVE':'plave','플레이브':'plave','ZEROBASEONE':'zerobaseone','ZB1':'zerobaseone',
+    'BOYNEXTDOOR':'boynextdoor','TWS':'tws','KISS OF LIFE':'kissoflife',
+    'QWER':'qwer','ILLIT':'illit','아일릿':'illit','BABYMONSTER':'babymonster',
+    '&TEAM':'andteam','INI':'ini','EVNNE':'evnne','CRAVITY':'cravity',
+    'THE BOYZ':'theboyz','ONEUS':'oneus','GOT7':'got7','DAY6':'day6',
+    'tripleS':'triples','NEXZ':'nexz','KATSEYE':'katseye',
+    'Xdinary Heroes':'xdinaryheroes','ALPHA DRIVE ONE':'alphadriveone',
+    'Billlie':'billlie','빌리':'billlie','82MAJOR':'82major',
+    'YOUNITE':'younite','유나이트':'younite','NAZE':'naze','네이즈':'naze',
+    'UNCHILD':'unchild','CORTIS':'cortis','CrazAngel':'crazangel','크레이즈엔젤':'crazangel',
+    'KIIRAS':'kiiras','FLARE U':'flareu','플레어 유':'flareu',
+    'H//PE Princess':'hpeprincess','XngHan&Xoul':'xnghananxoul',
   };
-  const btnClose = document.createElement('button');
-  btnClose.className='btn-sm'; btnClose.style.cssText='background:#222;color:#888';
-  btnClose.textContent='Close'; btnClose.onclick = () => panel.classList.remove('open');
-  actions.append(btnGoLineups, btnClose);
+  const groups = [...new Set(artists.map(a=>ARTIST_MAP[a]).filter(Boolean))];
+
+  msg.style.color='#888'; msg.textContent='Saving...';
+  const editId = detailEvent ? detailEvent.id : null;
+  try {
+    const url = editId ? `/api/lineup-upsert?id=${editId}` : '/api/lineup-upsert';
+    const res = await fetch(url, {
+      method: editId ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        show_name: show,
+        broad_date: date,
+        episode_number: episode || null,
+        groups,
+        raw_title: `${show} - ${artists.join(', ')}`,
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    msg.style.color='#60d090'; msg.textContent='✓ Saved';
+    document.getElementById('detail-panel').classList.remove('open');
+    await loadAllEvents();
+    renderCal();
+    updateTopbar();
+  } catch(e) {
+    msg.style.color='#f08080'; msg.textContent='Error: ' + e.message;
+  }
 }
 
 // ── FEEDBACK ──

@@ -272,14 +272,13 @@ function matchesArtist(item, aliases) {
     const idx = text.indexOf(alias);
     if (idx < 0) return false;
     const before = idx === 0 ? '' : text[idx - 1];
-    const after = text[idx + alias.length] || '';
+    // 한국어 alias: 앞에만 한글이 붙지 않으면 통과 (뒤는 '공방', '포카' 등 키워드가 붙는 게 정상)
+    // 예) '라이즈' → '문라이즈'·'썬라이즈' 제외, '라이즈공방' 포함
     if (/[가-힣]/.test(alias)) {
-      // 한국어 alias: 앞뒤에 한글이 붙어있으면 부분매칭이므로 제외
-      // 예) '라이즈' → '문라이즈', '썬라이즈' 제외
-      return !/[가-힣]/.test(before) && !/[가-힣]/.test(after);
+      return !/[가-힣]/.test(before);
     }
     // 영문/숫자 alias: 앞뒤가 알파벳/숫자가 아닌지 확인 (단어 경계)
-    return !/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after);
+    return !/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(text[idx + alias.length] || '');
   });
 }
 
