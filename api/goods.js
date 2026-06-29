@@ -319,13 +319,29 @@ module.exports = async function handler(req, res) {
       uniqueQueryList.map(({ q, kw }) => {
         const url = `${BUNJANG_API}?q=${encodeURIComponent(q)}&order=date&n=${FETCH_N}&page=0`;
         return fetch(url, {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
+            'Referer': 'https://bunjang.co.kr/',
+            'Origin': 'https://bunjang.co.kr',
+          },
           signal: AbortSignal.timeout(10000),
         }).then(r => r.ok ? r.json() : { list: [] }).then(data => ({ data, kw }));
       })
     );
 
     // 중복 제거 (pid 기준): 쿼리 키워드가 상품명에 있거나, alias가 매칭되면 통과
+    const debugInfo = req.query._debug === '1' ? {
+      aliases,
+      queries: uniqueQueryList.map(q => q.q),
+      rawCounts: results.map((r, i) => ({
+        q: uniqueQueryList[i]?.q,
+        status: r.status,
+        count: r.status === 'fulfilled' ? (r.value?.data?.list?.length ?? -1) : -1,
+        firstItem: r.status === 'fulfilled' ? (r.value?.data?.list?.[0]?.name ?? null) : null,
+      })),
+    } : null;
     const seen = new Set();
     const items = [];
     for (const r of results) {
@@ -363,8 +379,8 @@ module.exports = async function handler(req, res) {
       displayName: item.name || '',
     }));
 
-    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=120');
-    return res.status(200).json({ artist, items: itemsOut });
+    res.setHeader('Cache-Control', debugInfo ? 'no-store' : 's-maxage=600, stale-while-revalidate=120');
+    return res.status(200).json({ artist, items: itemsOut, ...(debugInfo ? { _debug: debugInfo } : {}) });
   } catch (err) {
     return res.status(502).json({ error: err.message });
   }
