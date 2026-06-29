@@ -258,12 +258,9 @@ body{
   background:#FFFFFF;
 }
 
-/* chip bar — 그룹칩: 헤더 바로 밑 sticky */
+/* chip bar — hdr-wrap 안에 위치, sticky는 hdr-wrap이 담당 */
 #chipBar{
   background:#FFFFFF;
-  position:sticky;
-  top:0; /* JS가 hdr-wrap 높이로 덮어씀 */
-  z-index:45;
 }
 #chipBar:not(:empty){
   border-bottom:1px solid var(--border);
@@ -752,6 +749,8 @@ body{
     <span class="hdr-search-placeholder">Search by group name...</span>
   </button>
 </header>
+<!-- chipBar: 헤더 바로 밑 sticky (JS가 내용 채움) -->
+<div id="chipBar"></div>
 </div><!-- /hdr-wrap -->
 
 <div id="typeFilter" style="display:none"></div>
@@ -1295,10 +1294,9 @@ function scrollToTodayGoods(){
   function doScroll(){
     const dateHeader = document.getElementById('dateHeader');
     if(!dateHeader) return;
-    // sticky 헤더 + chipBar 높이만큼 offset
+    // sticky 헤더(hdr-wrap) 높이만큼 offset — chipBar도 hdr-wrap 안에 포함됨
     const hdrWrap = document.querySelector('.hdr-wrap');
-    const chipBarEl = document.getElementById('chipBar');
-    const offset = (hdrWrap ? hdrWrap.offsetHeight : 52) + (chipBarEl ? chipBarEl.offsetHeight : 0);
+    const offset = hdrWrap ? hdrWrap.offsetHeight : 52;
     const top = dateHeader.getBoundingClientRect().top + window.scrollY - offset;
     window.scrollTo({top, behavior:'smooth'});
   }
@@ -1661,8 +1659,7 @@ function scrollToBottom(){
   const target=document.getElementById('dateHeader')||document.getElementById('bottom');
   if(!target) return;
   const hdrWrapEl2 = document.querySelector('.hdr-wrap');
-  const chipBarEl2 = document.getElementById('chipBar');
-  const stickyH = (hdrWrapEl2 ? hdrWrapEl2.offsetHeight : 97) + (chipBarEl2 ? chipBarEl2.offsetHeight : 0) + 8;
+  const stickyH = (hdrWrapEl2 ? hdrWrapEl2.offsetHeight : 97) + 8;
   const top = target.getBoundingClientRect().top + window.scrollY - stickyH;
   window.scrollTo({top, behavior:'smooth'});
 }
@@ -1675,12 +1672,9 @@ function renderBottom(){
   bot.innerHTML='';
   const dateHeader = document.getElementById('dateHeader');
   dateHeader.innerHTML='';
-  // chipBar는 bot 안에 동적으로 생성 (일정 리스트 아래, 매물 위)
-  const chipBar = document.createElement('div');
-  chipBar.id = 'chipBar';
-  // sticky top = hdr-wrap 높이 (동적 계산)
-  const hdrWrapEl = document.querySelector('.hdr-wrap');
-  if (hdrWrapEl) chipBar.style.top = hdrWrapEl.offsetHeight + 'px';
+  // chipBar는 hdr-wrap 안 정적 요소 — 내용만 초기화 후 재사용
+  const chipBar = document.getElementById('chipBar');
+  chipBar.innerHTML = '';
 
   const [y,mo,d]=selectedDate.split('-').map(Number);
   const dateObj=new Date(y,mo-1,d);
@@ -1824,7 +1818,6 @@ function renderBottom(){
       });
       chipBar.appendChild(strip);
     }
-    bot.appendChild(chipBar);
 
     const div = document.createElement('div');
     div.className = 'divider';
