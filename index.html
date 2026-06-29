@@ -1994,36 +1994,29 @@ async function fetchGoodsClientSide(artistName, n) {
 
   const seen = new Set();
   const items = [];
-  await Promise.all(queries.map(q =>
-    fetch(`${BUNJANG_SEARCH_URL}?q=${encodeURIComponent(q)}&order=date&n=100&page=0`)
+  for (const q of queries) {
+    const data = await fetch(`${BUNJANG_SEARCH_URL}?q=${encodeURIComponent(q)}&order=date&n=100&page=0`)
       .then(r => r.ok ? r.json() : { list: [] })
-      .catch(() => ({ list: [] }))
-      .then(data => {
-        for (const p of (data.list || [])) {
-          if (seen.has(p.pid)) continue;
-          if (p.status !== '0' && p.status !== 0) continue;
-          const name = p.name || '';
-          if (!GONBANG_KW_RE.test(name)) continue;
-          if (!clientMatchesArtist(name, kr, en)) continue;
-          if (/구함|구해요|구합니다/.test(name)) continue;
-          seen.add(p.pid);
-          const price = parseInt(p.price, 10) || 0;
-          const priceGlobal = Math.round((price / 1300) * 100) / 100;
-          items.push({
-            id: p.pid,
-            name,
-            displayName: name,
-            price,
-            priceGlobal,
-            displayPrice: priceGlobal ? `$${priceGlobal.toFixed(2)}` : null,
-            currency: 'USD',
-            imageUrl: p.product_image ? p.product_image.replace('{res}', '360') : '',
-            updatedAt: p.update_time || 0,
-            status: p.status,
-          });
-        }
-      })
-  ));
+      .catch(() => ({ list: [] }));
+    for (const p of (data.list || [])) {
+      if (seen.has(p.pid)) continue;
+      if (p.status !== '0' && p.status !== 0) continue;
+      const name = p.name || '';
+      if (!GONBANG_KW_RE.test(name)) continue;
+      if (!clientMatchesArtist(name, kr, en)) continue;
+      if (/구함|구해요|구합니다/.test(name)) continue;
+      seen.add(p.pid);
+      const price = parseInt(p.price, 10) || 0;
+      const priceGlobal = Math.round((price / 1300) * 100) / 100;
+      items.push({
+        id: p.pid, name, displayName: name, price, priceGlobal,
+        displayPrice: priceGlobal ? `$${priceGlobal.toFixed(2)}` : null,
+        currency: 'USD',
+        imageUrl: p.product_image ? p.product_image.replace('{res}', '360') : '',
+        updatedAt: p.update_time || 0, status: p.status,
+      });
+    }
+  }
   items.sort((a, b) => b.updatedAt - a.updatedAt);
   return { artist: artistName, items: items.slice(0, n) };
 }
@@ -2414,29 +2407,30 @@ async function fetchAllGroupGoods(artists, showName, _areaOverride) {
   }
 
   try {
-    // 아티스트별 순차 처리 — 브라우저에서 Bunjang 직접 호출 시 동시 64개 요청 방지
-    // 결과가 들어올 때마다 즉시 렌더해서 빈 화면 시간 최소화
-    const allItems = [];
-    const seenPids = new Set();
-    for (const a of artists) {
-      if (requestId !== goodsRequestSeq) return;
-      const artistItems = await fetchGoodsCached(a, 60)
-        .then(r => r.ok ? r.json() : { items: [] })
-        .then(d => d.items || [])
-        .catch(() => []);
-      let added = 0;
-      for (const item of artistItems) {
-        if (!seenPids.has(item.id)) { seenPids.add(item.id); allItems.push(item); added++; }
-      }
-      // 새 아이템이 추가됐으면 즉시 렌더 (점진적 업데이트)
-      if (added > 0 && requestId === goodsRequestSeq) {
-        renderAllGoods(area, sortGoodsByWindow(allItems, selectedDate), showName, artists);
-      }
-    }
+    // artists 배열에서 한국어 alias 기준으로 dedupe
+    // (TREASURE, treasure, 트레저 → 트레저 1개로)
+    const seenKr = new Set();
+    const dedupedArtists = artists.filter(a => {
+      const kr = EN_TO_KR_CLIENT[a] || (hasKorean(a) ? a : null)
+        || (() => { for (const [k,v] of Object.entries(ARTIST_DISPLAY_NAME)) { if (hasKorean(k) && (v===a||v.toLowerCase()===a.toLowerCase())) return k; } return null; })();
+      const key = kr ? kr : a.toLowerCase();
+      if (seenKr.has(key)) return false;
+      seenKr.add(key);
+      return true;
+    });
+
+    const results = await Promise.all(
+      dedupedArtists.map(a =>
+        fetchGoodsCached(a, 60)
+          .then(r => r.ok ? r.json() : { items: [] })
+          .then(d => d.items || [])
+          .catch(() => [])
+      )
+    );
 
     if (requestId !== goodsRequestSeq) return;
 
-    const items = sortGoodsByWindow(allItems, selectedDate);
+    const items = mergeGoodsResults(results);
     if (items.length > 0) writeGoodsCache(comboKey, { items });
 
     // 즉시 렌더 후 백그라운드 enrich
