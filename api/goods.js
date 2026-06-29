@@ -379,8 +379,8 @@ module.exports = async function handler(req, res) {
       displayName: item.name || '',
     }));
 
-    res.setHeader('Cache-Control', debugInfo ? 'no-store' : 's-maxage=600, stale-while-revalidate=120');
-    return res.status(200).json({ artist, items: itemsOut, ...(debugInfo ? { _debug: debugInfo } : {}) });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({ artist, items: itemsOut, ...(debugInfo ? { _debug: debugInfo } : {}), _v: 'icn1-v1' });
   } catch (err) {
     return res.status(502).json({ error: err.message });
   }
