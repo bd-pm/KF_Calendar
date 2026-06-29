@@ -36,6 +36,7 @@
     { "source": "/goods/(.*)", "destination": "/goods/$1" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/market", "destination": "/market.html" },
+    { "source": "/(.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf))", "destination": "/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
