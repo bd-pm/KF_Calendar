@@ -583,6 +583,21 @@ async function syncNaver() {
 // supaFetch alias (admin에서 lineup 기능에 사용)
 const supaFetch = (path, opts={}) => api(path, opts);
 
+// ── AUTH ──
+(function requireAuth() {
+  const KEY = 'admin_authed';
+  const PW = 'mosa.jang';
+  if (sessionStorage.getItem(KEY) === '1') return;
+  document.body.style.visibility = 'hidden';
+  const pw = prompt('Password');
+  if (pw === PW) {
+    sessionStorage.setItem(KEY, '1');
+    document.body.style.visibility = '';
+  } else {
+    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#888">Access denied.</div>';
+  }
+})();
+
 // ── INIT ──
 (async function init() {
   const now = new Date();
