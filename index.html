@@ -717,15 +717,27 @@ body{
 
 /* ── HERO ── */
 .hero{
-  background:#FFFFFF;
-  padding:16px 20px;
+  background:#F4F4F4;
+  padding:12px 16px;
 }
 .hero-inner{
   display:flex;flex-direction:row;align-items:center;gap:16px;
+  background:#FFFFFF;
+  border-radius:16px;
+  border:1px solid #F0F0F0;
+  box-shadow:0 2px 12px rgba(0,0,0,0.07);
+  padding:16px;
+  cursor:pointer;
+  transition:transform 0.2s ease, box-shadow 0.2s ease;
+  -webkit-tap-highlight-color:transparent;
 }
+.hero-inner:hover{ box-shadow:0 4px 20px rgba(0,0,0,0.10); }
+.hero-inner:active{ transform:scale(0.98);box-shadow:0 1px 6px rgba(0,0,0,0.06); }
 .hero-text{ flex:1;min-width:0; }
-.hero-title{ font-size:18px;font-weight:800;color:#191919;line-height:1.25;letter-spacing:-0.2px;margin:0 0 6px; }
-.hero-desc{ font-size:12px;font-weight:400;color:#666666;line-height:1.55;letter-spacing:0;margin:0; }
+.hero-label{ display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:100px;background:#FDF3F3;color:#D80C18;font-size:11px;font-weight:700;letter-spacing:0;margin:0 0 8px; }
+.hero-label::before{ content:'🔥';font-size:10px; }
+.hero-title{ font-size:18px;font-weight:800;color:#191919;line-height:1.25;letter-spacing:0;margin:0 0 6px; }
+.hero-desc{ font-size:13px;font-weight:400;color:#666666;line-height:1.55;letter-spacing:0;margin:0; }
 .hero-img-wrap{ flex-shrink:0;width:120px; }
 .hero-img-wrap img{ width:100%;height:auto;display:block; }
 .hero-cta{
@@ -770,14 +782,14 @@ body{
 <div class="hero">
   <div class="hero-inner">
     <div class="hero-text">
-      <h1 class="hero-title">Rare Broadcast Pocas,<br>Straight from the Stage</h1>
-      <p class="hero-desc">Exclusive fan gifts from Inkigayo, M Countdown, Music Bank, Music Core, Show Champion</p>
+      <span class="hero-label">Trending Now</span>
+      <h1 class="hero-title">ATEEZ Rare Broadcast Pocas</h1>
+      <p class="hero-desc">Explore latest fan goods →</p>
     </div>
-    <div class="hero-img-wrap"><img src="/image.svg" alt="K-pop broadcast poca"></div>
+    <div class="hero-img-wrap"><img src="/ateez_cover.png" alt="K-pop broadcast poca"></div>
   </div>
 </div>
 
-<div style="height:10px;background:#F4F4F4;"></div>
 
 <!-- VIEW BAR (일반 흐름 — 스크롤과 함께 올라감) -->
 <div class="view-bar" id="viewBar">
