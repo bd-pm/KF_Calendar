@@ -4,24 +4,7 @@
     "api/goods.js": { "regions": ["icn1"] },
     "api/prefetch-goods.js": { "regions": ["icn1"] }
   },
-  "crons": [
-    {
-      "path": "/api/sync-naver",
-      "schedule": "0 6 * * 1-5"
-    },
-    {
-      "path": "/api/sync-events",
-      "schedule": "10 6 * * 1-5"
-    },
-    {
-      "path": "/api/prefetch-goods",
-      "schedule": "10 15 * * *"
-    },
-    {
-      "path": "/api/prefetch-goods",
-      "schedule": "10 9 * * *"
-    }
-  ],
+  "crons": [],
   "headers": [
     {
       "source": "/goods/(.*)",
